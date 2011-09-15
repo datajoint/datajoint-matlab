@@ -1,6 +1,11 @@
 % Relvar: a relational variable supporting relational operators
 % A relvar may be a base relation associated with a table or a derived
 % relation.
+% 
+% SYNTAX:
+%    obj = Relvar;                % abstract, must have derived property 'table' of type dj.Table
+%    obj = Relvar(anoterRelvar);  % copy constructor, strips derived properties
+%    obj = Relvar(tableObj);      % base relvar without a derived class, for internal use only
 
 
 

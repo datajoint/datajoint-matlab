@@ -24,7 +24,7 @@ classdef AutoPopulate < handle
             catch  %#ok
                 error 'an AutoPopulate object must be derived from dj.Relvar and define properties ''table'' and ''popRel'''
             end
-            assert(ismember(self.table.info.tier,{'imported','computed'}), ...
+            assert(ismember(self.table.info.tier, {'imported','computed'}), ...
                 'AutoPopulate tables can only be "imported" or "computed"')  %#ok
             assert(ismethod(self, 'makeTuples'), 'an AutoPopulate object must define method makeTuples(obj, key)')
         end

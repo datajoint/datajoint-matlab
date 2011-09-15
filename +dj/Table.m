@@ -18,9 +18,6 @@
 %
 
 classdef (Sealed) Table < handle
-    properties(Constant, GetAccess = private)
-        allowedTiers = {'lookup','manual','imported','computed'}   % lookup, manual, imported, or computed
-    end
     
     properties(SetAccess = private)
         schema           % handle to a schema object
@@ -43,7 +40,7 @@ classdef (Sealed) Table < handle
                     try
                         self.schema = eval([regexp(str,'^\w+','match','once'), '.getSchema']);
                         assert(isa(self.schema, 'dj.Schema'));
-                    catch  %#ok 
+                    catch  %#ok
                         error('invalid schema name in %s', str);
                     end
                     declaration = '';
@@ -52,7 +49,7 @@ classdef (Sealed) Table < handle
                 case nargin==1 && ischar(str) && any(exist(str,'file')==2)
                     % read the table declaration from the leading comment of the specified file
                     declaration = dj.utils.readPreamble(str);
-                                        
+                    
                 otherwise
                     error 'invalid constructor call'
             end
@@ -70,12 +67,12 @@ classdef (Sealed) Table < handle
             if ~any(ix)
                 fprintf('table %s not found in schema %s:%s\n', ...
                     className, self.schema.host, self.schema.dbname);
+
+                % create the table
                 if ~isempty(declaration)
-                % create the table in the database base on on definition
-                    if strcmp('yes',input('Would you like to create it ? yes/no >> ', 's'));
-                        dj.Table.create(declaration);
-                        ix = strcmp(className, self.schema.classNames);
-                    end
+                    dj.Table.create(declaration);
+                    self.schema.reload
+                    ix = strcmp(className, self.schema.classNames);
                 end
                 assert(any(ix), 'Table %s is not found', className);
             end
@@ -103,10 +100,10 @@ classdef (Sealed) Table < handle
             % depth1 and depth2 specify the connectivity radius upstream
             % (depth<0) and downstream (depth>0) of this table. Omitting
             % either of these arguments defaults to table.erd(-2,2).
-            % 
+            %
             % Example:
             %   t = dj.Table('vis2p.Scans');
-            %   t.erd       % plot two levels above and below 
+            %   t.erd       % plot two levels above and below
             %   t.erd( 2);  % plot dependents up to 2 levels below
             %   t.erd(-1);  % plot only immediate ancestors
             
@@ -137,12 +134,12 @@ classdef (Sealed) Table < handle
             end
             
             pool = unique([upstream downstream]);
-            self.schema.erd(pool)            
+            self.schema.erd(pool)
         end
-            
-            
-            
-            
+        
+        
+        
+        
         
         
         function varargout = re(self, expandForeignKeys)
@@ -247,71 +244,139 @@ classdef (Sealed) Table < handle
                 self.schema.query(sprintf('DROP TABLE `%s`.`%s`', self.schema.dbname, self.info.name))
                 fprintf('Dropped table `%s`.`%s`\n', self.schema.dbname, self.info.name)
                 self.schema.reload
-                self.delete
             end
         end
-    end
-    
-    
-    
-    methods(Static)
-        
-        function self = create(declaration)
-            % create a new table
-            [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
-            schemaObj = eval(sprintf('%s.getSchema', tableInfo.packageName));
-            
-            % compile the CREATE TABLE statement
-            sql = sprintf('CREATE TABLE `%s`.`%s (\n', schemaObj.dbname, tableInfo.name);
-            
-            primaryKey = {};
-            primaryFields = [];
-            for i=1:length(parents)
-                
-                primaryKeyFields = parents{i}.fields(parents{i}.fields.iskey);
-            end
-            
-            % execute declaration
-            schemaObj.query(sql);
-            
-            
-            
-            
-            function [sql, indices] = addForeignKeyDeclarations(sql, referencedTables, indices, prefix, propagate)
-                % add declarations of foreign keys referring to the referenced tables.
-                % Also add any necessary indices as required by InnoDB.
-                
-                for iRef = 1:numel(referencedTables)
-                    referencedFields = getPrimaryKey(referencedTables{iRef});
-                    pkeyStr = sprintf(',`%s`',referencedFields{:});
-                    pkeyStr = pkeyStr(2:end);
-                    
-                    % add index if necessary. From MySQL manual:
-                    % "In the referencing table, there must be an index where the foreign
-                    % key columns are listed as the first columns in the same order."
-                    needIndex = true;
-                    for iIndex = 1:numel(indices)
-                        if isequal(referencedFields,indices{iIndex}(1:min(end,numel(referencedFields))))
-                            needIndex = false;
-                            break;
-                        end
-                    end
-                    if needIndex
-                        sql = sprintf('%s\n    INDEX (%s),', sql, pkeyStr);
-                        indices{end+1} = {referencedFields};
-                    end
-                    
-                    sql = sprintf( '%s\n    CONSTRAINT %s_djfk_%d FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) %s,'...
-                        ,sql,prefix,iRef,pkeyStr,getSchema(referencedTables{iRef}),getTable(referencedTables{iRef}),pkeyStr,propagate);
-                end
-            end
-        end
-        
     end
     
     
     
     methods(Static, Access=private)
+        
+        function create(declaration)
+            % create a new table
+            disp 'CREATING TABLE IN THE DATABASE: ';
+                        
+            [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
+            schemaObj = eval(sprintf('%s.getSchema', tableInfo.packageName));
+            
+            % compile the CREATE TABLE statement
+            tableName = [...
+                dj.utils.tierPrefixes{strcmp(tableInfo.tier, dj.utils.allowedTiers)}, ...
+                dj.utils.camelCase(tableInfo.className, true)];
+            
+            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', schemaObj.dbname, tableName);
+            
+            % add inherited primary key fields
+            primaryKeyFields = {};
+            for iRef = 1:length(parents)
+                for iField=find([parents{iRef}.fields.iskey])
+                    field = parents{iRef}.fields(iField);
+                    if ~ismember(field.name, primaryKeyFields)
+                        primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
+                        assert(~field.isnullable);   %primary key fields cannot be nullable
+                        if strcmp(field.default, '<<<none>>>')
+                            field.default = 'NOT NULL';
+                        else
+                            field.default = sprintf('NOT NULL DEFAULT "%s"', field.default);
+                        end
+                        sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
+                            sql, field.name, field.type, field.default, field.comment);
+                    end
+                end
+            end
+            
+            % add the new primary key fields
+            for iField = find([fieldDefs.iskey])
+                field = fieldDefs(iField);
+                primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
+                assert(~strcmpi(field.default,'null'), ...
+                    'primary key fields cannot be nullable')
+                if isempty(field.default)
+                    field.default = 'NOT NULL';
+                else
+                    if ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                        field.default = ['"' default '"'];
+                    end
+                    field.default = sprint('NOT NULL DEFAULT %s', field.default);
+                end
+                sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
+                    sql, field.name, field.type, field.default, field.comment);
+            end
+            
+            % add references
+            for iRef = 1:length(references)
+                field = references{iRef}.fields(iField);
+                if ~ismember(field.name, primaryKeyFields)
+                    if field.isnullable
+                        field.default = 'DEFAULT NULL';  % all nullable fields default to null
+                    else
+                        if strcmp(field.default, '<<<none>>>')
+                            field.default = 'NOT NULL';
+                        else
+                            field.default = sprintf('NOT NULL DEFAULT "%s"', field.default);
+                        end
+                    end
+                    sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
+                        sql, field.name, field.type, field.default, field.comment);
+                end
+            end
+            
+            % add dependent fields
+            for iField = find(~fieldDefs.iskey)
+                field = fieldDefs(iField);
+                if strcmpi(field.default,'null')
+                    field.default = 'DEFAULT NULL';
+                else
+                    if isempty(field.default)
+                        field.default = 'NOT NULL';
+                    else
+                        if ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                            field.default = ['"' default '"'];
+                        end
+                        field.default = sprint('NOT NULL DEFAULT %s', field.default);
+                    end
+                end
+                sql = sprintf('%s`%s` %s %s COMMENT "%s",\n', ...
+                    sql, field.name, field.type, field.default, field.comment);
+            end
+            
+            % add primary key declaration
+            assert(~isempty(primaryKeyFields), ...
+                'table must have a primary key');
+            str = sprintf(',`%s`', primaryKeyFields{:});
+            sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
+            
+            % add foreign key declarations
+            indices = {primaryKeyFields};
+            for ref = [parents, references]
+                fieldList = sprintf('%s,', ref{1}.primaryKey{:});
+                fieldList(end)=[];
+                if ~any(cellfun(@(x) isequal(ref{1}.primaryKey, x(1:min(end,length(ref{1}.primaryKey)))), indices));
+                    % add index if necessary. From MySQL manual:
+                    % "In the referencing table, there must be an index where the foreign
+                    % key columns are listed as the first columns in the same order."
+                    % http://dev.mysql.com/doc/refman/5.6/en/innodb-foreign-key-constraints.html
+                    sql = sprintf('%sINDEX (%s),\n', sql, fieldList);
+                    indices{end+1} = ref{1}.primaryKey;  %#ok<AGROW>
+                end
+                sql = sprintf(...
+                    '%sCONSTRAINT FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
+                    sql, fieldList, ref{1}.schema.dbname, ref{1}.table.info.name, fieldList);
+            end
+            
+            % close the declaration
+            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
+            
+            disp <SQL>
+            disp(sql)
+            disp </SQL>
+
+            % execute declaration
+            schemaObj.query(sql);            
+        end
+        
+        
+        
         function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)
             parents = {};
             references = {};
@@ -326,10 +391,14 @@ classdef (Sealed) Table < handle
             declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
             
             % parse table schema, name, type, and comment
-            pat = '\s*(?<packageName>\w+)\.(?<className>\w+)\s*\(\s*(?<tier>\w+)\s*\)\s*#\s*(?<comment>\w.*\w)';
-            tableInfo = regexp(declaration{1}, pat, 'names');
+            pat = {
+                '^\s*(?<packageName>\w+)\.(?<className>\w+)\s*'  % package.TableName
+                '\(\s*(?<tier>\w+)\s*\)\s*'                      % (tier)
+                '#\s*(?<comment>\S.*\S)\s*$'                     % # comment
+                };
+            tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
             assert(numel(tableInfo)==1,'incorrect syntax is table declaration, line 1')
-            assert(ismember(tableInfo.tier, dj.Table.allowedTiers),...
+            assert(ismember(tableInfo.tier, dj.utils.allowedTiers),...
                 ['Invalid tier for table ' tableInfo.className])
             
             if nargout > 1
@@ -351,17 +420,22 @@ classdef (Sealed) Table < handle
                             end
                         otherwise
                             % parse field definition
-                            pat = '\s*(?<name>\w+)\s*=\s*(?<default>\S+(\s+\S+)*)\s*:\s*(?<type>\S.*\S)\s*#\s*(?<comment>\S+(\s+\S+)*)\s*';
-                            fieldInfo = regexp(line, pat, 'names');
-                            fieldInfo.isKey = inKey;
+                            pat = {
+                                '^\s*(?<name>\w+)\s*'                % attribute name
+                                '=\s*(?<default>\S+(\s+\S+)*)\s*'    % default value
+                                ':\s*(?<type>\S.*\S)\s*'             % datatype
+                                '#\s*(?<comment>\S.*\S*)\s*$'   % comment
+                                };
+                            fieldInfo = regexp(line, cat(2,pat{:}), 'names');
                             if isempty(fieldInfo)
-                                % no default provided
-                                pat = '\s*(?<name>\w+)\s*:\s*(?<type>\S.*\S)\s*#\s*(?<comment>\S+(\s+\S+)*)\s*';
-                                fieldInfo = regexp(line, pat, 'names');
+                                % try no default value
+                                fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
                                 fieldInfo.default = [];
                             end
-                            assert(numel(fieldInfo)==1,'Invalid field declaration "%s"',line);
-                            fieldDefs(end+1) = fieldInfo;  %#ok:<AGROW>
+                            assert(numel(fieldInfo)==1, ...
+                                'Invalid field declaration "%s"', line);
+                            fieldInfo.iskey = inKey;
+                            fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
                     end
                 end
             end

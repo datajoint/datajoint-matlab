@@ -1,6 +1,4 @@
-% DataJoint schema class, manages information about database tables.
-
-% :: Dimitri Yatsenko :: Created 2009-10-07 :: Modified 2011-08-31 ::
+% manages information about database tables and their dependencies
 
 classdef Schema < handle
     
@@ -55,38 +53,44 @@ classdef Schema < handle
         function reload(self)
             % load schema information into memory: table names and table
             % dependencies.
+            
+            % connect to the database
             tic
             fprintf 'loading mym... '
             [~] = self.query('status');
+            
+            % load table information
             fprintf('%.3g s\nloading table definitions from %s/%s... ', toc, self.host, self.dbname), tic
             self.tables = self.query(sprintf([...
                 'SELECT table_name AS name, table_comment AS comment ', ...
                 'FROM information_schema.tables WHERE table_schema="%s"'], ...
                 self.dbname));
             
-            % determine table type according to following rules
-            %   lookup:   tableName starts with a '#'
-            %   manual:   tableName starts with a letter
-            %   imported: tableName with a '_'
-            %   computed: tableName with '__'
-            tableTypes = {'lookup','manual','imported','computed','invalid'};
-            re = {'^#[a-z]\w*', '^[a-z]\w*', '^_[a-z]\w*', '^__[a-z]\w*', '.*'};
-            self.tables.tier = cellfun(@(x) ...
-                tableTypes{find(~cellfun(@isempty, regexp(x, re)),1,'first')}, ...
-                self.tables.name, 'UniformOutput', false);
-            validTables = ~strcmp(self.tables.tier,'invalid');
-            %fprintf('Warning: Schema contains invalid table "%s"\n', self.tables.name{~validTables})
+            % determine table tier (see dj.Table)            
+            re = [cellfun(@(x) ...
+                sprintf('^%s[a-z]\\w+$',x), dj.utils.tierPrefixes, ...
+                'UniformOutput', false) ...
+                {'.*'}];  % regular expressions to determine table tier
+            tierIdx = cellfun(@(x) ...
+                find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
+                self.tables.name);
+            self.tables.tier = dj.utils.allowedTiers(min(tierIdx,end))';
+            
+            % exclude tables that do not match the naming conventions
+            validTables = tierIdx < length(re);  % matched table name pattern
             self.tables.comment = cellfun(@(x) strtok(x,'$'), self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
             self.tables = dj.utils.structure2array(self.tables);
             self.tables = self.tables(validTables);
             self.classNames = cellfun(@(x) sprintf('%s.%s', self.package, dj.utils.camelCase(x)), {self.tables.name}, 'UniformOutput', false);
+                        
+            % read field information
             if ~isempty(self.tables)
                 fprintf('%.3g s\nloading field information... ', toc), tic
                 self.fields = query(self, sprintf([...
                     'SELECT table_name AS `table`, column_name as `name`,'...
                     '(column_key="PRI") AS `iskey`,column_type as `type`,'...
                     '(is_nullable="YES") AS isnullable, column_comment as `comment`,'...
-                    'ifnull(column_default,"<<<none>>>") AS `default` FROM information_schema.columns '...
+                    'ifnull(CAST(column_default AS CHAR),"<<<none>>>") AS `default` FROM information_schema.columns '...
                     'WHERE table_schema="%s"'],...
                     self.dbname));
                 self.fields.isnullable = logical(self.fields.isnullable);
@@ -96,9 +100,6 @@ classdef Schema < handle
                 self.fields.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), '^(tiny|medium|long)?blob', 'once')), self.fields.type);
                 % strip field lengths off integer types
                 self.fields.type = cellfun(@(x) regexprep(char(x'), '((tiny|long|small|)int)\(\d+\)','$1'), self.fields.type, 'UniformOutput', false);
-                for i=find(self.fields.isString | self.fields.isBlob)' % this compensates for a mym bug
-                    self.fields.default{i} = char(self.fields.default{i}(:))';
-                end
                 self.fields = dj.utils.structure2array(self.fields);
                 self.fields = self.fields(ismember({self.fields.table}, {self.tables.name}));
                 validFields = [self.fields.isNumeric] | [self.fields.isString] | [self.fields.isBlob];
@@ -127,7 +128,7 @@ classdef Schema < handle
                 nTables = length(self.tables);
                 self.dependencies = sparse(ixFrom, ixTo, 2-[foreignKeys.parental], nTables, nTables);
                 
-                % sort tables by hierarchical order
+                % determine tables' hierarchical order
                 K = self.dependencies;
                 ik = 1:length(self.tables);
                 levels = nan(size(ik));
