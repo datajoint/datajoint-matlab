@@ -67,7 +67,7 @@ classdef (Sealed) Table < handle
             if ~any(ix)
                 fprintf('table %s not found in schema %s:%s\n', ...
                     className, self.schema.host, self.schema.dbname);
-
+                
                 % create the table
                 if ~isempty(declaration)
                     dj.Table.create(declaration);
@@ -255,7 +255,7 @@ classdef (Sealed) Table < handle
         function create(declaration)
             % create a new table
             disp 'CREATING TABLE IN THE DATABASE: ';
-                        
+            
             [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
             schemaObj = eval(sprintf('%s.getSchema', tableInfo.packageName));
             
@@ -286,21 +286,23 @@ classdef (Sealed) Table < handle
             end
             
             % add the new primary key fields
-            for iField = find([fieldDefs.iskey])
-                field = fieldDefs(iField);
-                primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
-                assert(~strcmpi(field.default,'null'), ...
-                    'primary key fields cannot be nullable')
-                if isempty(field.default)
-                    field.default = 'NOT NULL';
-                else
-                    if ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                        field.default = ['"' default '"'];
+            if ~isempty(fieldDefs)
+                for iField = find([fieldDefs.iskey])
+                    field = fieldDefs(iField);
+                    primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
+                    assert(~strcmpi(field.default,'null'), ...
+                        'primary key fields cannot be nullable')
+                    if isempty(field.default)
+                        field.default = 'NOT NULL';
+                    else
+                        if ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                            field.default = ['"' default '"'];
+                        end
+                        field.default = sprint('NOT NULL DEFAULT %s', field.default);
                     end
-                    field.default = sprint('NOT NULL DEFAULT %s', field.default);
+                    sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
+                        sql, field.name, field.type, field.default, field.comment);
                 end
-                sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
-                    sql, field.name, field.type, field.default, field.comment);
             end
             
             % add references
@@ -322,22 +324,24 @@ classdef (Sealed) Table < handle
             end
             
             % add dependent fields
-            for iField = find(~fieldDefs.iskey)
-                field = fieldDefs(iField);
-                if strcmpi(field.default,'null')
-                    field.default = 'DEFAULT NULL';
-                else
-                    if isempty(field.default)
-                        field.default = 'NOT NULL';
+            if ~isempty(fieldDefs)
+                for iField = find(~fieldDefs.iskey)
+                    field = fieldDefs(iField);
+                    if strcmpi(field.default,'null')
+                        field.default = 'DEFAULT NULL';
                     else
-                        if ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                            field.default = ['"' default '"'];
+                        if isempty(field.default)
+                            field.default = 'NOT NULL';
+                        else
+                            if ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                                field.default = ['"' default '"'];
+                            end
+                            field.default = sprint('NOT NULL DEFAULT %s', field.default);
                         end
-                        field.default = sprint('NOT NULL DEFAULT %s', field.default);
                     end
+                    sql = sprintf('%s`%s` %s %s COMMENT "%s",\n', ...
+                        sql, field.name, field.type, field.default, field.comment);
                 end
-                sql = sprintf('%s`%s` %s %s COMMENT "%s",\n', ...
-                    sql, field.name, field.type, field.default, field.comment);
             end
             
             % add primary key declaration
@@ -367,12 +371,12 @@ classdef (Sealed) Table < handle
             % close the declaration
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
             
-            disp <SQL>
+            fprintf \n<SQL>
             disp(sql)
-            disp </SQL>
-
+            fprintf </SQL>\n\n
+            
             % execute declaration
-            schemaObj.query(sql);            
+            schemaObj.query(sql);
         end
         
         

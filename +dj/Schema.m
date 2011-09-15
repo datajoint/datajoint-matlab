@@ -55,18 +55,17 @@ classdef Schema < handle
             % dependencies.
             
             % connect to the database
-            tic
-            fprintf 'loading mym... '
             [~] = self.query('status');
             
             % load table information
-            fprintf('%.3g s\nloading table definitions from %s/%s... ', toc, self.host, self.dbname), tic
+            fprintf('loading table definitions from %s/%s... ', self.host, self.dbname)
+            tic
             self.tables = self.query(sprintf([...
                 'SELECT table_name AS name, table_comment AS comment ', ...
                 'FROM information_schema.tables WHERE table_schema="%s"'], ...
                 self.dbname));
             
-            % determine table tier (see dj.Table)            
+            % determine table tier (see dj.Table)
             re = [cellfun(@(x) ...
                 sprintf('^%s[a-z]\\w+$',x), dj.utils.tierPrefixes, ...
                 'UniformOutput', false) ...
@@ -82,7 +81,7 @@ classdef Schema < handle
             self.tables = dj.utils.structure2array(self.tables);
             self.tables = self.tables(validTables);
             self.classNames = cellfun(@(x) sprintf('%s.%s', self.package, dj.utils.camelCase(x)), {self.tables.name}, 'UniformOutput', false);
-                        
+            
             % read field information
             if ~isempty(self.tables)
                 fprintf('%.3g s\nloading field information... ', toc), tic
