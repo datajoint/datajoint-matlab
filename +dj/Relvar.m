@@ -7,6 +7,8 @@
 %    obj = Relvar(anoterRelvar);  % copy constructor, strips derived properties
 %    obj = Relvar(tableObj);      % base relvar without a derived class, for internal use only
 
+% Dimitri Yatsenko, 2009-09-10, 2011-09-16
+
 
 
 classdef Relvar < matlab.mixin.Copyable
@@ -127,10 +129,57 @@ classdef Relvar < matlab.mixin.Copyable
         end
         
         
+                function del(self, doPrompt)
+            % del(self)  - remove all tuples in relation self from its base relation.
+            %
+            % EXAMPLE:
+            %   del(Scans) -- delete all tuples from table Scans
+            %   del(Scans('mouse_id=12')) -- delete all Scans for mouse 12
+            %   del(Scans-Cells)  -- delete all tuples from table Scans
+            %           that do not have a matching tuples in table Cells
+            
+            doPrompt = nargin<2 || doPrompt;
+            self.schema.cancelTransaction  % roll back any uncommitted transaction
+            assert(~isempty(findprop(self,'table')) && isa(self.table, 'dj.Table'), ...
+                'Cannot delete from a derived relation');
+            
+            n = self.length;
+            doDelete = true;
+            if n == 0
+                disp('Nothing to delete')
+            else
+                if ismember(self.table.info.tier, {'manual','lookup'})
+                    warning('DataJoint:del',...
+                        'About to delete from a table containing manual data. Proceed at your own risk.')
+                else
+                    assert(~isempty(findprop(self,'popRel')), ...
+                        'Subtables cannot be deleted from directly')
+                    doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
+                        'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
+                        ,'s'));
+                end
+            end
+            
+            doDelete = ~doPrompt || doDelete && strcmpi('yes',input(sprintf(...
+                'Delete %d records from %s? yes/no >> ',...
+                n, class(self)), 's'));
+            
+            if doDelete
+                self.schema.query(sprintf('DELETE FROM %s%s', self.sql.src, self.sql.res))
+            else
+                disp 'Nothing deleted'
+            end
+        end
+
+        
+        
         
         
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        
         function self = times(self, arg)
+            % this alias is for backward compatibility
             self = self & arg;
         end
         
@@ -274,151 +323,9 @@ classdef Relvar < matlab.mixin.Copyable
                 end
             end
         end
+
         
-        
-        function ret = fetch(self, varargin)
-            % Relvar/fetch - retrieve data from a relation as a struct array
-            % SYNTAX:
-            %    s = fetch(self)       %% retrieve primary key attributes only
-            %    s = fetch(self,'*')   %% retrieve all attributes
-            %    s = fetch(self,'attr1','attr2',...) - retrieve primary key
-            %       attributes and additional listed attributes.
-            LIMIT = '';
-            if nargin>1 && isnumeric(varargin{end})
-                if nargin>2 && isnumeric(varargin{end-1})
-                    LIMIT = sprintf(' LIMIT %d, %d', varargin{end-1:end});
-                    varargin(end-1:end) = [];
-                else
-                    LIMIT = sprintf(' LIMIT %d', varargin{end});
-                    varargin(end) = [];
-                end
-            end
-            self = pro(self, varargin{:});
-            ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
-                self.sql.pro, self.sql.src, self.sql.res, LIMIT));
-            ret = dj.utils.structure2array(ret);
-        end
-        
-        
-        
-        function varargout = fetch1(self, varargin)
-            % Relvar/fetch1 - retrieve attributes from a single tuple in a
-            % relation into separate variables.
-            % Use fetch1 when you know that self contains at most one tuple.
-            % Strings are retrieves as character arrays.
-            %
-            % SYNTAX:
-            %    [f1,f2,..,fk] = fetch1( self, 'attr1','attr2',...,'attrk' )
-            
-            % validate input
-            if nargin>=2 && ...
-                    (isa(varargin{1}, 'dj.Relvar') || isa(varargin{1}, 'dj.Table'))
-                attrs = varargin(2:end);
-            else
-                attrs = varargin;
-            end
-            assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1),...
-                'The number of outputs must match the number of requested attributes');
-            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()');
-            
-            s = fetch(self, varargin{:});
-            assert(isscalar(s),'fetch1 can only retrieve a single existing tuple.');
-            
-            % copy into output arguments
-            for iArg=1:length(attrs)
-                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  % if aliased, use the alias
-                if length(name)==2
-                    name = name{2}{2};
-                else
-                    name = name{1}{2};
-                end
-                varargout{iArg}=s.(name);
-            end
-        end
-        
-        
-        function varargout = fetchn(self, varargin)
-            % DJ/fetch1 - retrieve attribute values from multiple tuples in relation self.
-            % Nonnumeric results are returned as cell arrays.
-            %
-            % Syntax:
-            %    [v1,v2,..,vk] = fetch1(self, 'attr1','attr2',...,'attrk')
-            %    [v1,v2,..,vk] = fetch1(self, Q, 'attr1', 'attr2',...,'attrk');
-            
-            
-            % validate input
-            if nargin>=2 && isa(varargin{1},'dj.Relvar')
-                attrs = varargin(2:end);
-            else
-                attrs = varargin;
-            end
-            assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1), ...
-                'The number of outputs must match the number of requested attributes');
-            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetchn()');
-            
-            % submit query
-            self = pro(self,varargin{:});
-            ret=query(self,...
-                sprintf('SELECT %s FROM %s%s',...
-                self.sql.pro, self.sql.src, self.sql.res));
-            
-            % copy into output arguments
-            for iArg=1:length(attrs)
-                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  % if renamed, use the renamed attribute
-                name = name{end}{2};
-                assert(isfield(ret,name),'Field %s not found', name );
-                varargout{iArg} = ret.(name);
-            end
-        end
-        
-        
-        
-        
-        function del(self, doPrompt)
-            % del(self)  - remove all tuples in relation self from its base relation.
-            %
-            % EXAMPLE:
-            %   del(Scans) -- delete all tuples from table Scans
-            %   del(Scans('mouse_id=12')) -- delete all Scans for mouse 12
-            %   del(Scans-Cells)  -- delete all tuples from table Scans
-            %           that do not have a matching tuples in table Cells
-            
-            doPrompt = nargin<2 || doPrompt;
-            self.schema.cancelTransaction  % roll back any uncommitted transaction
-            assert(~isempty(findprop(self,'table')) && isa(self.table, 'dj.Table'), ...
-                'Cannot delete from a derived relation');
-            
-            n = self.length;
-            doDelete = true;
-            if n == 0
-                disp('Nothing to delete')
-            else
-                if ismember(self.table.info.tier, {'manual','lookup'})
-                    warning('DataJoint:del',...
-                        'About to delete from a table containing manual data. Proceed at your own risk.')
-                else
-                    assert(~isempty(findprop(self,'popRel')), ...
-                        'Subtables cannot be deleted from directly')
-                    doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
-                        'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
-                        ,'s'));
-                end
-            end
-            
-            doDelete = ~doPrompt || doDelete && strcmpi('yes',input(sprintf(...
-                'Delete %d records from %s? yes/no >> ',...
-                n, class(self)), 's'));
-            
-            if doDelete
-                self.schema.query(sprintf('DELETE FROM %s%s', self.sql.src, self.sql.res))
-            else
-                disp 'Nothing deleted'
-            end
-        end
-        
-        
-        
-        function R1 = rdivide(R1, R2)
+                function R1 = rdivide(R1, R2)
             warning('datajoint:deprecation',...
                 'Use R1-R2 instead of R1./R2. dj.Relvar/rdivide will be deprecated in next release')
             R1 = R1 - R2;
@@ -565,7 +472,109 @@ classdef Relvar < matlab.mixin.Copyable
                 self.restrict(varargin{2:end});
             end
         end
+
         
+        
+        %--------------  FETCHING DATA  --------------------
+        
+        function ret = fetch(self, varargin)
+            % Relvar/fetch - retrieve data from a relation as a struct array
+            % SYNTAX:
+            %    s = fetch(self)       %% retrieve primary key attributes only
+            %    s = fetch(self,'*')   %% retrieve all attributes
+            %    s = fetch(self,'attr1','attr2',...) - retrieve primary key
+            %       attributes and additional listed attributes.
+            LIMIT = '';
+            if nargin>1 && isnumeric(varargin{end})
+                if nargin>2 && isnumeric(varargin{end-1})
+                    LIMIT = sprintf(' LIMIT %d, %d', varargin{end-1:end});
+                    varargin(end-1:end) = [];
+                else
+                    LIMIT = sprintf(' LIMIT %d', varargin{end});
+                    varargin(end) = [];
+                end
+            end
+            self = pro(self, varargin{:});
+            ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
+                self.sql.pro, self.sql.src, self.sql.res, LIMIT));
+            ret = dj.utils.structure2array(ret);
+        end
+        
+        
+        
+        function varargout = fetch1(self, varargin)
+            % Relvar/fetch1 - retrieve attributes from a single tuple in a
+            % relation into separate variables.
+            % Use fetch1 when you know that self contains at most one tuple.
+            % Strings are retrieves as character arrays.
+            %
+            % SYNTAX:
+            %    [f1,f2,..,fk] = fetch1( self, 'attr1','attr2',...,'attrk' )
+            
+            % validate input
+            if nargin>=2 && ...
+                    (isa(varargin{1}, 'dj.Relvar') || isa(varargin{1}, 'dj.Table'))
+                attrs = varargin(2:end);
+            else
+                attrs = varargin;
+            end
+            assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1),...
+                'The number of outputs must match the number of requested attributes');
+            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()');
+            
+            s = fetch(self, varargin{:});
+            assert(isscalar(s),'fetch1 can only retrieve a single existing tuple.');
+            
+            % copy into output arguments
+            for iArg=1:length(attrs)
+                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  % if aliased, use the alias
+                if length(name)==2
+                    name = name{2}{2};
+                else
+                    name = name{1}{2};
+                end
+                varargout{iArg}=s.(name);
+            end
+        end
+        
+        
+        function varargout = fetchn(self, varargin)
+            % DJ/fetch1 - retrieve attribute values from multiple tuples in relation self.
+            % Nonnumeric results are returned as cell arrays.
+            %
+            % Syntax:
+            %    [v1,v2,..,vk] = fetch1(self, 'attr1','attr2',...,'attrk')
+            %    [v1,v2,..,vk] = fetch1(self, Q, 'attr1', 'attr2',...,'attrk');
+            
+            
+            % validate input
+            if nargin>=2 && isa(varargin{1},'dj.Relvar')
+                attrs = varargin(2:end);
+            else
+                attrs = varargin;
+            end
+            assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1), ...
+                'The number of outputs must match the number of requested attributes');
+            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetchn()');
+            
+            % submit query
+            self = pro(self,varargin{:});
+            ret=query(self,...
+                sprintf('SELECT %s FROM %s%s',...
+                self.sql.pro, self.sql.src, self.sql.res));
+            
+            % copy into output arguments
+            for iArg=1:length(attrs)
+                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  % if renamed, use the renamed attribute
+                name = name{end}{2};
+                assert(isfield(ret,name),'Field %s not found', name );
+                varargout{iArg} = ret.(name);
+            end
+        end
+        
+               
+        
+             
         
         
         function insert(self, tuples)
@@ -732,7 +741,7 @@ classdef Relvar < matlab.mixin.Copyable
         
         function [include,aliases,computedAttrs] = parseAttrList(self, attrList)
             %{
-            This is a help function for dj.Revlar.pro.
+            This is a helper function for dj.Revlar.pro.
             Parse and validate the list of relation attributes in attrList.
             OUTPUT:
               include: a logical array marking which fields of self must be included

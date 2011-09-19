@@ -50,6 +50,17 @@ classdef Schema < handle
         end
         
         
+        function test(self)
+            % test the connection
+            fprintf('host: %s\n', self.host);
+            fprintf('user: %s\n', self.user);
+            self.query('status')
+            id = self.query('SELECT connection_id() as id');
+            fprintf('>>> Success. Connection id %d\n', id.id);
+        end
+        
+        
+        
         function reload(self)
             % load schema information into memory: table names and table
             % dependencies.
@@ -200,7 +211,6 @@ classdef Schema < handle
             %}
             if isempty(self.connection) || 0<mym(self.connection, 'status')
                 self.connection=mym('open', self.host, self.user, self.password);
-                fprintf('opened mym connection %d\n', self.connection')
             end
             if nargout>0
                 ret=mym(self.connection, queryStr, varargin{:});

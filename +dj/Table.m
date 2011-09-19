@@ -11,11 +11,12 @@
 % Syntax 2 is used in base relvar classes to instantiate the constant table
 % property as table = dj.Table(mfilename('fullpath')). The filepath must
 % specify a valid matlab file.
-
+%
 % In this case, the constructor reads the first multi-line comment block
 % that begins with %{ all by itself and ends with %} all by itself.
 % Incidentally, this block is ignored by matlab's help function.
-%
+
+% Dimitri Yatsenko, 2009, 2010, 2011.
 
 classdef (Sealed) Table < handle
     
@@ -425,10 +426,10 @@ classdef (Sealed) Table < handle
                         otherwise
                             % parse field definition
                             pat = {
-                                '^\s*(?<name>\w+)\s*'                % attribute name
-                                '=\s*(?<default>\S+(\s+\S+)*)\s*'    % default value
-                                ':\s*(?<type>\S.*\S)\s*'             % datatype
-                                '#\s*(?<comment>\S.*\S*)\s*$'   % comment
+                                '^\s*(?<name>\w+)\s*'             % attribute name
+                                '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
+                                ':\s*(?<type>\S.*\S)\s*'          % datatype
+                                '#\s*(?<comment>\S.*\S)\s*$'      % comment
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');
                             if isempty(fieldInfo)
