@@ -3,9 +3,9 @@
 % relation.
 % 
 % SYNTAX:
-%    obj = Relvar;                % abstract, must have derived property 'table' of type dj.Table
-%    obj = Relvar(anoterRelvar);  % copy constructor, strips derived properties
-%    obj = Relvar(tableObj);      % base relvar without a derived class, for internal use only
+%    obj = dj.Relvar;                % abstract, must have derived property 'table' of type dj.Table
+%    obj = dj.Relvar(anoterRelvar);  % copy constructor, strips derived properties
+%    obj = dj.Relvar(tableObj);      % base relvar without a derived class, for internal use only
 
 % Dimitri Yatsenko, 2009-09-10, 2011-09-16
 
@@ -24,7 +24,7 @@ classdef Relvar < matlab.mixin.Copyable
         sql        % sql statement: source, projection, and restriction clauses
         precedence = 0   % 0 (base), -1='*', -2='-', -3='&'
     end
-    
+     
     
     methods
         function self = Relvar(copyObj)
@@ -68,10 +68,11 @@ classdef Relvar < matlab.mixin.Copyable
                 
         
         
-        function display(self)
+        function display(self, justify)
             % DJ/disp - displays the contents of a relation.
             % Only non-blob fields of the first several tuples are shown. The total
             % number of tuples is printed at the end.
+            justify = nargin==1 || justify;
             tic
             display@handle(self)
             % print header
@@ -90,9 +91,13 @@ classdef Relvar < matlab.mixin.Copyable
                     for iField = ix
                         v = s.(self.fields(iField).name);
                         if isnumeric(v)
-                            fprintf('  %12g',v);
+                                fprintf('  %12g',v);                              
                         else
-                            fprintf('  %12.12s',v);
+                            if justify
+                                fprintf('  %12.12s',v);
+                            else
+                                fprintf('  ''%12s''', v);
+                            end
                         end
                     end
                     fprintf('\n');

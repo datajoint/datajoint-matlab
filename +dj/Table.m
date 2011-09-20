@@ -296,10 +296,12 @@ classdef (Sealed) Table < handle
                     if isempty(field.default)
                         field.default = 'NOT NULL';
                     else
-                        if ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                            field.default = ['"' default '"'];
+                         % put everything in quotes, even numbers, but not SQL values
+                         if ~strcmpi(field.default, 'CURRENT_TIMESTAMP') && ...
+                                   ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                            field.default = ['"' field.default '"'];
                         end
-                        field.default = sprint('NOT NULL DEFAULT %s', field.default);
+                        field.default = sprintf('NOT NULL DEFAULT %s', field.default);
                     end
                     sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
                         sql, field.name, field.type, field.default, field.comment);
@@ -326,7 +328,7 @@ classdef (Sealed) Table < handle
             
             % add dependent fields
             if ~isempty(fieldDefs)
-                for iField = find(~fieldDefs.iskey)
+                for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
                     if strcmpi(field.default,'null')
                         field.default = 'DEFAULT NULL';
@@ -334,10 +336,12 @@ classdef (Sealed) Table < handle
                         if isempty(field.default)
                             field.default = 'NOT NULL';
                         else
-                            if ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                                field.default = ['"' default '"'];
+                            % put everything in quotes, even numbers, but not SQL values
+                            if ~any(strcmpi(field.default, {'CURRENT_TIMESTAMP', 'null'})) && ...
+                                   ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                                field.default = ['"' field.default '"'];
                             end
-                            field.default = sprint('NOT NULL DEFAULT %s', field.default);
+                            field.default = sprintf('NOT NULL DEFAULT %s', field.default);
                         end
                     end
                     sql = sprintf('%s`%s` %s %s COMMENT "%s",\n', ...
