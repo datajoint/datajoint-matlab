@@ -123,14 +123,14 @@ classdef (Sealed) Table < handle
             upstream = i;
             nodes = i;
             for j=1:-levels(1)
-                [~,nodes] = find(self.schema.dependencies(nodes,:));
+                [trash,nodes] = find(self.schema.dependencies(nodes,:));
                 upstream = [upstream nodes(:)'];  %#ok:<AGROW>
             end
             
             downstream = [];
             nodes = i;
             for j=1:levels(2)
-                [nodes,~] = find(self.schema.dependencies(:, nodes));
+                [nodes,trash] = find(self.schema.dependencies(:, nodes));
                 downstream = [downstream nodes(:)'];  %#ok:<AGROW>
             end
             

@@ -10,8 +10,8 @@
 % Dimitri Yatsenko, 2009-09-10, 2011-09-16
 
 
-
-classdef Relvar < matlab.mixin.Copyable
+% classdef Revlar < matlab.mixin.Copyable   % R2011
+classdef Relvar < dynamicprops   % R2009a
     
     properties(SetAccess = private)
         schema     % handle to the schema object
@@ -143,11 +143,11 @@ classdef Relvar < matlab.mixin.Copyable
             %   del(Scans-Cells)  -- delete all tuples from table Scans
             %           that do not have a matching tuples in table Cells
             
-            doPrompt = nargin<2 || doPrompt;
-            self.schema.cancelTransaction  % roll back any uncommitted transaction
             assert(~isempty(findprop(self,'table')) && isa(self.table, 'dj.Table'), ...
                 'Cannot delete from a derived relation');
-            
+
+            doPrompt = nargin<2 || doPrompt;
+            self.schema.cancelTransaction  % roll back any uncommitted transaction
             n = self.length;
             doDelete = true;
             if n == 0
@@ -181,13 +181,25 @@ classdef Relvar < matlab.mixin.Copyable
         
         
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-        
+               
         function self = times(self, arg)
             % this alias is for backward compatibility
             self = self & arg;
         end
         
+        
+        function newSelf = copy(self)   % remove this function in R2011
+            if isa(self, 'matlab.mixin.Copyable')
+                newSelf = copy@matlab.mixinCopyable(self);
+            else
+                newSelf = dj.Relvar(self);
+                if ~isempty(self.findprop('table'));
+                    newSelf.addprop('table');
+                    newSelf.table = self.table;
+                end
+            end
+        end
+      
         
         
         function self = and(self, arg)
@@ -199,10 +211,12 @@ classdef Relvar < matlab.mixin.Copyable
             % expression.
             %
             % Examples:
-            %   Scans ^ struct('mouse_id',3, 'scannum', 4);
-            %   Scans ^ 'lens=10'
-            %   Mice ^ (Scans^'lens=10')
-            self = self.copy;
+            %   Scans & struct('mouse_id',3, 'scannum', 4);
+            %   Scans & 'lens=10'
+            %   Mice & (Scans & 'lens=10')
+            
+            	self = self.copy;  % uncomment in R2011
+            
             self.restrict(arg)
         end
         
@@ -356,7 +370,7 @@ classdef Relvar < matlab.mixin.Copyable
             R1.precedence = prec;
             
             % merge field lists
-            [~,ix] = setdiff({R2.fields.name},{R1.fields.name});
+            [trashs,ix] = setdiff({R2.fields.name},{R1.fields.name});
             R1.fields = [R1.fields;R2.fields(sort(ix))];
             R1.primaryKey = {R1.fields([R1.fields.iskey]).name}';
             

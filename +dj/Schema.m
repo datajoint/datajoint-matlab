@@ -66,7 +66,7 @@ classdef Schema < handle
             % dependencies.
             
             % connect to the database
-            [~] = self.query('status');
+            [trash] = self.query('status');
             
             % load table information
             fprintf('loading table definitions from %s/%s... ', self.host, self.dbname)
