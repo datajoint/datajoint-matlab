@@ -96,7 +96,7 @@ classdef(Sealed) utils
                 % to camelCase
                 assert(isempty(regexp(str, '[A-Z]', 'once')), ...
                     'underscore_compound_words must not contain uppercase characters');
-                str = regexprep(str, '(^|[_\W]+)([a-zA-Z]?)', '${upper($2)}');
+                str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
             end
         end
         

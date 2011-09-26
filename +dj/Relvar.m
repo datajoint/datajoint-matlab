@@ -1,7 +1,7 @@
 % Relvar: a relational variable supporting relational operators
 % A relvar may be a base relation associated with a table or a derived
 % relation.
-% 
+%
 % SYNTAX:
 %    obj = dj.Relvar;                % abstract, must have derived property 'table' of type dj.Table
 %    obj = dj.Relvar(anoterRelvar);  % copy constructor, strips derived properties
@@ -24,7 +24,7 @@ classdef Relvar < dynamicprops   % R2009a
         sql        % sql statement: source, projection, and restriction clauses
         precedence = 0   % 0 (base), -1='*', -2='-', -3='&'
     end
-     
+    
     
     methods
         function self = Relvar(copyObj)
@@ -65,7 +65,7 @@ classdef Relvar < dynamicprops   % R2009a
                     error 'invalid initatlization'
             end
         end
-                
+        
         
         
         function display(self, justify)
@@ -91,7 +91,7 @@ classdef Relvar < dynamicprops   % R2009a
                     for iField = ix
                         v = s.(self.fields(iField).name);
                         if isnumeric(v)
-                                fprintf('  %12g',v);                              
+                            fprintf('  %12g',v);
                         else
                             if justify
                                 fprintf('  %12.12s',v);
@@ -134,7 +134,7 @@ classdef Relvar < dynamicprops   % R2009a
         end
         
         
-                function del(self, doPrompt)
+        function del(self, doPrompt)
             % del(self)  - remove all tuples in relation self from its base relation.
             %
             % EXAMPLE:
@@ -145,7 +145,7 @@ classdef Relvar < dynamicprops   % R2009a
             
             assert(~isempty(findprop(self,'table')) && isa(self.table, 'dj.Table'), ...
                 'Cannot delete from a derived relation');
-
+            
             doPrompt = nargin<2 || doPrompt;
             self.schema.cancelTransaction  % roll back any uncommitted transaction
             n = self.length;
@@ -157,8 +157,6 @@ classdef Relvar < dynamicprops   % R2009a
                     warning('DataJoint:del',...
                         'About to delete from a table containing manual data. Proceed at your own risk.')
                 else
-                    assert(~isempty(findprop(self,'popRel')), ...
-                        'Subtables cannot be deleted from directly')
                     doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
                         'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
                         ,'s'));
@@ -175,13 +173,13 @@ classdef Relvar < dynamicprops   % R2009a
                 disp 'Nothing deleted'
             end
         end
-
+        
         
         
         
         
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
-               
+        
         function self = times(self, arg)
             % this alias is for backward compatibility
             self = self & arg;
@@ -199,7 +197,7 @@ classdef Relvar < dynamicprops   % R2009a
                 end
             end
         end
-      
+        
         
         
         function self = and(self, arg)
@@ -215,7 +213,7 @@ classdef Relvar < dynamicprops   % R2009a
             %   Scans & 'lens=10'
             %   Mice & (Scans & 'lens=10')
             
-            	self = self.copy;  % uncomment in R2011
+            self = self.copy;  % uncomment in R2011
             
             self.restrict(arg)
         end
@@ -342,9 +340,9 @@ classdef Relvar < dynamicprops   % R2009a
                 end
             end
         end
-
         
-                function R1 = rdivide(R1, R2)
+        
+        function R1 = rdivide(R1, R2)
             warning('datajoint:deprecation',...
                 'Use R1-R2 instead of R1./R2. dj.Relvar/rdivide will be deprecated in next release')
             R1 = R1 - R2;
@@ -491,7 +489,7 @@ classdef Relvar < dynamicprops   % R2009a
                 self.restrict(varargin{2:end});
             end
         end
-
+        
         
         
         %--------------  FETCHING DATA  --------------------
@@ -591,9 +589,9 @@ classdef Relvar < dynamicprops   % R2009a
             end
         end
         
-               
         
-             
+        
+        
         
         
         function insert(self, tuples)
