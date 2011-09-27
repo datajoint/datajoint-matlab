@@ -213,8 +213,7 @@ classdef Relvar < dynamicprops   % R2009a
             %   Scans & 'lens=10'
             %   Mice & (Scans & 'lens=10')
             
-            self = self.copy;  % uncomment in R2011
-            
+            self = self.copy;              
             self.restrict(arg)
         end
         

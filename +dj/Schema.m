@@ -5,7 +5,6 @@ classdef Schema < handle
     properties(SetAccess = private)
         package % the package (directory starting with a +) that stores schema classes, must be on path
         host
-        port
         user
         dbname  % database (schema) name
         tables  % full list of tables
@@ -27,11 +26,9 @@ classdef Schema < handle
             if nargin<6
                 self.host = host;
             else
-                self.port = port;
                 self.host = sprintf('%s:%d', host, port);
             end
             self.package = package;
-            self.host = host;
             self.user = user;
             self.password = password;
             self.dbname = dbname;
