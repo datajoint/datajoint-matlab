@@ -38,7 +38,7 @@ classdef (Sealed) Table < handle
             
             % find table in the schema
             ix = strcmp(className, self.schema.classNames);
-            if isempty(ix)
+            if ~any(ix)
                 % table does not exist. Create it.
                 path = which(className);
                 assert(~isempty(path), [className ' not found']');
