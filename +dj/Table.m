@@ -2,20 +2,18 @@
 % database.
 %
 % Initialization:
-%    table = dj.Table('package.Table');
-%    table = dj.Table('<declarationFilepath>.m');
+%    table = dj.Table('package.className')
 %
-% Syntax 1 can be used to retrieve the definition of an existing
-% table not yet associated with a base relvar class.
+% If the table does not exist, it is created based on the definition
+% specified in the first multi-line percent-brace comment block.
 %
-% Syntax 2 is used in base relvar classes to instantiate the constant table
-% property as table = dj.Table(mfilename('fullpath')). The filepath must
-% specify a valid matlab file.
+% Note, that the class package.className need not exist if the table exists
+% in the database. Only if the table does not exist will dj.Table access
+% the table definition file.
 %
-% In this case, the constructor reads the first multi-line comment block
-% that begins with %{ all by itself and ends with %} all by itself.
-% Incidentally, this block is ignored by matlab's help function.
-
+% The syntax of the table definition can be found at
+% http://code.google.com/p/datajoint/wiki/TableDeclarationSyntax
+%
 % Dimitri Yatsenko, 2009, 2010, 2011.
 
 classdef (Sealed) Table < handle
@@ -28,48 +26,23 @@ classdef (Sealed) Table < handle
     end
     
     methods
-        function self = Table(str)
-            %   obj = dj.Table('package.className') or obj = dj.Table(declarationFile);
-            %
-            % When the declaration filename is provided, the constructor
-            % creates the table in the database if does not already exist.
-            %
-            switch true
-                % SYNTAX 1
-                case nargin==1 && ischar(str) && ~isempty(regexp(str, '^\w+\.\w+$', 'once'))
-                    className = str;
-                    try
-                        self.schema = eval([regexp(str,'^\w+','match','once'), '.getSchema']);
-                        assert(isa(self.schema, 'dj.Schema'));
-                    catch  %#ok
-                        error('invalid schema name in %s', str);
-                    end
-                    declaration = '';
-                    
-                    % SYNTAX 2
-                case nargin==1 && ischar(str) && any(exist(str,'file')==2)
-                    % read the table declaration from the leading comment of the specified file
-                    declaration = dj.utils.readPreamble(str);
-                    
-                otherwise
-                    error 'invalid constructor call'
-            end
+        function self = Table(className)
+            % obj = dj.Table('package.className')
+            assert(nargin==1 && ischar(className) && ...
+                ~isempty(regexp(className,'\w+\.[A-Z]\w+','once')), ...
+                'dj.Table requres input ''package.ClassName''')
+            schemaFunction = regexprep('v2p.Mice', '\.\w+$', '.getSchema');
+            self.schema = eval(schemaFunction);
+            assert(isa(self.schema, 'dj.Schema'), ...
+                [schemaFunction ' must return an instance of dj.Schema']);
             
-            if ~isempty(declaration)
-                % parse declaration
-                tableInfo = dj.Table.parseDeclaration(declaration);
-                self.schema = eval(sprintf('%s.getSchema', tableInfo.packageName));
-                className = sprintf('%s.%s', tableInfo.packageName, tableInfo.className);
-            end
-            
-            % check if the table exists in the schema
+            % find table in the schema
             ix = strcmp(className, self.schema.classNames);
-            
-            if ~any(ix)
-                fprintf('table %s not found in schema %s:%s\n', ...
-                    className, self.schema.host, self.schema.dbname);
-                
-                % create the table
+            if isempty(ix)
+                % table does not exist. Create it.
+                path = which(className);
+                assert(~isempty(path), [className ' not found']');
+                declaration = dj.utils.readPreamble(path);
                 if ~isempty(declaration)
                     dj.Table.create(declaration);
                     self.schema.reload
@@ -78,7 +51,7 @@ classdef (Sealed) Table < handle
                 assert(any(ix), 'Table %s is not found', className);
             end
             
-            % table already exists, initialize
+            % table exists, initialize
             self.info = self.schema.tables(ix);
             self.fields = self.schema.fields(strcmp(self.info.name, {self.schema.fields.table}));
             self.primaryKey = {self.fields([self.fields.iskey]).name};
@@ -296,9 +269,9 @@ classdef (Sealed) Table < handle
                     if isempty(field.default)
                         field.default = 'NOT NULL';
                     else
-                         % put everything in quotes, even numbers, but not SQL values
-                         if ~strcmpi(field.default, 'CURRENT_TIMESTAMP') && ...
-                                   ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                        % put everything in quotes, even numbers, but not SQL values
+                        if ~strcmpi(field.default, 'CURRENT_TIMESTAMP') && ...
+                                ~any(strcmp(field.default([1 end]), {'''''','""'}))
                             field.default = ['"' field.default '"'];
                         end
                         field.default = sprintf('NOT NULL DEFAULT %s', field.default);
@@ -338,7 +311,7 @@ classdef (Sealed) Table < handle
                         else
                             % put everything in quotes, even numbers, but not SQL values
                             if ~any(strcmpi(field.default, {'CURRENT_TIMESTAMP', 'null'})) && ...
-                                   ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                                    ~any(strcmp(field.default([1 end]), {'''''','""'}))
                                 field.default = ['"' field.default '"'];
                             end
                             field.default = sprintf('NOT NULL DEFAULT %s', field.default);
