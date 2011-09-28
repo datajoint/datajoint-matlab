@@ -28,9 +28,10 @@ classdef (Sealed) Table < handle
     methods
         function self = Table(className)
             % obj = dj.Table('package.className')
-            assert(nargin==1 && ischar(className) && ...
-                ~isempty(regexp(className,'\w+\.[A-Z]\w+','once')), ...
+            assert(nargin==1 && ischar(className),  ...
                 'dj.Table requres input ''package.ClassName''')
+            assert(~isempty(regexp(className,'\w+\.[A-Z]\w+','once')), ...
+                'invalid table identification ''%s''. Should be package.ClassName', className)
             schemaFunction = regexprep(className, '\.\w+$', '.getSchema');
             self.schema = eval(schemaFunction);
             assert(isa(self.schema, 'dj.Schema'), ...
@@ -121,8 +122,13 @@ classdef (Sealed) Table < handle
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
             className = [self.schema.package '.' dj.utils.camelCase(self.info.name)];
-            str = sprintf('%s (%s) # %s\n', ...
-                className, self.info.tier, self.info.comment);
+            if expandForeignKeys
+                str = '';
+            else
+                str = sprintf('<BEGIN DECLARATION CODE>\n%%{\n');
+            end
+            str = sprintf('%s%s (%s) # %s\n', ...
+                str, className, self.info.tier, self.info.comment);
             tableIdx = find(strcmp(self.schema.classNames, className));
             assert(~isempty(tableIdx), ...
                 'class %s does not appear in the class list of the schema', className);
@@ -187,6 +193,11 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s\n', str);
             
+            if ~expandForeignKeys
+                str = sprintf('%s%%}\n', str);                
+                str = sprintf('%s<END DECLARATION CODE>\n',str);
+            end
+            
             if nargout==0
                 fprintf('\n%s\n', str)
             else
@@ -229,9 +240,9 @@ classdef (Sealed) Table < handle
         function create(declaration)
             % create a new table
             disp 'CREATING TABLE IN THE DATABASE: ';
-            
+                        
             [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
-            schemaObj = eval(sprintf('%s.getSchema', tableInfo.packageName));
+            schemaObj = eval(sprintf('%s.getSchema', tableInfo.package));
             
             % compile the CREATE TABLE statement
             tableName = [...
@@ -347,9 +358,9 @@ classdef (Sealed) Table < handle
             end
             
             % close the declaration
-            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
+            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s$"', sql(1:end-2), tableInfo.comment);
             
-            fprintf \n<SQL>
+            fprintf \n<SQL>\n
             disp(sql)
             fprintf </SQL>\n\n
             
@@ -372,11 +383,26 @@ classdef (Sealed) Table < handle
             % remove empty lines
             declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
             
+            % expand <<macros>>.  (TODO: make recursive if necessary)
+            for macro = fieldnames(dj.utils.macros)'
+                while true
+                    ix = find(strcmp(strtrim(declaration), ['<<' macro{1} '>>']),1,'first');
+                    if isempty(ix)
+                        break
+                    end
+                    declaration = [
+                        declaration(1:ix-1) 
+                        dj.utils.macros.(macro{1})
+                        declaration(ix+1:end)
+                        ];
+                end
+            end
+
             % parse table schema, name, type, and comment
             pat = {
-                '^\s*(?<packageName>\w+)\.(?<className>\w+)\s*'  % package.TableName
-                '\(\s*(?<tier>\w+)\s*\)\s*'                      % (tier)
-                '#\s*(?<comment>\S.*\S)\s*$'                     % # comment
+                '^\s*(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+                '\(\s*(?<tier>\w+)\s*\)\s*'                  % (tier)
+                '#\s*(?<comment>\S.*\S)\s*$'                 % # comment
                 };
             tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
             assert(numel(tableInfo)==1,'incorrect syntax is table declaration, line 1')
@@ -412,6 +438,7 @@ classdef (Sealed) Table < handle
                             if isempty(fieldInfo)
                                 % try no default value
                                 fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
+                                assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
                                 fieldInfo.default = [];
                             end
                             assert(numel(fieldInfo)==1, ...

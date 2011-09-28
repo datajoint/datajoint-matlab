@@ -22,7 +22,7 @@ classdef AutoPopulate < handle
                 assert(isa(self.table, 'dj.Table'))    %#ok
                 assert(isa(self.popRel, 'dj.Relvar'))  %#ok
             catch  %#ok
-                error 'an AutoPopulate object must be derived from dj.Relvar and define properties ''table'' and ''popRel'''
+                error 'an AutoPopulate class must be derived from dj.Relvar and define properties ''table'' and ''popRel'''
             end
             assert(ismember(self.table.info.tier, {'imported','computed'}), ...
                 'AutoPopulate tables can only be "imported" or "computed"')  %#ok

@@ -135,37 +135,45 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         function del(self, doPrompt)
-            % del(self)  - remove all tuples in relation self from its base relation.
+            % del(self) remove all tuples in relation self from its base relation.
             %
-            % EXAMPLE:
+            % EXAMPLES:
             %   del(Scans) -- delete all tuples from table Scans
             %   del(Scans('mouse_id=12')) -- delete all Scans for mouse 12
             %   del(Scans-Cells)  -- delete all tuples from table Scans
             %           that do not have a matching tuples in table Cells
+            %
+            % When the second arguments is set to false, no prompt is given
+            % and the data are deleted immediately. Only use this when
+            % noninteractivity is critical.
             
-            assert(~isempty(findprop(self,'table')) && isa(self.table, 'dj.Table'), ...
+            assert(~isempty(findprop(self,'table')) ...
+                && isa(self.table, 'dj.Table'), ...
                 'Cannot delete from a derived relation');
             
             doPrompt = nargin<2 || doPrompt;
-            self.schema.cancelTransaction  % roll back any uncommitted transaction
-            n = self.length;
+            self.schema.cancelTransaction  % exit ongoing transaction, if any
             doDelete = true;
-            if n == 0
-                disp('Nothing to delete')
-            else
-                if ismember(self.table.info.tier, {'manual','lookup'})
-                    warning('DataJoint:del',...
-                        'About to delete from a table containing manual data. Proceed at your own risk.')
-                else
-                    doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
-                        'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
-                        ,'s'));
-                end
-            end
             
-            doDelete = ~doPrompt || doDelete && strcmpi('yes',input(sprintf(...
-                'Delete %d records from %s? yes/no >> ',...
-                n, class(self)), 's'));
+            if doPrompt
+                n = self.length;
+                if n == 0
+                    disp('Nothing to delete')
+                    doDelete = false;
+                else
+                    if ismember(self.table.info.tier, {'manual','lookup'})
+                        warning('DataJoint:del',...
+                            'About to delete from a table containing manual data. Proceed at your own risk.')
+                    else
+                        doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
+                            'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
+                            ,'s'));
+                    end
+                end
+                doDelete = doDelete && strcmpi('yes',input(sprintf(...
+                    'Delete %d records from %s? yes/no >> ',...
+                    n, class(self)), 's'));
+            end
             
             if doDelete
                 self.schema.query(sprintf('DELETE FROM %s%s', self.sql.src, self.sql.res))
@@ -213,7 +221,7 @@ classdef Relvar < dynamicprops   % R2009a
             %   Scans & 'lens=10'
             %   Mice & (Scans & 'lens=10')
             
-            self = self.copy;              
+            self = self.copy;
             self.restrict(arg)
         end
         
@@ -554,6 +562,7 @@ classdef Relvar < dynamicprops   % R2009a
         end
         
         
+        
         function varargout = fetchn(self, varargin)
             % DJ/fetch1 - retrieve attribute values from multiple tuples in relation self.
             % Nonnumeric results are returned as cell arrays.
@@ -590,19 +599,17 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         
-        
-        
-        
-        function insert(self, tuples)
-            % insert tuples directly into the table with no checks.
+        function insert(self, tuples, command)
+            % insert an array of tuples directly into the table
             %
             % The input argument tuples must a structure array with field
             % names exactly matching those in the table.
             %
-            % Duplicates, unmathed fields, or missing required fields will
-            % cause an error.
+            % The optional argument 'command' allows replacing the MySQL
+            % command from the default INSERT to INSERT IGNORE or REPLACE.
             %
-            % See also dj.Relvar/inserti.
+            % Duplicates, unmatched fields, or missing required fields will
+            % cause an error, unless command is specified.
             
             assert(~isempty(findprop(self,'table')), ...
                 'Cannot insert into a derived relation')
@@ -611,6 +618,10 @@ classdef Relvar < dynamicprops   % R2009a
             if isempty(tuples)
                 return
             end
+            if nargin<=2
+                command = 'INSERT';
+            end
+            assert(ismember(upper(command),{'INSERT', 'INSERT IGNORE', 'REPLACE'}))
             
             % validate fields
             fnames = fieldnames(tuples);
@@ -655,11 +666,21 @@ classdef Relvar < dynamicprops   % R2009a
                 end
                 
                 % issue query
-                self.schema.query(sprintf('INSERT `%s`.`%s` SET %s', ...
-                    self.schema.dbname, self.table.info.name, queryStr(1:end-1)), blobs{:})
+                self.schema.query(sprintf('%s `%s`.`%s` SET %s', ...
+                    command, self.schema.dbname, self.table.info.name, queryStr(1:end-1)), blobs{:})
             end
         end
+        
+        
+        
+        function inserti(self, tuples)
+            % insert tuples but ignore errors. This is useful for rare
+            % applications when duplicate entries should be quitely
+            % discarded, for example.
+            insert(self, tuples, 'INSERT IGNORE')
+        end
     end
+    
     
     
     methods(Access=private)

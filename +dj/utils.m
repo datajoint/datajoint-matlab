@@ -8,7 +8,13 @@ classdef(Sealed) utils
         %   computed: tableName with '__'
         
         allowedTiers = {'lookup','manual','imported','computed'}
-        tierPrefixes = {'#', '', '_', '__'}
+        tierPrefixes = {'#', '', '_', '__'}    
+        macros = struct(...
+            'JobFields', {{
+ 'job_status: enum("reserved","completed","error","ignore") # if tuple is missing, the job is available'
+ 'error_message=null: varchar(1023) # error message returned if failed'
+ 'error_stack=null: blob  # error stack if failed'
+ }})        
     end
     
     methods(Static)
@@ -55,6 +61,7 @@ classdef(Sealed) utils
             ret = arrayfun(@(i) str(pos(i-1):pos(i)), ...
                 2:length(pos),'UniformOutput', false);
             ret = ret(~cellfun(@isempty, ret));
+            ret = ret(:);  % convert to column
         end
         
         
