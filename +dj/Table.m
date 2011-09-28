@@ -429,7 +429,7 @@ classdef (Sealed) Table < handle
                         otherwise
                             % parse field definition
                             pat = {
-                                '^\s*(?<name>\w+)\s*'             % attribute name
+                                '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
                                 ':\s*(?<type>\S.*\S)\s*'          % datatype
                                 '#\s*(?<comment>\S.*\S)\s*$'      % comment
