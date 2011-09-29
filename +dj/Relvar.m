@@ -584,8 +584,7 @@ classdef Relvar < dynamicprops   % R2009a
             
             % submit query
             self = pro(self,varargin{:});
-            ret=query(self,...
-                sprintf('SELECT %s FROM %s%s',...
+            ret = self.schema.query(sprintf('SELECT %s FROM %s%s',...
                 self.sql.pro, self.sql.src, self.sql.res));
             
             % copy into output arguments
