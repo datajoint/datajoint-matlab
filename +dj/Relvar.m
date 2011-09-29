@@ -7,8 +7,6 @@
 %    obj = dj.Relvar(anoterRelvar);  % copy constructor, strips derived properties
 %    obj = dj.Relvar(tableObj);      % base relvar without a derived class, for internal use only
 
-% Dimitri Yatsenko, 2009-09-10, 2011-09-16
-
 
 % classdef Revlar < matlab.mixin.Copyable   % R2011
 classdef Relvar < dynamicprops   % R2009a
@@ -119,9 +117,12 @@ classdef Relvar < dynamicprops   % R2009a
         function n = length(self)
             % return the cardinality of relation self
             if strcmp(self.sql.pro, '*')
-                n = self.schema.query(sprintf('SELECT count(*) as n FROM %s%s', self.sql.src, self.sql.res));
+                n = self.schema.query(...
+                    sprintf('SELECT count(*) as n FROM %s%s',...
+                    self.sql.src, self.sql.res));
             else
-                n = self.schema.query(sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ...
+                n = self.schema.query(...
+                    sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ...
                     self.sql.pro, self.sql.src, self.sql.res));
             end
             n=n.n;
@@ -233,39 +234,35 @@ classdef Relvar < dynamicprops   % R2009a
             %
             % INPUTS:
             %    'attr1',...,'attrn' is a comma-separated string of relation attributes
-            % onto which to project the relation self.
+            % onto which to project the relation selfi. 
             %
             % Primary key attributes are included implicitly and cannot be excluded.
             %
             % To rename an attribute, list it in the form 'old_name->new_name'.
             %
-            % Computed attributes are always aliased:
+            % To compute a new attribute, list it as 'expression->new_name', e.g.
             % 'datediff(exp_date,now())->days_ago'
-            %
-            % When attr1 is '*', all attributes are included. Attributes can then be
-            % excluded by prefixing them with a tilde '~'.
-            %
-            % The order of attributes in the attribute list does not affect the
-            % ordering of attributes in the resulting relation.
+            % 
+            % The expressions may use SQL operators and functions. 
             %
             % Example 1. Construct relation r2 containing only the primary keys of r1:
-            %    >> r2 = pro(r1);
+            %    >> r2 = r1.pro();
             %
             % Example 2. Construct relation r3 which contains values for 'operator'
             %    and 'anesthesia' for every tuple in r1:
-            %    >> r3=pro(r1,'operator','anesthesia');
+            %    >> r3=r1.pro('operator','anesthesia');
             %
             % Example 3. Rename attribute 'anesthesia' to 'anesth' in relation r1:
-            %    >> r1 = pro( r1, '*','anesthesia->anesth');
+            %    >> r1 = r1.pro('*','anesthesia->anesth');
             %
-            % Example 4. Add field mouse_age in days to relation r1 that has the field mouse_dob:
-            %    >> r1 = pro( r1, '*', 'datediff(now(),mouse_dob)->mouse_age' );
+            % Example 4. Add field mouse_age to relation r1 that has the field mouse_dob:
+            %    >> r1 = r1.pro('*','datediff(now(),mouse_dob)->mouse_age');
             %
             % Example 5. Add field 'n' which contains the count of matching tuples in r2
             % for every tuple in r1. Also add field 'avga' which contains the average
             % value of field 'a' in r2.
-            %    >> r1 = pro( r1, r2, '*','count(*)->n','avg(a)->avga');
-            % You may use the following aggregation functions: max,min,sum,avg,variance,std,count
+            %    >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
+            % You may use the following summary functions: max,min,sum,avg,variance,std,count
             
             self = dj.Relvar(self);  % copy into a derived relation
             
@@ -533,7 +530,12 @@ classdef Relvar < dynamicprops   % R2009a
             % Strings are retrieves as character arrays.
             %
             % SYNTAX:
-            %    [f1,f2,..,fk] = fetch1( self, 'attr1','attr2',...,'attrk' )
+            %    v1 = self.fetch1('attr1');
+            %    [v1,..,vk] = self.fetch1('attr1',..,'attrk')
+            %    [f1,..,fk] = self.fetch1(Q, 'attr1',..,'attrk')
+            % 
+            % When Q is another dj.Relvar, the last syntax is equivalent to 
+            %    [f1,..,fk] = fetch1(self.pro(Q,'attr1',..,'attrk'), 'attr1',..,'attrk')
             
             % validate input
             if nargin>=2 && ...
@@ -546,7 +548,7 @@ classdef Relvar < dynamicprops   % R2009a
                 'The number of outputs must match the number of requested attributes');
             assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()');
             
-            s = fetch(self, varargin{:});
+            s = self.fetch(varargin{:});
             assert(isscalar(s),'fetch1 can only retrieve a single existing tuple.');
             
             % copy into output arguments
@@ -564,13 +566,17 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         function varargout = fetchn(self, varargin)
-            % DJ/fetch1 - retrieve attribute values from multiple tuples in relation self.
+            % DJ/fetchn - retrieve attribute values from multiple tuples in relation self.
             % Nonnumeric results are returned as cell arrays.
             %
             % Syntax:
-            %    [v1,v2,..,vk] = fetch1(self, 'attr1','attr2',...,'attrk')
-            %    [v1,v2,..,vk] = fetch1(self, Q, 'attr1', 'attr2',...,'attrk');
-            
+            %    v1 = fetchn(self, 'attr1');
+            %    [v1,v2,..,vk] = fetchn(self, 'attr1','attr2',...,'attrk');
+            %    [v1,v2,..,vk] = fetchn(self, Q, 'attr1', 'attr2',...,'attrk');
+            %  
+            % When Q is another dj.Relvar, the last syntax is equivalent to 
+            %    [f1,..,fk] = fetchn(self.pro(Q,'attr1',..,'attrk'), 'attr1',..,'attrk')
+
             
             % validate input
             if nargin>=2 && isa(varargin{1},'dj.Relvar')
@@ -583,13 +589,14 @@ classdef Relvar < dynamicprops   % R2009a
             assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetchn()');
             
             % submit query
-            self = pro(self,varargin{:});
+            self = self.pro(varargin{:});
             ret = self.schema.query(sprintf('SELECT %s FROM %s%s',...
                 self.sql.pro, self.sql.src, self.sql.res));
             
             % copy into output arguments
             for iArg=1:length(attrs)
-                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  % if renamed, use the renamed attribute
+                % if renamed, use the renamed attribute
+                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  
                 name = name{end}{2};
                 assert(isfield(ret,name),'Field %s not found', name );
                 varargout{iArg} = ret.(name);
@@ -638,15 +645,17 @@ classdef Relvar < dynamicprops   % R2009a
                 for i = find(ix)
                     v = tuple.(self.fields(i).name);
                     if self.fields(i).isString
-                        assert( ischar(v), 'The field %s must be a character string', self.fields(i).name );
+                        assert(ischar(v), ...
+                            'The field %s must be a character string', ...
+                            self.fields(i).name)
                         if isempty(v)
-                            queryStr = sprintf( '%s`%s`="",', queryStr, self.fields(i).name);
+                            queryStr = sprintf('%s`%s`="",', queryStr, self.fields(i).name);
                         else
-                            queryStr = sprintf( '%s`%s`="{S}",', queryStr,self.fields(i).name );
+                            queryStr = sprintf('%s`%s`="{S}",', queryStr,self.fields(i).name);
                             blobs{end+1} = v;                                       %#ok<AGROW>
                         end
                     elseif self.fields(i).isBlob
-                        queryStr = sprintf( '%s`%s`="{M}",', queryStr,self.fields(i).name );
+                        queryStr = sprintf('%s`%s`="{M}",', queryStr,self.fields(i).name);
                         if islogical(v) % mym doesn't accept logicals
                             v = uint8(v);
                         end
@@ -655,10 +664,10 @@ classdef Relvar < dynamicprops   % R2009a
                         if islogical(v)  % mym doesn't accept logicals
                             v = uint8(v);
                         end
-                        assert( isscalar(v) && isnumeric(v),...
-                            'The field %s must be a numeric scalar value', self.fields(i).name );
+                        assert(isscalar(v) && isnumeric(v),...
+                            'The field %s must be a numeric scalar value', self.fields(i).name)
                         if ~isnan(v)  % nans are not passed: assumed missing.
-                            queryStr = sprintf( '%s`%s`=%1.16g,',...
+                            queryStr = sprintf('%s`%s`=%1.16g,',...
                                 queryStr, self.fields(i).name, v);
                         end
                     end
@@ -776,14 +785,13 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         function [include,aliases,computedAttrs] = parseAttrList(self, attrList)
-            %{
-            This is a helper function for dj.Revlar.pro.
-            Parse and validate the list of relation attributes in attrList.
-            OUTPUT:
-              include: a logical array marking which fields of self must be included
-              aliases: a string array containing aliases for each of self's fields or '' if not aliased
-              computedAttrs: pairs of SQL expressions and their aliases.
-            %}
+            % This is a helper function for dj.Revlar.pro.
+            % Parse and validate the list of relation attributes in attrList.
+            % OUTPUT:
+            %    include: a logical array marking which fields of self must be included
+            %    aliases: a string array containing aliases for each of self's fields or '' if not aliased
+            %  computedAttrs: pairs of SQL expressions and their aliases.
+            %
             
             include = [self.fields.iskey];  % implicitly include the primary key
             aliases = repmat({''},size(self.fields));  % one per each self.fields

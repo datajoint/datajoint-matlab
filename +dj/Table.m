@@ -2,12 +2,13 @@
 % database.
 %
 % Initialization:
-%    table = dj.Table('package.className')
+%    table = dj.Table('package.ClassName')
 %
 % If the table does not exist, it is created based on the definition
-% specified in the first multi-line percent-brace comment block.
+% specified in the first multi-line percent-brace comment block
+% of +package/ClassName.m 
 %
-% Note, that the class package.className need not exist if the table exists
+% Note that the class package.ClassName need not exist if the table exists
 % in the database. Only if the table does not exist will dj.Table access
 % the table definition file.
 %
@@ -73,8 +74,9 @@ classdef (Sealed) Table < handle
             % plot the entity relationship diagram of this and connected tables
             % table.erd([depth1[,depth2]])
             % depth1 and depth2 specify the connectivity radius upstream
-            % (depth<0) and downstream (depth>0) of this table. Omitting
-            % either of these arguments defaults to table.erd(-2,2).
+            % (depth<0) and downstream (depth>0) of this table. 
+            % Omitting both depths defaults to table.erd(-2,2).
+            % Omitting any one of the depths sets the other to zero.
             %
             % Example:
             %   t = dj.Table('vis2p.Scans');
