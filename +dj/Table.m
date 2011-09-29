@@ -384,7 +384,7 @@ classdef (Sealed) Table < handle
             
             % remove empty lines
             declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
-            
+                        
             % expand <<macros>>.  (TODO: make recursive if necessary)
             for macro = fieldnames(dj.utils.macros)'
                 while true
@@ -397,6 +397,18 @@ classdef (Sealed) Table < handle
                         dj.utils.macros.(macro{1})
                         declaration(ix+1:end)
                         ];
+                end
+            end
+            
+            % concatenate lines that end with a backslash to the next line
+            i = 1;
+            while i<length(declaration)
+                pos = regexp(declaration{i},  '\\\s*$', 'once');
+                if isempty(pos)
+                    i = i + 1;
+                else
+                    declaration{i} = [strtrim(declaration{i}(1:pos-1)) ' ' strtrim(declaration{i+1})];
+                    declaration(i+1) = [];
                 end
             end
 
@@ -434,7 +446,7 @@ classdef (Sealed) Table < handle
                                 '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
                                 ':\s*(?<type>\S.*\S)\s*'          % datatype
-                                '#\s*(?<comment>\S.*\S)\s*$'      % comment
+                                '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment  
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');
                             if isempty(fieldInfo)
