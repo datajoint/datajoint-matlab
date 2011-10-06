@@ -166,10 +166,8 @@ classdef (Sealed) Table < handle
             if ~expandForeignKeys
                 if size(self.schema.dependencies, 2) >= tableIdx
                     refIds = find(self.schema.dependencies(tableIdx,:)==2);
-                    c = sprintf('\n->');
                     for i=refIds
-                        str = sprintf('%s%s%s', str, c, self.schema.classNames{i});
-                        c = ',';
+                        str = sprintf('%s\n-> %s',str, self.schema.classNames{i});
                         excludeFields = {self.schema.fields([self.schema.fields.iskey]...
                             & strcmp({self.schema.fields.table},self.schema.tables(i).name)).name};
                         dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
@@ -200,6 +198,7 @@ classdef (Sealed) Table < handle
                 str = sprintf('%s<END DECLARATION CODE>\n',str);
             end
             
+            % if no output argument, then print to stdout
             if nargout==0
                 fprintf('\n%s\n', str)
             else
@@ -237,11 +236,11 @@ classdef (Sealed) Table < handle
     
     
     
-    methods(Static, Access=private)
+    methods(Static)
         
-        function create(declaration)
+        function sql = create(declaration)
             % create a new table
-            disp 'CREATING TABLE IN THE DATABASE: ';
+            disp 'CREATING TABLE IN THE DATABASE: '
                         
             [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
             schemaObj = eval(sprintf('%s.getSchema', tableInfo.package));
@@ -256,18 +255,12 @@ classdef (Sealed) Table < handle
             % add inherited primary key fields
             primaryKeyFields = {};
             for iRef = 1:length(parents)
-                for iField=find([parents{iRef}.fields.iskey])
+                for iField = find([parents{iRef}.fields.iskey])
                     field = parents{iRef}.fields(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        assert(~field.isnullable);   %primary key fields cannot be nullable
-                        if strcmp(field.default, '<<<none>>>')
-                            field.default = 'NOT NULL';
-                        else
-                            field.default = sprintf('NOT NULL DEFAULT "%s"', field.default);
-                        end
-                        sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
-                            sql, field.name, field.type, field.default, field.comment);
+                        assert(~field.isnullable, 'primary key fields cannot be nullable')
+                        sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                     end
                 end
             end
@@ -277,38 +270,19 @@ classdef (Sealed) Table < handle
                 for iField = find([fieldDefs.iskey])
                     field = fieldDefs(iField);
                     primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
-                    assert(~strcmpi(field.default,'null'), ...
+                    assert(~strcmpi(field.default,'NULL'), ...
                         'primary key fields cannot be nullable')
-                    if isempty(field.default)
-                        field.default = 'NOT NULL';
-                    else
-                        % put everything in quotes, even numbers, but not SQL values
-                        if ~strcmpi(field.default, 'CURRENT_TIMESTAMP') && ...
-                                ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                            field.default = ['"' field.default '"'];
-                        end
-                        field.default = sprintf('NOT NULL DEFAULT %s', field.default);
-                    end
-                    sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
-                        sql, field.name, field.type, field.default, field.comment);
+                    sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                 end
             end
             
-            % add references
+            % add secondary foreign key fields
             for iRef = 1:length(references)
-                field = references{iRef}.fields(iField);
-                if ~ismember(field.name, primaryKeyFields)
-                    if field.isnullable
-                        field.default = 'DEFAULT NULL';  % all nullable fields default to null
-                    else
-                        if strcmp(field.default, '<<<none>>>')
-                            field.default = 'NOT NULL';
-                        else
-                            field.default = sprintf('NOT NULL DEFAULT "%s"', field.default);
-                        end
+                for iField = find([parents{iRef}.fields.iskey])
+                    field = references{iRef}.fields(iField);
+                    if ~ismember(field.name, primaryKeyFields)
+                        sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                     end
-                    sql = sprintf('%s  `%s` %s %s COMMENT "%s",\n', ...
-                        sql, field.name, field.type, field.default, field.comment);
                 end
             end
             
@@ -316,22 +290,7 @@ classdef (Sealed) Table < handle
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
-                    if strcmpi(field.default,'null')
-                        field.default = 'DEFAULT NULL';
-                    else
-                        if isempty(field.default)
-                            field.default = 'NOT NULL';
-                        else
-                            % put everything in quotes, even numbers, but not SQL values
-                            if ~any(strcmpi(field.default, {'CURRENT_TIMESTAMP', 'null'})) && ...
-                                    ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                                field.default = ['"' field.default '"'];
-                            end
-                            field.default = sprintf('NOT NULL DEFAULT %s', field.default);
-                        end
-                    end
-                    sql = sprintf('%s`%s` %s %s COMMENT "%s",\n', ...
-                        sql, field.name, field.type, field.default, field.comment);
+                    sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                 end
             end
             
@@ -367,9 +326,37 @@ classdef (Sealed) Table < handle
             fprintf </SQL>\n\n
             
             % execute declaration
-            schemaObj.query(sql);
+            if nargout==0                
+                schemaObj.query(sql);
+            end
         end
         
+        
+        
+        function sql = fieldToSQL(field)
+            % convert the structure field with fields {'name' 'type' 'default' 'comment'} 
+            % to the SQL column declaration
+            
+            if strcmpi(field.default, 'NULL')   
+                % all nullable fields default to null
+                field.default = 'DEFAULT NULL';   
+            else
+                if strcmp(field.default,'<<<none>>>')
+                    field.default = 'NOT NULL';
+                else
+                    % enclose value in quotes (even numeric), except special SQL values
+                    if ~strcmpi(field.default, 'CURRENT_TIMESTAMP') && ...
+                            ~any(strcmp(field.default([1 end]), {'''''','""'}))
+                        field.default = ['"' field.default '"'];
+                    end
+                    field.default = sprintf('NOT NULL DEFAULT %s', field.default);
+                end
+            end
+            sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
+                field.name, field.type, field.default, field.comment);
+        end
+            
+                
         
         
         function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)
@@ -385,7 +372,7 @@ classdef (Sealed) Table < handle
             % remove empty lines
             declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
                         
-            % expand <<macros>>.  (TODO: make recursive if necessary)
+            % expand <<macros>>   TODO: make macro expansion recursive (if necessary)
             for macro = fieldnames(dj.utils.macros)'
                 while true
                     ix = find(strcmp(strtrim(declaration), ['<<' macro{1} '>>']),1,'first');
@@ -453,7 +440,7 @@ classdef (Sealed) Table < handle
                                 % try no default value
                                 fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
                                 assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
-                                fieldInfo.default = [];
+                                fieldInfo.default = '<<<none>>>';  
                             end
                             assert(numel(fieldInfo)==1, ...
                                 'Invalid field declaration "%s"', line);
