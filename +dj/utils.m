@@ -22,9 +22,6 @@ classdef(Sealed) utils
             % reads the initial comment block %{ ... %}
             
             f = fopen(filename, 'rt');
-            if f==-1
-                f = fopen([filename, '.m'],'rt');
-            end
             assert(f~=-1, 'Could not open %s', filename)
             str = '';
             

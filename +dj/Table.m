@@ -432,7 +432,7 @@ classdef (Sealed) Table < handle
                             pat = {
                                 '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-                                ':\s*(?<type>\S.*\S)\s*'          % datatype
+                                ':\s*(?<type>\w[\w, ()]+[\w\)])\s*' % datatype
                                 '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment  
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');
@@ -442,6 +442,8 @@ classdef (Sealed) Table < handle
                                 assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
                                 fieldInfo.default = '<<<none>>>';  
                             end
+                            assert(~any(fieldInfo.comment=='"'), ...
+                                'comments must not contain double quotes')
                             assert(numel(fieldInfo)==1, ...
                                 'Invalid field declaration "%s"', line);
                             fieldInfo.iskey = inKey;
