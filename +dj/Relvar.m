@@ -58,7 +58,9 @@ classdef Relvar < dynamicprops   % R2009a
                     self.sql.src = sprintf('`%s`.`%s`', ...
                         copyObj.schema.dbname, copyObj.info.name);
                     self.expression = '<temporary>'; % no valid expression without subclassing
-                    
+                    self.addprop('table');
+                    self.table = copyObj;
+
                 otherwise
                     error 'invalid initatlization'
             end
@@ -141,7 +143,7 @@ classdef Relvar < dynamicprops   % R2009a
             % EXAMPLES:
             %   del(Scans) -- delete all tuples from table Scans
             %   del(Scans('mouse_id=12')) -- delete all Scans for mouse 12
-            %   del(Scans-Cells)  -- delete all tuples from table Scans
+            %   del(Scans - Cells)  -- delete all tuples from table Scans
             %           that do not have a matching tuples in table Cells
             %
             % When the second arguments is set to false, no prompt is given
@@ -154,22 +156,16 @@ classdef Relvar < dynamicprops   % R2009a
             
             doPrompt = nargin<2 || doPrompt;
             self.schema.cancelTransaction  % exit ongoing transaction, if any
-            doDelete = true;
+            n = self.length;
+            doDelete = n > 0;
             
-            if doPrompt
-                n = self.length;
-                if n == 0
-                    disp('Nothing to delete')
-                    doDelete = false;
+            if doPrompt && doDelete
+                if ismember(self.table.info.tier, {'manual','lookup'})
+                    disp 'About to delete from a table containing manual data. Proceed at your own risk!'
                 else
-                    if ismember(self.table.info.tier, {'manual','lookup'})
-                        warning('DataJoint:del',...
-                            'About to delete from a table containing manual data. Proceed at your own risk.')
-                    else
-                        doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
-                            'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
-                            ,'s'));
-                    end
+                    doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
+                        'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
+                        ,'s'));
                 end
                 doDelete = doDelete && strcmpi('yes',input(sprintf(...
                     'Delete %d records from %s? yes/no >> ',...
@@ -179,7 +175,7 @@ classdef Relvar < dynamicprops   % R2009a
             if doDelete
                 self.schema.query(sprintf('DELETE FROM %s%s', self.sql.src, self.sql.res))
             else
-                disp 'Nothing deleted'
+                disp 'No tuples deleted'
             end
         end
         
@@ -234,7 +230,7 @@ classdef Relvar < dynamicprops   % R2009a
             %
             % INPUTS:
             %    'attr1',...,'attrn' is a comma-separated string of relation attributes
-            % onto which to project the relation selfi. 
+            % onto which to project the relation selfi.
             %
             % Primary key attributes are included implicitly and cannot be excluded.
             %
@@ -242,8 +238,8 @@ classdef Relvar < dynamicprops   % R2009a
             %
             % To compute a new attribute, list it as 'expression->new_name', e.g.
             % 'datediff(exp_date,now())->days_ago'
-            % 
-            % The expressions may use SQL operators and functions. 
+            %
+            % The expressions may use SQL operators and functions.
             %
             % Example 1. Construct relation r2 containing only the primary keys of r1:
             %    >> r2 = r1.pro();
@@ -533,8 +529,8 @@ classdef Relvar < dynamicprops   % R2009a
             %    v1 = self.fetch1('attr1');
             %    [v1,..,vk] = self.fetch1('attr1',..,'attrk')
             %    [f1,..,fk] = self.fetch1(Q, 'attr1',..,'attrk')
-            % 
-            % When Q is another dj.Relvar, the last syntax is equivalent to 
+            %
+            % When Q is another dj.Relvar, the last syntax is equivalent to
             %    [f1,..,fk] = fetch1(self.pro(Q,'attr1',..,'attrk'), 'attr1',..,'attrk')
             
             % validate input
@@ -573,10 +569,10 @@ classdef Relvar < dynamicprops   % R2009a
             %    v1 = fetchn(self, 'attr1');
             %    [v1,v2,..,vk] = fetchn(self, 'attr1','attr2',...,'attrk');
             %    [v1,v2,..,vk] = fetchn(self, Q, 'attr1', 'attr2',...,'attrk');
-            %  
-            % When Q is another dj.Relvar, the last syntax is equivalent to 
+            %
+            % When Q is another dj.Relvar, the last syntax is equivalent to
             %    [f1,..,fk] = fetchn(self.pro(Q,'attr1',..,'attrk'), 'attr1',..,'attrk')
-
+            
             
             % validate input
             if nargin>=2 && isa(varargin{1},'dj.Relvar')
@@ -596,7 +592,7 @@ classdef Relvar < dynamicprops   % R2009a
             % copy into output arguments
             for iArg=1:length(attrs)
                 % if renamed, use the renamed attribute
-                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  
+                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');
                 name = name{end}{2};
                 assert(isfield(ret,name),'Field %s not found', name );
                 varargout{iArg} = ret.(name);

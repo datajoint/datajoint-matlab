@@ -6,7 +6,7 @@
 %
 % If the table does not exist, it is created based on the definition
 % specified in the first multi-line percent-brace comment block
-% of +package/ClassName.m 
+% of +package/ClassName.m
 %
 % Note that the class package.ClassName need not exist if the table exists
 % in the database. Only if the table does not exist will dj.Table access
@@ -32,7 +32,8 @@ classdef (Sealed) Table < handle
             assert(nargin==1 && ischar(className),  ...
                 'dj.Table requres input ''package.ClassName''')
             assert(~isempty(regexp(className,'\w+\.[A-Z]\w+','once')), ...
-                'invalid table identification ''%s''. Should be package.ClassName', className)
+                'invalid table identification ''%s''. Should be package.ClassName', ...
+                className)
             schemaFunction = regexprep(className, '\.\w+$', '.getSchema');
             self.schema = eval(schemaFunction);
             assert(isa(self.schema, 'dj.Schema'), ...
@@ -55,7 +56,8 @@ classdef (Sealed) Table < handle
             
             % table exists, initialize
             self.info = self.schema.tables(ix);
-            self.fields = self.schema.fields(strcmp(self.info.name, {self.schema.fields.table}));
+            self.fields = self.schema.fields(strcmp(self.info.name, ...
+                {self.schema.fields.table}));
             self.primaryKey = {self.fields([self.fields.iskey]).name};
         end
         
@@ -74,7 +76,7 @@ classdef (Sealed) Table < handle
             % plot the entity relationship diagram of this and connected tables
             % table.erd([depth1[,depth2]])
             % depth1 and depth2 specify the connectivity radius upstream
-            % (depth<0) and downstream (depth>0) of this table. 
+            % (depth<0) and downstream (depth>0) of this table.
             % Omitting both depths defaults to table.erd(-2,2).
             % Omitting any one of the depths sets the other to zero.
             %
@@ -194,7 +196,7 @@ classdef (Sealed) Table < handle
             str = sprintf('%s\n', str);
             
             if ~expandForeignKeys
-                str = sprintf('%s%%}\n', str);                
+                str = sprintf('%s%%}\n', str);
                 str = sprintf('%s<END DECLARATION CODE>\n',str);
             end
             
@@ -220,15 +222,45 @@ classdef (Sealed) Table < handle
         
         
         function drop(self)
-            % remove the table from the database
-            assert(isempty(dj.Relvar(self)), 'The table must be empty before it can be dropped')
+            % drop the table and all its dependents.
+            % No warning is given when the tables are empty.
+            % If the tables have data in them, a warning is given first.
             
-            refs = find(self.schema.dependencies(:,strcmp({self.schema.tables.name},self.info.name)));
-            if ~isempty(refs)
-                error('The table cannot be dropped because it''s referenced by %s', self.schema.classNames{refs})
+            self.schema.cancelTransaction   % exit ongoing transaction
+            
+            nodes = find(strcmp({self.schema.tables.name}, self.info.name));
+            downstream = nodes;
+            while ~isempty(nodes)
+                [nodes, trash] = find(self.schema.dependencies(:, nodes));
+                nodes = setdiff(nodes, downstream);
+                downstream = [nodes(:)' downstream];  %#ok:<AGROW>
+            end
+            if isempty(downstream)
+                disp 'No tables to drop'
             else
-                self.schema.query(sprintf('DROP TABLE `%s`.`%s`', self.schema.dbname, self.info.name))
-                fprintf('Dropped table `%s`.`%s`\n', self.schema.dbname, self.info.name)
+                fprintf('Dropping %s and %d dependent tables...\n',...
+                    self.schema.classNames{downstream(end)}, length(downstream)-1)
+                
+                % delate and drop tables in reverse order
+                for iTable = downstream
+                    name = sprintf('`%s`.`%s`', ...
+                        self.schema.dbname, self.schema.tables(iTable).name);
+                    
+                    % if the table has data, give option to cancel
+                    n = self.schema.query(sprintf('SELECT count(*) as n FROM %s',name));
+                    if n.n > 0
+                        fprintf('Table %s contains %d tuples.  Do you still want to drop this table? ', ...
+                            self.schema.classNames{iTable}, n.n);
+                        if ~strcmp('yes', input('yes/no? >> ','s'))
+                            fprintf('User cancelled.  Table %s not dropped\n', ...
+                                self.schema.classNames{iTable});
+                            break
+                        end
+                    end
+                    self.schema.query(sprintf('DROP TABLE %s', name))
+                    fprintf('Dropped table %s\n', self.schema.classNames{iTable})
+                end
+                
                 self.schema.reload
             end
         end
@@ -241,7 +273,7 @@ classdef (Sealed) Table < handle
         function sql = create(declaration)
             % create a new table
             disp 'CREATING TABLE IN THE DATABASE: '
-                        
+            
             [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
             schemaObj = eval(sprintf('%s.getSchema', tableInfo.package));
             
@@ -326,7 +358,7 @@ classdef (Sealed) Table < handle
             fprintf </SQL>\n\n
             
             % execute declaration
-            if nargout==0                
+            if nargout==0
                 schemaObj.query(sql);
             end
         end
@@ -334,12 +366,12 @@ classdef (Sealed) Table < handle
         
         
         function sql = fieldToSQL(field)
-            % convert the structure field with fields {'name' 'type' 'default' 'comment'} 
+            % convert the structure field with fields {'name' 'type' 'default' 'comment'}
             % to the SQL column declaration
             
-            if strcmpi(field.default, 'NULL')   
+            if strcmpi(field.default, 'NULL')
                 % all nullable fields default to null
-                field.default = 'DEFAULT NULL';   
+                field.default = 'DEFAULT NULL';
             else
                 if strcmp(field.default,'<<<none>>>')
                     field.default = 'NOT NULL';
@@ -355,8 +387,8 @@ classdef (Sealed) Table < handle
             sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
                 field.name, field.type, field.default, field.comment);
         end
-            
-                
+        
+        
         
         
         function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)
@@ -371,7 +403,7 @@ classdef (Sealed) Table < handle
             
             % remove empty lines
             declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
-                        
+            
             % expand <<macros>>   TODO: make macro expansion recursive (if necessary)
             for macro = fieldnames(dj.utils.macros)'
                 while true
@@ -380,7 +412,7 @@ classdef (Sealed) Table < handle
                         break
                     end
                     declaration = [
-                        declaration(1:ix-1) 
+                        declaration(1:ix-1)
                         dj.utils.macros.(macro{1})
                         declaration(ix+1:end)
                         ];
@@ -398,7 +430,7 @@ classdef (Sealed) Table < handle
                     declaration(i+1) = [];
                 end
             end
-
+            
             % parse table schema, name, type, and comment
             pat = {
                 '^\s*(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
@@ -433,14 +465,14 @@ classdef (Sealed) Table < handle
                                 '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
                                 ':\s*(?<type>\w[\w, ()]+[\w\)])\s*' % datatype
-                                '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment  
+                                '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');
                             if isempty(fieldInfo)
                                 % try no default value
                                 fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
                                 assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
-                                fieldInfo.default = '<<<none>>>';  
+                                fieldInfo.default = '<<<none>>>';
                             end
                             assert(~any(fieldInfo.comment=='"'), ...
                                 'comments must not contain double quotes')

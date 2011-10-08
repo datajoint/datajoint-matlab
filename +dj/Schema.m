@@ -222,6 +222,9 @@ classdef Schema < handle
         
         function erd(self, subset)
             % plot the Entity Relationship Diagram of the entire schema
+            % INPUTS:
+            %    subset -- indices schema.table to include in the diagram.
+            
             if nargin==1
                 subset = 1:length(self.tableLevels);
             end
