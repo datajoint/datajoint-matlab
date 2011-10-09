@@ -36,6 +36,145 @@ classdef Schema < handle
         end
         
         
+        
+        function erd(self, subset)
+            % plot the Entity Relationship Diagram of the entire schema
+            % INPUTS:
+            %    subset -- indices schema.table to include in the diagram.
+            
+            if nargin==1
+                subset = 1:length(self.tableLevels);
+            end
+            levels = -self.tableLevels(subset);
+            C = self.dependencies(subset,subset);  % connectivity matrix
+            
+            yi = levels;
+            xi = zeros(size(yi));
+            
+            % optimize graph appearance by minimizing disctances.^2 to connected nodes
+            % while maximizing distances to nodes on the same level.
+            fprintf 'optimizing layout...'
+            j1 = cell(1,length(xi));
+            j2 = cell(1,length(xi));
+            for i=1:length(xi)
+                j1{i} = setdiff(find(yi==yi(i)),i);
+                j2{i} = [find(C(i,:)) find(C(:,i)')];
+            end
+            niter=5e4;
+            T0=5; % initial temperature
+            cr=6/niter; % cooling rate
+            L = inf(size(xi));
+            for iter=1:niter
+                i = ceil(rand*length(xi));  % pick a random node
+                
+                % Compute the cost function Lnew of the increasing xi(i) by dx
+                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
+                xx=xi(i)+dx;
+                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
+                if ~isempty(j1{i})
+                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
+                end
+                
+                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
+                    xi(i)=xi(i)+dx;
+                    L(i) = Lnew;
+                end
+            end
+            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
+            
+            
+            % plot nodes
+            plot(xi, yi, 'o', 'MarkerSize', 10);
+            hold on;
+            c = hsv(16);
+            % plot edges
+            for i=1:size(C,1)
+                ci = round((yi(i)-min(yi))/(max(yi)-min(yi))*15)+1;
+                cc = c(ci,:)*0.3+0.4;
+                for j=1:size(C,2)
+                    switch C(i,j)
+                        case 1
+                            connectNodes(xi([i j]), yi([i j]), '-', cc);
+                        case 2
+                            connectNodes(xi([i j]), yi([i j]), '--', cc);
+                    end
+                    hold on
+                end
+            end
+            
+            % annotate nodes
+            for i=1:length(subset)
+                switch self.tables(subset(i)).tier
+                    case 'manual'
+                        c = [0 0.6 0];
+                    case 'lookup'
+                        c = [0.3 0.4 0.3];
+                    case 'imported'
+                        c = [0 0 1];
+                    case 'computed'
+                        c = [0.5 0.0 0];
+                end
+                text(xi(i), yi(i), [dj.utils.camelCase(self.tables(subset(i)).name) '  '], ...
+                    'HorizontalAlignment', 'right', ...
+                    'Color', c, 'FontSize', 12);
+                hold on;
+            end
+            
+            xlim([min(xi)-0.5 max(xi)+0.5]);
+            ylim([min(yi)-0.5 max(yi)+0.5]);
+            hold off
+            axis off
+            disp done
+            
+            
+            function connectNodes(x, y, lineStyle, color)
+                assert(length(x)==2 && length(y)==2)
+                plot(x, y, 'k.')
+                t = 0:0.05:1;
+                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
+                y = y(1) + (y(2)-y(1))*t;
+                plot(x, y, lineStyle, 'Color', color)
+            end
+        end
+        
+        
+        
+        function backup(self, backupDir, tiers)
+            % Saves tables into .mat files
+            % Each tables must be small enough to be loaded into memory. 
+            % By default, only lookup and manual tables are saved.
+            if nargin<3
+                tiers = {'lookup','manual'};
+            end
+            assert(all(ismember(tiers, dj.utils.allowedTiers)))
+            backupDir = fullfile(backupDir, self.dbname);
+            if ~exist(backupDir, 'dir')
+                assert(mkdir(backupDir), ...
+                    'Could not create directory %s', backupDir)
+            end
+            backupDir = fullfile(backupDir, datestr(now,'yyyy-mm-dd'));
+            if ~exist(backupDir,'dir')
+                assert(mkdir(backupDir), ...
+                    'Could not create directory %s', backupDir)
+            end
+            ix = find(ismember({self.tables.tier}, tiers));
+            % save in hiearchical order
+            [~,order] = sort(self.tableLevels(ix));
+            ix = ix(order);
+            for iTable = ix(:)'
+                contents = self.query(sprintf('SELECT * FROM `%s`.`%s`', ...
+                    self.dbname, self.tables(iTable).name));
+                contents = dj.utils.structure2array(contents);
+                filename = fullfile(backupDir, ...
+                    regexprep(self.classNames{iTable}, '^.*\.', ''));
+                fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
+                save(filename, 'contents')
+                fprintf 'done\n'
+            end
+        end
+        
+        
+        
         function delete(self)
             % deletes the schme
             % unfortunately mym leaves open invisible connections after
@@ -46,18 +185,8 @@ classdef Schema < handle
             self.delete@handle
         end
         
-        
-        function test(self)
-            % test the connection
-            fprintf('host: %s\n', self.host);
-            fprintf('user: %s\n', self.user);
-            self.query('status')
-            id = self.query('SELECT connection_id() as id');
-            fprintf('>>> Success. Connection id %d\n', id.id);
-        end
-        
-        
-        
+                
+                
         function reload(self)
             % load schema information into memory: table names and table
             % dependencies.
@@ -181,24 +310,6 @@ classdef Schema < handle
         end
         
         
-        function ret = tables2cell(self)
-            % create a cell array of all table objects
-            ret = {};
-            for level = unique(self.tableLevels)
-                for tableName = self.classNames(self.tableLevels == level)
-                    try
-                        ret{end+1} = eval(tableName{1});  %#ok<AGROW>
-                    catch err
-                        if strcmp(err.identifier, 'MATLAB:undefinedVarOrClass')
-                            fprintf('WARNING! Class %s is not defined\n', tableName{1});
-                        else
-                            rethrow(err)
-                        end
-                    end
-                end
-            end
-        end
-        
         
         function ret = query(self, queryStr, varargin)
             %{
@@ -217,107 +328,5 @@ classdef Schema < handle
             end
         end
         
-        
-        
-        
-        function erd(self, subset)
-            % plot the Entity Relationship Diagram of the entire schema
-            % INPUTS:
-            %    subset -- indices schema.table to include in the diagram.
-            
-            if nargin==1
-                subset = 1:length(self.tableLevels);
-            end
-            levels = -self.tableLevels(subset);
-            C = self.dependencies(subset,subset);  % connectivity matrix
-            
-            yi = levels;
-            xi = zeros(size(yi));
-            
-            % optimize graph appearance by minimizing disctances.^2 to connected nodes
-            % while maximizing distances to nodes on the same level.
-            fprintf 'optimizing layout...'
-            j1 = cell(1,length(xi));
-            j2 = cell(1,length(xi));
-            for i=1:length(xi)
-                j1{i} = setdiff(find(yi==yi(i)),i);
-                j2{i} = [find(C(i,:)) find(C(:,i)')];
-            end
-            niter=5e4;
-            T0=5; % initial temperature
-            cr=6/niter; % cooling rate
-            L = inf(size(xi));
-            for iter=1:niter
-                i = ceil(rand*length(xi));  % pick a random node
-                
-                % Compute the cost function Lnew of the increasing xi(i) by dx
-                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
-                xx=xi(i)+dx;
-                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
-                if ~isempty(j1{i})
-                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
-                end
-                
-                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
-                    xi(i)=xi(i)+dx;
-                    L(i) = Lnew;
-                end
-            end
-            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
-            
-            
-            % plot nodes
-            plot(xi, yi, 'o', 'MarkerSize', 10);
-            hold on;
-            c = hsv(16);
-            % plot edges
-            for i=1:size(C,1)
-                ci = round((yi(i)-min(yi))/(max(yi)-min(yi))*15)+1;
-                cc = c(ci,:)*0.3+0.4;
-                for j=1:size(C,2)
-                    switch C(i,j)
-                        case 1
-                            connectNodes(xi([i j]), yi([i j]), '-', cc);
-                        case 2
-                            connectNodes(xi([i j]), yi([i j]), '--', cc);
-                    end
-                    hold on
-                end
-            end
-            
-            % annotate nodes
-            for i=1:length(subset)
-                switch self.tables(subset(i)).tier
-                    case 'manual'
-                        c = [0 0.6 0];
-                    case 'lookup'
-                        c = [0.3 0.4 0.3];
-                    case 'imported'
-                        c = [0 0 1];
-                    case 'computed'
-                        c = [0.5 0.0 0];
-                end
-                text(xi(i), yi(i), [dj.utils.camelCase(self.tables(subset(i)).name) '  '], ...
-                    'HorizontalAlignment', 'right', ...
-                    'Color', c, 'FontSize', 12);
-                hold on;
-            end
-            
-            xlim([min(xi)-0.5 max(xi)+0.5]);
-            ylim([min(yi)-0.5 max(yi)+0.5]);
-            hold off
-            axis off
-            disp done
-            
-            
-            function connectNodes(x, y, lineStyle, color)
-                assert(length(x)==2 && length(y)==2)
-                plot(x, y, 'k.')
-                t = 0:0.05:1;
-                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
-                y = y(1) + (y(2)-y(1))*t;
-                plot(x, y, lineStyle, 'Color', color)
-            end
-        end
     end
 end

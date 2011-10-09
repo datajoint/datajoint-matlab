@@ -8,14 +8,14 @@
 % specified in the first multi-line percent-brace comment block
 % of +package/ClassName.m
 %
-% Note that the class package.ClassName need not exist if the table exists
+% The file +package/ClassName.m need not exist if the table already exists
 % in the database. Only if the table does not exist will dj.Table access
-% the table definition file.
+% the table definition file and create the table in the database.
 %
 % The syntax of the table definition can be found at
 % http://code.google.com/p/datajoint/wiki/TableDeclarationSyntax
-%
-% Dimitri Yatsenko, 2009, 2010, 2011.
+
+% Dimitri Yatsenko, 2009-2011.
 
 classdef (Sealed) Table < handle
     
@@ -61,8 +61,7 @@ classdef (Sealed) Table < handle
             self.primaryKey = {self.fields([self.fields.iskey]).name};
         end
         
-        
-        
+             
         
         function display(self)
             display@handle(self)
@@ -78,9 +77,9 @@ classdef (Sealed) Table < handle
             % depth1 and depth2 specify the connectivity radius upstream
             % (depth<0) and downstream (depth>0) of this table.
             % Omitting both depths defaults to table.erd(-2,2).
-            % Omitting any one of the depths sets the other to zero.
+            % Omitting any one of the depths sets it to zero.
             %
-            % Example:
+            % Examples:
             %   t = dj.Table('vis2p.Scans');
             %   t.erd       % plot two levels above and below
             %   t.erd( 2);  % plot dependents up to 2 levels below
@@ -116,13 +115,18 @@ classdef (Sealed) Table < handle
             self.schema.erd(pool)
         end
         
+              
         
-        
-        
-        
-        
-        function varargout = re(self, expandForeignKeys)
-            % reverse engineer the table declaration
+        function str = re(self, expandForeignKeys)
+            % dj.Table.re reverse engineer the table declaration.
+            % table.re returns the table declaration that can be used to create 
+            % the table from scratch using the dj.Table constrcutor. 
+            % When expandForeignKeys is set to true, then references to other 
+            % tables are not displayed and foreign key fields are shown as 
+            % regular fields. 
+            % 
+            % See also dj.Table
+            
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
             className = [self.schema.package '.' dj.utils.camelCase(self.info.name)];
@@ -203,22 +207,9 @@ classdef (Sealed) Table < handle
             % if no output argument, then print to stdout
             if nargout==0
                 fprintf('\n%s\n', str)
-            else
-                varargout{1} = str;
             end
         end
-        
-        
-        
-        function isempty(self) %#ok
-            % throws error to prevent ambiguous meaning
-            error 'dj.Table/isempty is not defined. Use dj.Relvar/isempty'
-        end
-        
-        function length(self)  %#ok
-            % throws error to prevent ambiguous meaning
-            error 'dj.Table/length is not defined. Use dj.Relvar/length'
-        end
+                
         
         
         function drop(self)
@@ -264,11 +255,12 @@ classdef (Sealed) Table < handle
                 self.schema.reload
             end
         end
+        
     end
     
     
     
-    methods(Static)
+    methods(Static, Access=private)
         
         function sql = create(declaration)
             % create a new table
@@ -364,7 +356,6 @@ classdef (Sealed) Table < handle
         end
         
         
-        
         function sql = fieldToSQL(field)
             % convert the structure field with fields {'name' 'type' 'default' 'comment'}
             % to the SQL column declaration
@@ -387,8 +378,6 @@ classdef (Sealed) Table < handle
             sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
                 field.name, field.type, field.default, field.comment);
         end
-        
-        
         
         
         function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)

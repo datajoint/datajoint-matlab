@@ -116,8 +116,9 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         
-        function n = length(self)
-            % return the cardinality of relation self
+        function n = count(self)
+            % dj.Relvar.count return the cardinality of the relation contained
+            % in this relvar.
             if strcmp(self.sql.pro, '*')
                 n = self.schema.query(...
                     sprintf('SELECT count(*) as n FROM %s%s',...
@@ -129,11 +130,20 @@ classdef Relvar < dynamicprops   % R2009a
             end
             n=n.n;
         end
+       
         
+        
+        function n = length(self)
+            % dj.Relvar.length deprecated.  Use dj.Relvar.count instead.
+            % 
+            % See also dj.Relvar.count
+            n = self.count;
+        end
+       
         
         
         function ret = isempty(self)
-            ret = self.length==0;
+            ret = self.count==0;
         end
         
         
@@ -190,20 +200,7 @@ classdef Relvar < dynamicprops   % R2009a
             self = self & arg;
         end
         
-        
-        function newSelf = copy(self)   % remove this function in R2011
-            if isa(self, 'matlab.mixin.Copyable')
-                newSelf = copy@matlab.mixinCopyable(self);
-            else
-                newSelf = dj.Relvar(self);
-                if ~isempty(self.findprop('table'));
-                    newSelf.addprop('table');
-                    newSelf.table = self.table;
-                end
-            end
-        end
-        
-        
+       
         
         function self = and(self, arg)
             % relational restriction
@@ -223,11 +220,12 @@ classdef Relvar < dynamicprops   % R2009a
         end
         
         
+        
         function self = pro(self, varargin)
             % self=pro(self,attr1,...,attrn) - project relation self onto its attributes
             % self=pro(self,Q,attr1,...,attrn) - project relation self onto its attributes and
             % onto aggregate attributes of relation Q.
-            %
+            %x
             % INPUTS:
             %    'attr1',...,'attrn' is a comma-separated string of relation attributes
             % onto which to project the relation selfi.
@@ -342,9 +340,10 @@ classdef Relvar < dynamicprops   % R2009a
         end
         
         
+        
         function R1 = rdivide(R1, R2)
-            warning('datajoint:deprecation',...
-                'Use R1-R2 instead of R1./R2. dj.Relvar/rdivide will be deprecated in next release')
+            % dj.Relvar.rdivide is depracated. Use dj.R1.minus instead.
+            % See also dj.Relvar.minus
             R1 = R1 - R2;
         end
         
@@ -390,6 +389,7 @@ classdef Relvar < dynamicprops   % R2009a
             end
             
         end
+        
         
         
         function R1 = minus(R1,R2)
@@ -495,51 +495,67 @@ classdef Relvar < dynamicprops   % R2009a
         %--------------  FETCHING DATA  --------------------
         
         function ret = fetch(self, varargin)
-            % Relvar/fetch - retrieve data from a relation as a struct array
+            % dj.Relvar/fetch retrieve data from a relation as a struct array
             % SYNTAX:
-            %    s = fetch(self)       %% retrieve primary key attributes only
-            %    s = fetch(self,'*')   %% retrieve all attributes
-            %    s = fetch(self,'attr1','attr2',...) - retrieve primary key
+            %    s = self.fetch       % retrieve primary key attributes only
+            %    s = self.fetch('*')  % retrieve all attributes
+            %    s = self.fetch('attr1','attr2',...) - retrieve primary key
             %       attributes and additional listed attributes.
-            LIMIT = '';
-            if nargin>1 && isnumeric(varargin{end})
-                if nargin>2 && isnumeric(varargin{end-1})
-                    LIMIT = sprintf(' LIMIT %d, %d', varargin{end-1:end});
-                    varargin(end-1:end) = [];
-                else
-                    LIMIT = sprintf(' LIMIT %d', varargin{end});
-                    varargin(end) = [];
-                end
-            end
-            self = pro(self, varargin{:});
+            %
+            % The specification of attributes 'attri' follows the same
+            % conventions as in dj.Relvar.pro, including renamed
+            % attributed, and computed arguments.  In particular, if the second 
+            % input argument is another relvar, the computed arguments can 
+            % include summary operations on the fields of the second relvar.
+            %
+            % For example:
+            %   s = R.fetch(Q, 'count(*)->n');  
+            % Here s(i).n will contain the number of tuples in Q matching
+            % the ith tuple in R.
+            %
+            % If the last input argument is numerical, the number of
+            % retrieved tuples will be limited to that number.
+            % If two numerical arguments trail the argument list, then the
+            % first is used as the starting index.  
+            % 
+            % For example:
+            %    s = R.fetch('*', 100);        % tuples 1-100 from R
+            %    s = R.fetch('*', 1, 100);     % still tuples 1-100
+            %    s = R.fetch('*', 101, 100);   % tuples 101-200 
+            % 
+            % The numerical indexing into the relvar is a deviation from
+            % relational theory and should be reserved for special cases only.
+            % 
+            % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
+            
+            
+            [limit, args] = dj.Relvar.limitToSQL(varargin{:});
+
+            self = pro(self, args{:});
             ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
-                self.sql.pro, self.sql.src, self.sql.res, LIMIT));
+                self.sql.pro, self.sql.src, self.sql.res, limit));
             ret = dj.utils.structure2array(ret);
         end
         
         
         
         function varargout = fetch1(self, varargin)
-            % Relvar/fetch1 - retrieve attributes from a single tuple in a
-            % relation into separate variables.
-            % Use fetch1 when you know that self contains at most one tuple.
-            % Strings are retrieves as character arrays.
+            % dj.Relvar/fetch1 same as dj.Relvat/fetch but each field is 
+            % retrieved into a separate output variable.  
+            % Use fetch1 when you know that the relvar contains exactly one tuple.
+            % The attribute list is specified the same way as in
+            % dj.Relvar/fetch but wildcards '*' are not allowed.  
+            % The number of specified attributes must exactly match the number
+            % of output arguments.
             %
-            % SYNTAX:
-            %    v1 = self.fetch1('attr1');
-            %    [v1,..,vk] = self.fetch1('attr1',..,'attrk')
-            %    [f1,..,fk] = self.fetch1(Q, 'attr1',..,'attrk')
+            % Examples:
+            %    v1 = R.fetch1('attr1');
+            %    [v1,v2,qn] = R.fetch1(Q,'attr1','attr2','count(*)->n')
             %
-            % When Q is another dj.Relvar, the last syntax is equivalent to
-            %    [f1,..,fk] = fetch1(self.pro(Q,'attr1',..,'attrk'), 'attr1',..,'attrk')
+            % See also dj.Relvar.fetch, dj.Relvar/fetchn, dj.Relvar/pro
             
             % validate input
-            if nargin>=2 && ...
-                    (isa(varargin{1}, 'dj.Relvar') || isa(varargin{1}, 'dj.Table'))
-                attrs = varargin(2:end);
-            else
-                attrs = varargin;
-            end
+            attrs = varargin(cellfun(@ischar, varargin));
             assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1),...
                 'The number of outputs must match the number of requested attributes');
             assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()');
@@ -548,54 +564,41 @@ classdef Relvar < dynamicprops   % R2009a
             assert(isscalar(s),'fetch1 can only retrieve a single existing tuple.');
             
             % copy into output arguments
+            varargout = cell(length(attrs));
             for iArg=1:length(attrs)
-                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');  % if aliased, use the alias
-                if length(name)==2
-                    name = name{2}{2};
-                else
-                    name = name{1}{2};
-                end
-                varargout{iArg}=s.(name);
+                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens'); 
+                varargout{iArg} = s.(name{1}{1});
             end
         end
         
         
         
         function varargout = fetchn(self, varargin)
-            % DJ/fetchn - retrieve attribute values from multiple tuples in relation self.
-            % Nonnumeric results are returned as cell arrays.
+            % dj.Relvar/fetchn same as dj.Relvar/fetch1 but can fetch
+            % values from multiple tuples.  Unlike fetch1, string and
+            % blob values are retrieved as matlab cells.
             %
-            % Syntax:
-            %    v1 = fetchn(self, 'attr1');
-            %    [v1,v2,..,vk] = fetchn(self, 'attr1','attr2',...,'attrk');
-            %    [v1,v2,..,vk] = fetchn(self, Q, 'attr1', 'attr2',...,'attrk');
-            %
-            % When Q is another dj.Relvar, the last syntax is equivalent to
-            %    [f1,..,fk] = fetchn(self.pro(Q,'attr1',..,'attrk'), 'attr1',..,'attrk')
-            
+            % See also dj.Relvar/fetch1, dj.Relvar/fetch, dj.Relvar/pro
             
             % validate input
-            if nargin>=2 && isa(varargin{1},'dj.Relvar')
-                attrs = varargin(2:end);
-            else
-                attrs = varargin;
-            end
+            attrs = varargin(cellfun(@ischar, varargin));
             assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1), ...
                 'The number of outputs must match the number of requested attributes');
             assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetchn()');
             
+            [limit, args] = dj.Relvar.limitToSQL(varargin{:});
+            
             % submit query
-            self = self.pro(varargin{:});
-            ret = self.schema.query(sprintf('SELECT %s FROM %s%s',...
-                self.sql.pro, self.sql.src, self.sql.res));
+            self = self.pro(args{:});
+            ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s',...
+                self.sql.pro, self.sql.src, self.sql.res, limit));
             
             % copy into output arguments
+            varargout = cell(length(attrs));
             for iArg=1:length(attrs)
                 % if renamed, use the renamed attribute
-                name = regexp(attrs{iArg}, '(^|->)\s*(\w+)', 'tokens');
-                name = name{end}{2};
-                assert(isfield(ret,name),'Field %s not found', name );
-                varargout{iArg} = ret.(name);
+                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens'); 
+                varargout{iArg} = ret.(name{1}{1});  
             end
         end
         
@@ -683,12 +686,29 @@ classdef Relvar < dynamicprops   % R2009a
             % discarded, for example.
             insert(self, tuples, 'INSERT IGNORE')
         end
+        
     end
     
     
     
     methods(Access=private)
+
+        function newSelf = copy(self)   
+            % dj.Relvar.copy implements a copy of a handle object.  It is
+            % unnecessary in R2011+
+            if isa(self, 'matlab.mixin.Copyable')
+                newSelf = copy@matlab.mixinCopyable(self);
+            else
+                newSelf = dj.Relvar(self);
+                if ~isempty(self.findprop('table'));
+                    newSelf.addprop('table');
+                    newSelf.table = self.table;
+                end
+            end
+        end
+
         
+         
         function semijoin(R1, R2)
             % relational natural semijoin performed in place.
             % The R1.semjoin(R2) contains all the tuples of R1 that have matching tuples in R2.
@@ -823,6 +843,7 @@ classdef Relvar < dynamicprops   % R2009a
         end
         
         
+        
         function str = brace(self, precedence)
             % return self.expression in parentheses if precedence > self.precedence
             str = self.expression;
@@ -830,5 +851,27 @@ classdef Relvar < dynamicprops   % R2009a
                 str = ['(' str ')'];
             end
         end
+        
     end
+    
+    
+    
+    methods(Access=private, Static)
+        
+        function [limit, args] = limitToSQL(varargin)
+            limit = '';
+            args = varargin;
+            if nargin>1 && isnumeric(args{end})
+                if nargin>2 && isnumeric(args{end-1})
+                    limit = sprintf(' limit %d, %d', args{end-1:end});
+                    args(end-1:end) = [];
+                else
+                    limit = sprintf(' limit %d', varargin{end});
+                    args(end) = [];
+                end
+            end
+        end
+        
+    end
+    
 end
