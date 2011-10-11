@@ -43,6 +43,7 @@ classdef (Sealed) Table < handle
             ix = strcmp(className, self.schema.classNames);
             if ~any(ix)
                 % table does not exist. Create it.
+                fprintf('Parsing the table declaration for %s\n', className)
                 path = which(className);
                 assert(~isempty(path), [className ' not found']');
                 declaration = dj.utils.readPreamble(path);
@@ -453,7 +454,7 @@ classdef (Sealed) Table < handle
                             pat = {
                                 '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-                                ':\s*(?<type>\w[\w, ()]+[\w\)])\s*' % datatype
+                                ':\s*(?<type>\w[\w,"'' ()]+[\w\)])\s*' % datatype
                                 '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');

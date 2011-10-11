@@ -145,6 +145,7 @@ classdef Relvar < dynamicprops   % R2009a
         function ret = isempty(self)
             ret = self.count==0;
         end
+ 
         
         
         function del(self, doPrompt)
@@ -159,7 +160,7 @@ classdef Relvar < dynamicprops   % R2009a
             % When the second arguments is set to false, no prompt is given
             % and the data are deleted immediately. Only use this when
             % noninteractivity is critical.
-            
+                        
             assert(~isempty(findprop(self,'table')) ...
                 && isa(self.table, 'dj.Table'), ...
                 'Cannot delete from a derived relation');
@@ -189,9 +190,7 @@ classdef Relvar < dynamicprops   % R2009a
             end
         end
         
-        
-        
-        
+               
         
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
         
@@ -319,7 +318,8 @@ classdef Relvar < dynamicprops   % R2009a
                 
                 % update query
                 if ~strcmp(self.sql.pro,'*')
-                    self.sql.src = sprintf('(SELECT %s FROM %s%s) as r',self.sql.pro,self.sql.src,self.sql.res);
+                    self.sql.src = sprintf('(SELECT %s FROM %s%s) as r', ...
+                        self.sql.pro, self.sql.src, self.sql.res);
                     self.sql.res = '';
                 end
                 self.sql.pro = fieldList;
@@ -327,11 +327,16 @@ classdef Relvar < dynamicprops   % R2009a
                 if isGrouped
                     keyStr = sprintf(',%s',self.primaryKey{:});
                     if isempty(Q.sql.res) && strcmp(Q.sql.pro,'*')
-                        self.sql.src = sprintf('(SELECT %s FROM %s NATURAL JOIN %s%s GROUP BY %s) as q%s'...
-                            , self.sql.pro, self.sql.src, Q.sql.src, self.sql.res, keyStr(2:end), char(rand(1,3)*26+65) );
+                        self.sql.src = sprintf(...
+                            '(SELECT %s FROM %s NATURAL JOIN %s%s GROUP BY %s) as q%s', ...
+                            self.sql.pro, self.sql.src, ...
+                            Q.sql.src, self.sql.res, keyStr(2:end), char(rand(1,3)*26+65));
                     else
-                        self.sql.src = sprintf('(SELECT %s FROM %s NATURAL JOIN (SELECT %s FROM %s%s) as q%s GROUP BY %s) as q%s'...
-                            , self.sql.pro, self.sql.src, Q.sql.pro, Q.sql.src, Q.sql.res, self.sql.res, keyStr(2:end),char(rand(1,3)*26+65) );
+                        self.sql.src = sprintf(...
+                            '(SELECT %s FROM %s NATURAL JOIN (SELECT %s FROM %s%s) as q%s GROUP BY %s) as q%s', ...
+                            self.sql.pro, self.sql.src, ...
+                            Q.sql.pro, Q.sql.src, Q.sql.res, ...
+                            self.sql.res, keyStr(2:end),char(rand(1,3)*26+65));
                     end
                     self.sql.pro = '*';
                     self.sql.res = '';
