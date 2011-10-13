@@ -8,13 +8,16 @@ classdef(Sealed) utils
         %   computed: tableName with '__'
         
         allowedTiers = {'lookup','manual','imported','computed'}
-        tierPrefixes = {'#', '', '_', '__'}    
+        tierPrefixes = {'#', '', '_', '__'}
         macros = struct(...
             'JobFields', {{
- 'job_status: enum("reserved","completed","error","ignore") # if tuple is missing, the job is available'
- 'error_message=null: varchar(1023) # error message returned if failed'
- 'error_stack=null: blob  # error stack if failed'
- }})        
+            'table_name: varchar(255)  # table name for which the job is reserved'
+            '---'
+            'job_status: enum("reserved","completed","error","ignore") # if tuple is missing, the job is available'
+            'error_message="": varchar(1023) # error message returned if failed'
+            'error_stack=null: blob  # error stack if failed'
+            'job_timestamp=CURRENT_TIMESTAMP: timestamp # automatic timestamp'
+            }})
     end
     
     methods(Static)
@@ -113,15 +116,15 @@ classdef(Sealed) utils
             
             lst = {};
             for fname = fieldnames(s)'
-                lst{end+1} = fname{1};
+                lst{end+1} = fname{1};  %#ok<AGROW>
                 v = s.(fname{1});
                 if isempty(v)
-                    lst{end+1}={};
+                    lst{end+1}={};   %#ok<AGROW>
                 else
                     if isnumeric(v) || islogical(v)
-                        lst{end+1} = num2cell(s.(fname{1}));
+                        lst{end+1} = num2cell(s.(fname{1}));  %#ok<AGROW>
                     else
-                        lst{end+1} = s.(fname{1});
+                        lst{end+1} = s.(fname{1});  %#ok<AGROW>
                     end
                 end
             end

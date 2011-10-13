@@ -15,6 +15,7 @@
 % invoke self.populate to populate the table.
 
 classdef AutoPopulate < handle
+    
     methods
         function self = AutoPopulate
             try
@@ -59,7 +60,7 @@ classdef AutoPopulate < handle
             
             self.schema.cancelTransaction  % rollback any unfinished transaction
             
-            if nargout>0
+            if nargout
                 failedKeys = struct([]);
                 errors = struct([]);
             end
@@ -67,27 +68,39 @@ classdef AutoPopulate < handle
             unpopulatedKeys = fetch((self.popRel - self) & varargin);
             
             for key = unpopulatedKeys'
-                self.schema.startTransaction
-                try
-                    % check again in case a parallel process has already populated
-                    if ~isempty(self & key)
+                if setJobStatus(key, 'reserved')
+                    self.schema.startTransaction
+                    try
+                        % check again in case a parallel process has already populated
+                        if count(self & key)
+                            self.schema.cancelTransaction
+                        else
+                            % populate for the key
+                            fprintf('Populating %s for:\n', class(self))
+                            disp(key)
+                            self.makeTuples(key)
+                            self.schema.commitTransaction
+                        end
+                    catch err
                         self.schema.cancelTransaction
-                    else
-                        % populate for the key
-                        fprintf('Populating %s for:\n', class(self))
-                        disp(key)
-                        self.makeTuples(key)
-                        self.schema.commitTransaction
-                    end
-                catch err
-                    self.schema.cancelTransaction
-                    if nargout == 0
-                        rethrow(err)
-                    else
-                        failedKeys = [failedKeys; key]; %#ok<AGROW>
-                        errors = [errors; err];         %#ok<AGROW>
+                        setJobStatus(key, 'error', err.message, err.stack);
+                        if nargout
+                            failedKeys = [failedKeys; key]; %#ok<AGROW>
+                            errors = [errors; err];         %#ok<AGROW>
+                        else
+                            if isempty(self.schema.jobReservations)
+                                rethrow(err)
+                            end
+                        end
                     end
                 end
+            end
+            setJobStatus(key, 'completed');
+            
+            
+            function success = setJobStatus(key, status, varargin)
+                key.table_name = self.table.info.name;
+                success = self.schema.setJobStatus(key, status, varargin{:});
             end
         end
     end

@@ -43,14 +43,20 @@ classdef (Sealed) Table < handle
             ix = strcmp(className, self.schema.classNames);
             if ~any(ix)
                 % table does not exist. Create it.
-                fprintf('Parsing the table declaration for %s\n', className)
                 path = which(className);
                 assert(~isempty(path), [className ' not found']');
                 declaration = dj.utils.readPreamble(path);
                 if ~isempty(declaration)
-                    dj.Table.create(declaration);
-                    self.schema.reload
-                    ix = strcmp(className, self.schema.classNames);
+                    try
+                        dj.Table.create(declaration);
+                        self.schema.reload
+                        ix = strcmp(className, self.schema.classNames);
+                    catch e
+                        fprintf('!!! Error while parsing the table declaration for %s:\n%s\n', ...
+                            className, e.message)
+                        rethrow(e)
+                    end
+
                 end
                 assert(any(ix), 'Table %s is not found', className);
             end
@@ -101,14 +107,14 @@ classdef (Sealed) Table < handle
             upstream = i;
             nodes = i;
             for j=1:-levels(1)
-                [trash,nodes] = find(self.schema.dependencies(nodes,:));
+                [~, nodes] = find(self.schema.dependencies(nodes,:));
                 upstream = [upstream nodes(:)'];  %#ok:<AGROW>
             end
             
             downstream = [];
             nodes = i;
             for j=1:levels(2)
-                [nodes,trash] = find(self.schema.dependencies(:, nodes));
+                [nodes, ~] = find(self.schema.dependencies(:, nodes));
                 downstream = [downstream nodes(:)'];  %#ok:<AGROW>
             end
             
@@ -214,7 +220,7 @@ classdef (Sealed) Table < handle
         
         
         function drop(self)
-            % drop the table and all its dependents.
+            % dj.Table/drop drop the table and all its dependents.
             % No warning is given when the tables are empty.
             % If the tables have data in them, a warning is given first.
             
@@ -223,7 +229,7 @@ classdef (Sealed) Table < handle
             nodes = find(strcmp({self.schema.tables.name}, self.info.name));
             downstream = nodes;
             while ~isempty(nodes)
-                [nodes, trash] = find(self.schema.dependencies(:, nodes));
+                [nodes, ~] = find(self.schema.dependencies(:, nodes));
                 nodes = setdiff(nodes, downstream);
                 downstream = [nodes(:)' downstream];  %#ok:<AGROW>
             end
@@ -416,7 +422,8 @@ classdef (Sealed) Table < handle
                 if isempty(pos)
                     i = i + 1;
                 else
-                    declaration{i} = [strtrim(declaration{i}(1:pos-1)) ' ' strtrim(declaration{i+1})];
+                    declaration{i} = [strtrim(declaration{i}(1:pos-1)) ' ' ...
+                        strtrim(declaration{i+1})];
                     declaration(i+1) = [];
                 end
             end
@@ -443,7 +450,8 @@ classdef (Sealed) Table < handle
                         case strncmp(line,'->',2)
                             % foreign key
                             p = eval(line(3:end));
-                            assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
+                            assert(isa(p, 'dj.Relvar'), ...
+                                'foreign keys must be base relvars')
                             if inKey
                                 parents{end+1} = p;     %#ok:<AGROW>
                             else
@@ -461,7 +469,8 @@ classdef (Sealed) Table < handle
                             if isempty(fieldInfo)
                                 % try no default value
                                 fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-                                assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
+                                assert(~isempty(fieldInfo), ...
+                                    'invalid field declaration line: %s', line);
                                 fieldInfo.default = '<<<none>>>';
                             end
                             assert(~any(fieldInfo.comment=='"'), ...

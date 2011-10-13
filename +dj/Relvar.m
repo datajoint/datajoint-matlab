@@ -3,13 +3,12 @@
 % relation.
 %
 % SYNTAX:
-%    obj = dj.Relvar;                % abstract, must have derived property 'table' of type dj.Table
-%    obj = dj.Relvar(anoterRelvar);  % copy constructor, strips derived properties
-%    obj = dj.Relvar(tableObj);      % base relvar without a derived class, for internal use only
+%    obj = dj.Relvar;               % abstract, must have derived property 'table' of type dj.Table
+%    obj = dj.Relvar(anoterRelvar); % copy constructor, strips derived properties
+%    obj = dj.Relvar(tableObj);     % base relvar without a derived class, for internal use only
 
 
-% classdef Revlar < matlab.mixin.Copyable   % R2011
-classdef Relvar < dynamicprops   % R2009a
+classdef Relvar < matlab.mixin.Copyable & dynamicprops
     
     properties(SetAccess = private)
         schema     % handle to the schema object
@@ -60,7 +59,7 @@ classdef Relvar < dynamicprops   % R2009a
                     self.expression = '<temporary>'; % no valid expression without subclassing
                     self.addprop('table');
                     self.table = copyObj;
-
+                    
                 otherwise
                     error 'invalid initatlization'
             end
@@ -84,7 +83,7 @@ classdef Relvar < dynamicprops   % R2009a
             % print rows
             maxRows = 24;
             tuples = self.fetch(self.fields(ix).name,maxRows+1);
-            nTuples = length(self);
+            nTuples = count(self);
             
             if nTuples>0
                 for s = tuples(1:min(end,maxRows))'
@@ -130,22 +129,9 @@ classdef Relvar < dynamicprops   % R2009a
             end
             n=n.n;
         end
-       
         
         
-        function n = length(self)
-            % dj.Relvar.length deprecated.  Use dj.Relvar.count instead.
-            % 
-            % See also dj.Relvar.count
-            n = self.count;
-        end
-       
-        
-        
-        function ret = isempty(self)
-            ret = self.count==0;
-        end
- 
+                      
         
         
         function del(self, doPrompt)
@@ -160,14 +146,14 @@ classdef Relvar < dynamicprops   % R2009a
             % When the second arguments is set to false, no prompt is given
             % and the data are deleted immediately. Only use this when
             % noninteractivity is critical.
-                        
+            
             assert(~isempty(findprop(self,'table')) ...
                 && isa(self.table, 'dj.Table'), ...
                 'Cannot delete from a derived relation');
             
             doPrompt = nargin<2 || doPrompt;
             self.schema.cancelTransaction  % exit ongoing transaction, if any
-            n = self.length;
+            n = self.count;
             doDelete = n > 0;
             
             if doPrompt && doDelete
@@ -190,7 +176,7 @@ classdef Relvar < dynamicprops   % R2009a
             end
         end
         
-               
+        
         
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
         
@@ -199,7 +185,7 @@ classdef Relvar < dynamicprops   % R2009a
             self = self & arg;
         end
         
-       
+        
         
         function self = and(self, arg)
             % relational restriction
@@ -221,13 +207,15 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         function self = pro(self, varargin)
-            % self=pro(self,attr1,...,attrn) - project relation self onto its attributes
-            % self=pro(self,Q,attr1,...,attrn) - project relation self onto its attributes and
-            % onto aggregate attributes of relation Q.
-            %x
+            % r = rel.pro(attr1, ..., attrn) - project relvar rel onto a subset 
+            % of its attributes.
+            %
+            % r = relvar.pro(otherRel, attr1, ..., attrn) - project relation 
+            % relvar1 onto its attributes and onto aggregate attributes 
+            % of relation Q.
+            %
             % INPUTS:
-            %    'attr1',...,'attrn' is a comma-separated string of relation attributes
-            % onto which to project the relation selfi.
+            %    'attr1',...,'attrn' is a comma-separated string of attributes.
             %
             % Primary key attributes are included implicitly and cannot be excluded.
             %
@@ -237,25 +225,28 @@ classdef Relvar < dynamicprops   % R2009a
             % 'datediff(exp_date,now())->days_ago'
             %
             % The expressions may use SQL operators and functions.
+            % 
+            % EXAMPLES:
+            %   Construct relation r2 containing only the primary keys of r1:
+            %   >> r2 = r1.pro();
             %
-            % Example 1. Construct relation r2 containing only the primary keys of r1:
-            %    >> r2 = r1.pro();
+            %   Construct relation r3 which contains values for 'operator'
+            %   and 'anesthesia' for every tuple in r1:
+            %   >> r3=r1.pro('operator','anesthesia');
             %
-            % Example 2. Construct relation r3 which contains values for 'operator'
-            %    and 'anesthesia' for every tuple in r1:
-            %    >> r3=r1.pro('operator','anesthesia');
+            % 	Rename attribute 'anesthesia' to 'anesth' in relation r1:
+            %   >> r1 = r1.pro('*','anesthesia->anesth');
             %
-            % Example 3. Rename attribute 'anesthesia' to 'anesth' in relation r1:
-            %    >> r1 = r1.pro('*','anesthesia->anesth');
+            %   Add field mouse_age to relation r1 that has the field mouse_dob:
+            %   >> r1 = r1.pro('*','datediff(now(),mouse_dob)->mouse_age');
             %
-            % Example 4. Add field mouse_age to relation r1 that has the field mouse_dob:
-            %    >> r1 = r1.pro('*','datediff(now(),mouse_dob)->mouse_age');
-            %
-            % Example 5. Add field 'n' which contains the count of matching tuples in r2
-            % for every tuple in r1. Also add field 'avga' which contains the average
-            % value of field 'a' in r2.
-            %    >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
-            % You may use the following summary functions: max,min,sum,avg,variance,std,count
+            %   Add field 'n' which contains the count of matching tuples in r2
+            %   for every tuple in r1. Also add field 'avga' which contains the 
+            %   average value of field 'a' in r2.
+            %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
+            % 
+            % You may use the following summary functions: max, min, sum, ...
+            % avg, variance, std, count
             
             self = dj.Relvar(self);  % copy into a derived relation
             
@@ -312,7 +303,8 @@ classdef Relvar < dynamicprops   % R2009a
                         'isNumeric', true, ...  % only numeric computations allowed for now, deal with character string expressions somehow
                         'isString', false, ...
                         'isBlob', false);
-                    fieldList=sprintf('%s%s %s as `%s`',fieldList,c,computedAttrs{iComp,1},computedAttrs{iComp,2});
+                    fieldList=sprintf('%s%s %s as `%s`', ...
+                        fieldList,c,computedAttrs{iComp,1},computedAttrs{iComp,2});
                     c=',';
                 end
                 
@@ -509,33 +501,33 @@ classdef Relvar < dynamicprops   % R2009a
             %
             % The specification of attributes 'attri' follows the same
             % conventions as in dj.Relvar.pro, including renamed
-            % attributed, and computed arguments.  In particular, if the second 
-            % input argument is another relvar, the computed arguments can 
+            % attributed, and computed arguments.  In particular, if the second
+            % input argument is another relvar, the computed arguments can
             % include summary operations on the fields of the second relvar.
             %
             % For example:
-            %   s = R.fetch(Q, 'count(*)->n');  
+            %   s = R.fetch(Q, 'count(*)->n');
             % Here s(i).n will contain the number of tuples in Q matching
             % the ith tuple in R.
             %
             % If the last input argument is numerical, the number of
             % retrieved tuples will be limited to that number.
             % If two numerical arguments trail the argument list, then the
-            % first is used as the starting index.  
-            % 
+            % first is used as the starting index.
+            %
             % For example:
             %    s = R.fetch('*', 100);        % tuples 1-100 from R
             %    s = R.fetch('*', 1, 100);     % still tuples 1-100
-            %    s = R.fetch('*', 101, 100);   % tuples 101-200 
-            % 
+            %    s = R.fetch('*', 101, 100);   % tuples 101-200
+            %
             % The numerical indexing into the relvar is a deviation from
             % relational theory and should be reserved for special cases only.
-            % 
+            %
             % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
             
             
             [limit, args] = dj.Relvar.limitToSQL(varargin{:});
-
+            
             self = pro(self, args{:});
             ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
@@ -545,11 +537,11 @@ classdef Relvar < dynamicprops   % R2009a
         
         
         function varargout = fetch1(self, varargin)
-            % dj.Relvar/fetch1 same as dj.Relvat/fetch but each field is 
-            % retrieved into a separate output variable.  
+            % dj.Relvar/fetch1 same as dj.Relvat/fetch but each field is
+            % retrieved into a separate output variable.
             % Use fetch1 when you know that the relvar contains exactly one tuple.
             % The attribute list is specified the same way as in
-            % dj.Relvar/fetch but wildcards '*' are not allowed.  
+            % dj.Relvar/fetch but wildcards '*' are not allowed.
             % The number of specified attributes must exactly match the number
             % of output arguments.
             %
@@ -571,7 +563,7 @@ classdef Relvar < dynamicprops   % R2009a
             % copy into output arguments
             varargout = cell(length(attrs));
             for iArg=1:length(attrs)
-                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens'); 
+                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = s.(name{1}{1});
             end
         end
@@ -602,8 +594,8 @@ classdef Relvar < dynamicprops   % R2009a
             varargout = cell(length(attrs));
             for iArg=1:length(attrs)
                 % if renamed, use the renamed attribute
-                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens'); 
-                varargout{iArg} = ret.(name{1}{1});  
+                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens');
+                varargout{iArg} = ret.(name{1}{1});
             end
         end
         
@@ -653,23 +645,27 @@ classdef Relvar < dynamicprops   % R2009a
                             'The field %s must be a character string', ...
                             self.fields(i).name)
                         if isempty(v)
-                            queryStr = sprintf('%s`%s`="",', queryStr, self.fields(i).name);
+                            queryStr = sprintf('%s`%s`="",', ...
+                                queryStr, self.fields(i).name);
                         else
-                            queryStr = sprintf('%s`%s`="{S}",', queryStr,self.fields(i).name);
-                            blobs{end+1} = v;                                       %#ok<AGROW>
+                            queryStr = sprintf('%s`%s`="{S}",', ...
+                                queryStr,self.fields(i).name);
+                            blobs{end+1} = v;  %#ok<AGROW>
                         end
                     elseif self.fields(i).isBlob
-                        queryStr = sprintf('%s`%s`="{M}",', queryStr,self.fields(i).name);
+                        queryStr = sprintf('%s`%s`="{M}",', ...
+                            queryStr,self.fields(i).name);
                         if islogical(v) % mym doesn't accept logicals
                             v = uint8(v);
                         end
-                        blobs{end+1} = v;                                       %#ok<AGROW>
+                        blobs{end+1} = v;    %#ok<AGROW>
                     else
                         if islogical(v)  % mym doesn't accept logicals
                             v = uint8(v);
                         end
                         assert(isscalar(v) && isnumeric(v),...
-                            'The field %s must be a numeric scalar value', self.fields(i).name)
+                            'The field %s must be a numeric scalar value', ...
+                            self.fields(i).name)
                         if ~isnan(v)  % nans are not passed: assumed missing.
                             queryStr = sprintf('%s`%s`=%1.16g,',...
                                 queryStr, self.fields(i).name, v);
@@ -679,7 +675,8 @@ classdef Relvar < dynamicprops   % R2009a
                 
                 % issue query
                 self.schema.query(sprintf('%s `%s`.`%s` SET %s', ...
-                    command, self.schema.dbname, self.table.info.name, queryStr(1:end-1)), blobs{:})
+                    command, self.schema.dbname, self.table.info.name, ...
+                    queryStr(1:end-1)), blobs{:})
             end
         end
         
@@ -691,29 +688,13 @@ classdef Relvar < dynamicprops   % R2009a
             % discarded, for example.
             insert(self, tuples, 'INSERT IGNORE')
         end
-        
     end
     
     
     
     methods(Access=private)
-
-        function newSelf = copy(self)   
-            % dj.Relvar.copy implements a copy of a handle object.  It is
-            % unnecessary in R2011+
-            if isa(self, 'matlab.mixin.Copyable')
-                newSelf = copy@matlab.mixinCopyable(self);
-            else
-                newSelf = dj.Relvar(self);
-                if ~isempty(self.findprop('table'));
-                    newSelf.addprop('table');
-                    newSelf.table = self.table;
-                end
-            end
-        end
-
         
-         
+        
         function semijoin(R1, R2)
             % relational natural semijoin performed in place.
             % The R1.semjoin(R2) contains all the tuples of R1 that have matching tuples in R2.
@@ -731,7 +712,7 @@ classdef Relvar < dynamicprops   % R2009a
                 {R1.fields([R1.fields.isBlob]).name},...
                 {R2.fields([R2.fields.isBlob]).name});
             if ~isempty(commonIllegal)
-                error('Attribute ''%s'' is optional or a blob and cannot be compared. You may project it out first.',...
+                error('Attribute ''%s'' is a blob and cannot be compared. You may project it out first.',...
                     commonIllegal{1})
             end
             
@@ -796,7 +777,8 @@ classdef Relvar < dynamicprops   % R2009a
                                 'Value for key.%s must be numeric', field{1});
                             value=sprintf('%1.16g',value);
                         end
-                        cond = sprintf('%s%s`%s`=%s', cond, word, self.fields(iField).name, value);
+                        cond = sprintf('%s%s`%s`=%s', ...
+                            cond, word, self.fields(iField).name, value);
                         word = ' AND';
                     end
                 end
@@ -823,23 +805,27 @@ classdef Relvar < dynamicprops   % R2009a
                     include = include | true;   % include all attributes
                 else
                     % process a renamed attribute
-                    toks = regexp( attrList{iAttr}, '^([a-z]\w*)\s*->\s*(\w+)', 'tokens' );
+                    toks = regexp( attrList{iAttr}, ... 
+                        '^([a-z]\w*)\s*->\s*(\w+)', 'tokens' );
                     if ~isempty(toks)
                         ix = find(strcmp(toks{1}{1},{self.fields.name}));
                         assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
                         include(ix)=true;
-                        assert(~ismember(toks{1}{2},aliases) && ~ismember(toks{1}{2},{self.fields.name})...
+                        assert(~ismember(toks{1}{2},aliases) ...
+                            && ~ismember(toks{1}{2},{self.fields.name})...
                             ,'Duplicate attribute alias `%s`',toks{1}{2});
                         aliases{ix}=toks{1}{2};
                     else
                         % process a computed attribute
-                        toks = regexp( attrList{iAttr}, '(.*\S)\s*->\s*(\w+)', 'tokens' );
+                        toks = regexp( attrList{iAttr}, ... 
+                            '(.*\S)\s*->\s*(\w+)', 'tokens' );
                         if ~isempty(toks)
                             computedAttrs(end+1,:) = toks{:};   %#ok<AGROW>
                         else
                             % process a regular attribute
                             ix = find(strcmp(attrList{iAttr},{self.fields.name}));
-                            assert(length(ix)==1,'Attribute `%s` not found', attrList{iAttr});
+                            assert(length(ix)==1,'Attribute `%s` not found', ...
+                                attrList{iAttr});
                             include(ix)=true;
                         end
                     end

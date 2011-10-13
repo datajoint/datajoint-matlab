@@ -11,12 +11,14 @@ classdef Schema < handle
         classNames % classes corresponding to tables
         fields  % full list of all table fields
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
+        jobReservations    % a dj.Relvar of the job reservation table
     end
     
     properties(Access = private)
         password
         tableLevels   % levels in dependency hiararchy
         connection
+        jobKey        % currently checked out job
     end
     
     methods
@@ -141,7 +143,7 @@ classdef Schema < handle
         
         function backup(self, backupDir, tiers)
             % Saves tables into .mat files
-            % Each tables must be small enough to be loaded into memory. 
+            % Each tables must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
             if nargin<3
                 tiers = {'lookup','manual'};
@@ -185,8 +187,8 @@ classdef Schema < handle
             self.delete@handle
         end
         
-                
-                
+        
+        
         function reload(self)
             % load schema information into memory: table names and table
             % dependencies.
@@ -328,5 +330,83 @@ classdef Schema < handle
             end
         end
         
+        
+        
+        function setJobManagement(self, jobReservations)
+            if nargin == 1
+                self.jobReservations = [];
+            else
+                assert(isa(jobReservations, 'dj.Relvar'));
+                self.jobReservations = jobReservations;
+            end
+            self.jobKey = [];
+        end
+        
+        
+        
+        function success = setJobStatus(self, key, status, errMsg, errStack)
+            % dj.Schema/setJobStatus - manage jobs
+            % This processed is used by dj.AutoPopulate/populate to reserve
+            % jobs for distributed processing. Jobs are managed only when a
+            % job manager is specified using dj.Schema/setJobManager
+            
+            % if no job manager, do nothing
+            success = isempty(self.jobReservations);
+            
+            if ~success
+                switch status
+                    case {'completed','error'}
+                        % check that this is the matching job
+                        assert(~isempty(self.jobKey) && ...
+                            ~isempty(dj.utils.structJoin(key, self.joinKey)), ...
+                            'The job must be reserved first')
+                        
+                        self.jobKey.job_status = status;
+                        if nargin>3
+                            self.jobKey.error_message = errMsg;
+                        end
+                        if nargin>4
+                            self.jobKey.error_stack = errStack;
+                        end
+                        self.jobReservations.insert(self.jobKey, 'REPLACE')
+                        self.jobKey = [];
+                        success = true;
+                        
+                    case 'reserved'
+                        % check if the job is already ours
+                        success = ~isempty(self.jobKey) && ...
+                            ~isempty(dj.utils.structJoin(key, self.jobKey));
+                        
+                        if ~success
+                            % mark previous job completed
+                            if ~isempty(self.jobKey)
+                                self.jobKey.job_status = 'completed';
+                                self.jobReservations.insert(self.jobKey, 'REPLACE');
+                                self.jobKey = [];
+                            end
+                            
+                            % create the new job key
+                            for f = self.jobReservations.primaryKey
+                                try
+                                    self.jobKey.(f{1}) = key.(f{1});
+                                catch e
+                                    error 'Incomplete job key: use a more general job reservation table.'
+                                end
+                            end
+                            
+                            % check if the job is available
+                            success = 0 == count(self.jobReservations & self.jobKey);
+                            if success
+                                % reserve the job
+                                self.jobKey.job_status = status;
+                                self.jobReservations.insert(self.jobKey, 'REPLACE');
+                            end
+                            
+                        end
+                    otherwise
+                        error 'invalid job status'
+                end
+            end
+        end
     end
 end
