@@ -332,7 +332,7 @@ classdef Schema < handle
         
         
         
-        function setJobManagement(self, jobReservations)
+        function manageJobs(self, jobReservations)
             if nargin == 1
                 self.jobReservations = [];
             else
