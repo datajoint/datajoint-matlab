@@ -136,7 +136,6 @@ classdef(Sealed) utils
         
         function ret = structJoin(s1, s2)
             % the relational join of structure arrays s1 and s2
-            % :: Dimitri Yatsenko :: Created 2011-06-12 :: Modified 2011-06-12 ::
             
             assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
             ret = struct([]);
@@ -144,7 +143,9 @@ classdef(Sealed) utils
             s2only = setdiff(fieldnames(s2),fieldnames(s1));
             for p2 = s2'
                 for p1 = s1'
-                    if isequal(structPro(p1,commonFields), structPro(p2,commonFields))
+                    if isequal(...
+                            dj.utils.structPro(p1,commonFields), ...
+                            dj.utils.structPro(p2,commonFields))
                         for f = s2only'
                             p1.(f{1}) = p2.(f{1});
                         end
@@ -153,17 +154,40 @@ classdef(Sealed) utils
                 end
             end
             
-            
-            
-            function s = structPro(s,fields)
-                % the relational projection of structure array onto fields
-                % Duplicates are not removed.
-                for f=fieldnames(s)'
-                    if ~ismember(f{1}, fields)
-                        s = rmfield(s, f{1});
-                    end
+        end
+        
+        
+        function s = structPro(s,fields)
+            % the relational projection of structure array onto fields
+            % Duplicates are not removed.
+            for ff=fieldnames(s)'
+                if ~ismember(ff{1}, fields)
+                    s = rmfield(s, ff{1});
                 end
             end
+        end
+        
+        
+        
+        function sorted = structSort(s, fieldNames)
+            % sort structure array s alphanumerically in order of fieldNames
+            % Example:
+            % >> s = struct('a', {1,1,2}, 'b', {'one' 'two' 'two'}, 'c', {1 2 1})'
+            % >> s = structSort(s, 'c');
+            % >> s = structSort(s, {'b','a'})
+            
+            assert(isstruct(s) && ndims(s)==2 && size(s,2)==1, ...
+                'first input must be a column array of structures.')
+            if ischar(fieldNames)
+                fieldNames = {fieldNames};
+            end
+            assert(iscellstr(fieldNames) && all(isfield(s, fieldNames)), ...
+                'second input must be an array of fieldnames');
+            f = fieldnames(s);
+            c = struct2cell(s)';
+            [~,i] = ismember(fieldNames,f);
+            [~,i] = sortrows(c(:,i));
+            sorted = s(i);
         end
     end
 end

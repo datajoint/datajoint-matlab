@@ -66,7 +66,15 @@ classdef AutoPopulate < handle
             end
             
             unpopulatedKeys = fetch((self.popRel - self) & varargin);
-            
+            if ~isempty(self.schema.jobReservations)
+                jobFields = self.schema.jobReservations.table.primaryKey(1:end-1);
+                assert(all(isfield(unpopulatedKeys, jobFields)), ...
+                    ['The primary key of job table %s is more specific than'...
+                    ' the primary key of %s.popRel. Use a more general job table'], ...
+                    class(self.schema.jobReservations), class(self));
+                % group unpopulated keys by job reservation
+                unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
+            end
             for key = unpopulatedKeys'
                 if setJobStatus(key, 'reserved')
                     self.schema.startTransaction

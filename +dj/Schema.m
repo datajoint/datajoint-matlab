@@ -396,10 +396,15 @@ classdef Schema < handle
                             
                             % check if the job is available
                             success = 0 == count(self.jobReservations & self.jobKey);
-                            if success
+                            if ~success
+                                self.jobKey = [];
+                            else
                                 % reserve the job
+                                disp 'RESERVED JOB:'
+                                disp(self.jobKey)
+
                                 self.jobKey.job_status = status;
-                                self.jobReservations.insert(self.jobKey, 'REPLACE');
+                                self.jobReservations.insert(self.jobKey, 'REPLACE')
                             end
                             
                         end
