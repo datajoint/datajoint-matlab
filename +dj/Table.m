@@ -56,7 +56,7 @@ classdef (Sealed) Table < handle
                             className, e.message)
                         rethrow(e)
                     end
-
+                    
                 end
                 assert(any(ix), 'Table %s is not found', className);
             end
@@ -68,7 +68,7 @@ classdef (Sealed) Table < handle
             self.primaryKey = {self.fields([self.fields.iskey]).name};
         end
         
-             
+        
         
         function display(self)
             display@handle(self)
@@ -122,16 +122,16 @@ classdef (Sealed) Table < handle
             self.schema.erd(pool)
         end
         
-              
+        
         
         function str = re(self, expandForeignKeys)
             % dj.Table.re reverse engineer the table declaration.
-            % table.re returns the table declaration that can be used to create 
-            % the table from scratch using the dj.Table constrcutor. 
-            % When expandForeignKeys is set to true, then references to other 
-            % tables are not displayed and foreign key fields are shown as 
-            % regular fields. 
-            % 
+            % table.re returns the table declaration that can be used to create
+            % the table from scratch using the dj.Table constrcutor.
+            % When expandForeignKeys is set to true, then references to other
+            % tables are not displayed and foreign key fields are shown as
+            % regular fields.
+            %
             % See also dj.Table
             
             expandForeignKeys = nargin>=2 && expandForeignKeys;
@@ -216,7 +216,7 @@ classdef (Sealed) Table < handle
                 fprintf('\n%s\n', str)
             end
         end
-                
+        
         
         
         function drop(self)
@@ -227,40 +227,37 @@ classdef (Sealed) Table < handle
             self.schema.cancelTransaction   % exit ongoing transaction
             
             nodes = find(strcmp({self.schema.tables.name}, self.info.name));
+            assert(~isempty(nodes));
             downstream = nodes;
             while ~isempty(nodes)
                 [nodes, ~] = find(self.schema.dependencies(:, nodes));
                 nodes = setdiff(nodes, downstream);
                 downstream = [nodes(:)' downstream];  %#ok:<AGROW>
             end
-            if isempty(downstream)
-                disp 'No tables to drop'
-            else
-                fprintf('Dropping %s and %d dependent tables...\n',...
-                    self.schema.classNames{downstream(end)}, length(downstream)-1)
+            fprintf('Dropping %s and %d dependent tables...\n',...
+                self.schema.classNames{downstream(end)}, length(downstream)-1)
+            
+            % delate and drop tables in reverse order
+            for iTable = downstream
+                name = sprintf('`%s`.`%s`', ...
+                    self.schema.dbname, self.schema.tables(iTable).name);
                 
-                % delate and drop tables in reverse order
-                for iTable = downstream
-                    name = sprintf('`%s`.`%s`', ...
-                        self.schema.dbname, self.schema.tables(iTable).name);
-                    
-                    % if the table has data, give option to cancel
-                    n = self.schema.query(sprintf('SELECT count(*) as n FROM %s',name));
-                    if n.n > 0
-                        fprintf('Table %s contains %d tuples.  Do you still want to drop this table? ', ...
-                            self.schema.classNames{iTable}, n.n);
-                        if ~strcmp('yes', input('yes/no? >> ','s'))
-                            fprintf('User cancelled.  Table %s not dropped\n', ...
-                                self.schema.classNames{iTable});
-                            break
-                        end
+                % if the table has data, give option to cancel
+                n = self.schema.query(sprintf('SELECT count(*) as n FROM %s',name));
+                if n.n > 0
+                    fprintf('Table %s contains %d tuples.  Do you still want to drop this table? ', ...
+                        self.schema.classNames{iTable}, n.n);
+                    if ~strcmp('yes', input('yes/no? >> ','s'))
+                        fprintf('User cancelled.  Table %s not dropped\n', ...
+                            self.schema.classNames{iTable});
+                        break
                     end
-                    self.schema.query(sprintf('DROP TABLE %s', name))
-                    fprintf('Dropped table %s\n', self.schema.classNames{iTable})
                 end
-                
-                self.schema.reload
+                self.schema.query(sprintf('DROP TABLE %s', name))
+                fprintf('Dropped table %s\n', self.schema.classNames{iTable})
             end
+            
+            self.schema.reload
         end
         
     end
@@ -395,7 +392,8 @@ classdef (Sealed) Table < handle
             if ischar(declaration)
                 declaration = dj.utils.str2cell(declaration);
             end
-            assert(iscellstr(declaration), 'declaration must be a multiline string or a cellstr');
+            assert(iscellstr(declaration), ...
+                'declaration must be a multiline string or a cellstr');
             
             % remove empty lines
             declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
@@ -403,7 +401,8 @@ classdef (Sealed) Table < handle
             % expand <<macros>>   TODO: make macro expansion recursive (if necessary)
             for macro = fieldnames(dj.utils.macros)'
                 while true
-                    ix = find(strcmp(strtrim(declaration), ['<<' macro{1} '>>']),1,'first');
+                    ix = find(strcmp(strtrim(declaration), ...
+                        ['<<' macro{1} '>>']),1,'first');
                     if isempty(ix)
                         break
                     end
@@ -435,7 +434,8 @@ classdef (Sealed) Table < handle
                 '#\s*(?<comment>\S.*\S)\s*$'                 % # comment
                 };
             tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-            assert(numel(tableInfo)==1,'incorrect syntax is table declaration, line 1')
+            assert(numel(tableInfo)==1, ...
+                'incorrect syntax is table declaration, line 1')
             assert(ismember(tableInfo.tier, dj.utils.allowedTiers),...
                 ['Invalid tier for table ' tableInfo.className])
             

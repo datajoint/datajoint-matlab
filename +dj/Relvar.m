@@ -3,9 +3,10 @@
 % relation.
 %
 % SYNTAX:
-%    obj = dj.Relvar;               % abstract, must have derived property 'table' of type dj.Table
-%    obj = dj.Relvar(anoterRelvar); % copy constructor, strips derived properties
-%    obj = dj.Relvar(tableObj);     % base relvar without a derived class, for internal use only
+%    obj = dj.Relvar  % can only be called after adding property 'table' of type dj.Table
+%    obj = dj.Relvar(anoterRelvar) % copy constructor, strips derived properties
+%    obj = dj.Relvar(tableObj)     % base relvar without a table-specific class
+%
 
 
 classdef Relvar < matlab.mixin.Copyable & dynamicprops
@@ -14,12 +15,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         schema     % handle to the schema object
         primaryKey % list of primary key fields
         fields     % list of fieldnames
-        expression % the MATLAB expression to construct this relation
     end
     
     properties(Access = private)
         sql        % sql statement: source, projection, and restriction clauses
-        precedence = 0   % 0 (base), -1='*', -2='-', -3='&'
     end
     
     
@@ -37,7 +36,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.sql.res = '';
                     self.sql.src = sprintf('`%s`.`%s`', ...
                         self.table.schema.dbname, self.table.info.name);
-                    self.expression = class(self);
                     
                 case nargin==1 && isa(copyObj, 'dj.Relvar')
                     % copy constructor
@@ -45,18 +43,16 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.primaryKey = copyObj.primaryKey;
                     self.sql = copyObj.sql;
                     self.fields = copyObj.fields;
-                    self.expression = copyObj.expression;
                     
                 case nargin==1 && isa(copyObj, 'dj.Table')
-                    % initialization from a dj.Table, for housekeeping use only
-                    self.schema = copyObj.schema;
+                    % initialization from a dj.Table, not using a table-specific class
                     self.primaryKey = copyObj.primaryKey;
+                    self.schema = copyObj.schema;
                     self.fields = copyObj.fields;
                     self.sql.pro = '*';
                     self.sql.res = '';
                     self.sql.src = sprintf('`%s`.`%s`', ...
                         copyObj.schema.dbname, copyObj.info.name);
-                    self.expression = '<temporary>'; % no valid expression without subclassing
                     self.addprop('table');
                     self.table = copyObj;
                     
@@ -131,11 +127,12 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         end
         
         
-                      
+        
         
         
         function del(self, doPrompt)
-            % del(self) remove all tuples in relation self from its base relation.
+            % del(self) remove all tuples in relation self from its table
+            % and dependent tuples in dependent tables.
             %
             % EXAMPLES:
             %   del(Scans) -- delete all tuples from table Scans
@@ -147,32 +144,76 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % and the data are deleted immediately. Only use this when
             % noninteractivity is critical.
             
-            assert(~isempty(findprop(self,'table')) ...
-                && isa(self.table, 'dj.Table'), ...
-                'Cannot delete from a derived relation');
-            
             doPrompt = nargin<2 || doPrompt;
             self.schema.cancelTransaction  % exit ongoing transaction, if any
-            n = self.count;
-            doDelete = n > 0;
             
-            if doPrompt && doDelete
-                if ismember(self.table.info.tier, {'manual','lookup'})
-                    disp 'About to delete from a table containing manual data. Proceed at your own risk!'
-                else
-                    doDelete = ~isempty(findprop(self,'popRel')) || strcmp('yes', input(...
-                        'Attempting to delete from a subtable: risk violating integrity constraints? yes/no? >> '...
-                        ,'s'));
-                end
-                doDelete = doDelete && strcmpi('yes',input(sprintf(...
-                    'Delete %d records from %s? yes/no >> ',...
-                    n, class(self)), 's'));
-            end
-            
-            if doDelete
-                self.schema.query(sprintf('DELETE FROM %s%s', self.sql.src, self.sql.res))
+            if self.count==0
+                disp 'nothing to delete'
             else
-                disp 'No tuples deleted'
+                assert(~isempty(findprop(self,'table')) ...
+                    && isa(self.table, 'dj.Table'), ...
+                    'Cannot delete from a derived relvar');
+                
+                % warn the user if deleting from a subtable
+                if ismember(self.table.info.tier, {'imported','computed'}) ...
+                        && ~isa(self, 'dj.AutoPopulate')
+                    fprintf('!!! %s is a subtable. Deleting from a subtable may violate referential constraints.', ...
+                        class(self))
+                end
+                
+                % get the list of dependent tables (only hierarchical dependencies)
+                nodes = find(strcmp({self.schema.tables.name}, self.table.info.name));
+                assert(numel(nodes)==1);
+                downstream = nodes;
+                while ~isempty(nodes)
+                    [nodes, ~] = find(self.schema.dependencies(:, nodes)==1);
+                    nodes = setdiff(nodes, downstream);
+                    downstream = [downstream nodes(:)'];  %#ok:<AGROW>
+                end
+                
+                % construct relvars to be deleted
+                rels = {self};
+                for iRel = downstream(2:end)
+                    rels{end+1} = dj.Relvar(dj.Table(self.schema.classNames{iRel})) ...
+                        & self; %#ok:<AGROW>
+                end
+                
+                % exclude relvar with no matching tuples
+                include = cellfun(@(x) count(x), rels) > 0;
+                rels = rels(include);
+                downstream = downstream(include);
+                
+                % inform the  user about what's being deleted
+                if doPrompt
+                    disp 'ABOUT TO DELETE:'
+                    for iRel = 1:length(rels)
+                        n = count(rels{iRel});
+                        fprintf('%s %s: %d', ...
+                            rels{iRel}.table.info.tier, ...
+                            self.schema.classNames{downstream(iRel)}, n);
+                        if ismember(rels{iRel}.table.info.tier, {'manual','lookup'})
+                            fprintf ' !!!'
+                        end
+                        fprintf \n
+                    end
+                    fprintf \n
+                end
+                
+                % confirm and delete
+                if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >> ', 's'))
+                    disp 'delete canceled'
+                else
+                    for iRel = length(rels):-1:1
+                        n = rels{iRel}.count;
+                        if n
+                            self.schema.query(sprintf('DELETE FROM %s%s', ...
+                                rels{iRel}.sql.src, rels{iRel}.sql.res))
+                            fprintf('Deleted %d tuples from %s\n', ...
+                                n, self.schema.classNames{downstream(iRel)})
+                        end
+                    end
+                    disp 'delete complete'
+                end
             end
         end
         
@@ -206,12 +247,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         
+        
         function self = pro(self, varargin)
-            % r = rel.pro(attr1, ..., attrn) - project relvar rel onto a subset 
+            % r = rel.pro(attr1, ..., attrn) - project relvar rel onto a subset
             % of its attributes.
             %
-            % r = relvar.pro(otherRel, attr1, ..., attrn) - project relation 
-            % relvar1 onto its attributes and onto aggregate attributes 
+            % r = relvar.pro(otherRel, attr1, ..., attrn) - project relation
+            % relvar1 onto its attributes and onto aggregate attributes
             % of relation Q.
             %
             % INPUTS:
@@ -225,7 +267,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % 'datediff(exp_date,now())->days_ago'
             %
             % The expressions may use SQL operators and functions.
-            % 
+            %
             % EXAMPLES:
             %   Construct relation r2 containing only the primary keys of r1:
             %   >> r2 = r1.pro();
@@ -241,33 +283,21 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             %   >> r1 = r1.pro('*','datediff(now(),mouse_dob)->mouse_age');
             %
             %   Add field 'n' which contains the count of matching tuples in r2
-            %   for every tuple in r1. Also add field 'avga' which contains the 
+            %   for every tuple in r1. Also add field 'avga' which contains the
             %   average value of field 'a' in r2.
             %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
-            % 
+            %
             % You may use the following summary functions: max, min, sum, ...
             % avg, variance, std, count
             
             self = dj.Relvar(self);  % copy into a derived relation
             
             params = varargin;
-            isGrouped = nargin>1 &&  isa(params{1},'dj.Relvar');
-            if isempty(params)
-                self.expression = sprintf('pro(%s)', self.expression);
-            else
-                if isGrouped
-                    Q = params{1};
-                    params(1)=[];
-                    str = sprintf(',''%s''',params{:});
-                    self.expression = sprintf('pro(%s,%s,%s)',...
-                        self.expression, Q.expression,str(2:end));
-                else
-                    str = sprintf(',''%s''',params{:});
-                    self.expression = sprintf('pro(%s,%s)',...
-                        self.expression, str(2:end));
-                end
+            isGrouped = nargin>1 && isa(params{1},'dj.Relvar');
+            if isGrouped
+                Q = params{1};
+                params(1)=[];
             end
-            self.precedence = 0;
             
             assert(iscellstr(params), 'attributes must be provided as a list of strings');
             
@@ -359,12 +389,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             end
             
             R1 = dj.Relvar(R1);
-            prec = -1;
-            R1.expression = sprintf('%s*%s', R1.brace(prec), R2.brace(prec+1));
-            R1.precedence = prec;
             
             % merge field lists
-            [trashs,ix] = setdiff({R2.fields.name},{R1.fields.name});
+            [~, ix] = setdiff({R2.fields.name},{R1.fields.name});
             R1.fields = [R1.fields;R2.fields(sort(ix))];
             R1.primaryKey = {R1.fields([R1.fields.iskey]).name}';
             
@@ -382,7 +409,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 R1.sql.src = sprintf( '%s%s', R1.sql.src, R2.sql.src);
             else
                 alias = char(97+floor(rand(1,6)*26)); % to avoid duplicates
-                R1.sql.src = sprintf( '%s (SELECT %s FROM %s%s) as `r2%s`',R1.sql.src,R2.sql.pro,R2.sql.src,R2.sql.res,alias);
+                R1.sql.src = sprintf( '%s (SELECT %s FROM %s%s) as `r2%s`', ...
+                    R1.sql.src, R2.sql.pro, R2.sql.src, R2.sql.res, alias);
             end
             
         end
@@ -398,9 +426,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % Semidifference is performed on common non-nullable nonblob attributes
             
             R1 = R1.copy; % shallow copy a the original object, preserves its identity
-            prec = -2;
-            R1.expression = sprintf('%s-%s', R1.brace(prec), R2.brace(prec+1));
-            R1.precedence = prec;
             
             commonIllegal = intersect( ...
                 {R1.fields([R1.fields.isnullable] | [R1.fields.isBlob]).name},...
@@ -420,7 +445,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 commonAttrs = sprintf( ',%s', commonAttrs{:} );
                 commonAttrs = commonAttrs(2:end);
                 if ~strcmp(R1.sql.pro,'*')
-                    R1.sql.src = sprintf('(SELECT %s FROM %s%s) as r1',R1.sql.pro,R1.sql.src,R1.sql.res);
+                    R1.sql.src = sprintf('(SELECT %s FROM %s%s) as r1', ...
+                        R1.sql.pro, R1.sql.src, R1.sql.res);
                     R1.sql.pro = '*';
                     R1.sql.res = '';
                 end
@@ -477,9 +503,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                                 self.sql.res = sprintf('%s AND (%s)', ...
                                     self.sql.res, cond);
                             end
-                            self.expression = sprintf('%s & ''%s''',...
-                                self.expression, cond);
-                            self.precedence = -3;
                         end
                     end
                 end
@@ -527,7 +550,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             
             
             [limit, args] = dj.Relvar.limitToSQL(varargin{:});
-            
             self = pro(self, args{:});
             ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
@@ -740,9 +762,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     R1.sql.res = sprintf( '%s %s (%s) IN (SELECT %s from (SELECT %s FROM %s%s) as r2)', ...
                         R1.sql.res,word,commonAttrs,commonAttrs,R2.sql.pro,R2.sql.src,R2.sql.res);
                 end
-                prec = -3;
-                R1.expression = sprintf('%s & %s', R1.brace(prec), R2.brace(prec+1));
-                R1.precedence = prec;
             end
         end
         
@@ -805,7 +824,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     include = include | true;   % include all attributes
                 else
                     % process a renamed attribute
-                    toks = regexp( attrList{iAttr}, ... 
+                    toks = regexp( attrList{iAttr}, ...
                         '^([a-z]\w*)\s*->\s*(\w+)', 'tokens' );
                     if ~isempty(toks)
                         ix = find(strcmp(toks{1}{1},{self.fields.name}));
@@ -817,7 +836,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         aliases{ix}=toks{1}{2};
                     else
                         % process a computed attribute
-                        toks = regexp( attrList{iAttr}, ... 
+                        toks = regexp( attrList{iAttr}, ...
                             '(.*\S)\s*->\s*(\w+)', 'tokens' );
                         if ~isempty(toks)
                             computedAttrs(end+1,:) = toks{:};   %#ok<AGROW>
@@ -832,17 +851,20 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 end
             end
         end
-        
-        
-        
-        function str = brace(self, precedence)
-            % return self.expression in parentheses if precedence > self.precedence
-            str = self.expression;
-            if precedence > self.precedence
-                str = ['(' str ')'];
+    end
+    
+    
+    
+    methods(Access=protected)
+        function selfCopy = copyElement(self)
+            selfCopy = copyElement@matlab.mixin.Copyable(self);
+            if ~isempty(findprop(self,'table')) && ...
+                    isempty(findprop(selfCopy,'table'))
+                % copy the dynamic property table
+                selfCopy.addprop('table');
+                selfCopy.table = self.table;
             end
         end
-        
     end
     
     
@@ -854,10 +876,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             args = varargin;
             if nargin>1 && isnumeric(args{end})
                 if nargin>2 && isnumeric(args{end-1})
-                    limit = sprintf(' limit %d, %d', args{end-1:end});
+                    limit = sprintf(' LIMIT %d, %d', args{end-1:end});
                     args(end-1:end) = [];
                 else
-                    limit = sprintf(' limit %d', varargin{end});
+                    limit = sprintf(' LIMIT %d', varargin{end});
                     args(end) = [];
                 end
             end
