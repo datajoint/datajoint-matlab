@@ -77,6 +77,13 @@ classdef (Sealed) Table < handle
         end
         
         
+        function str = getClassname(self)
+            % dj.Table.getClassname - returns the class name for the
+            % table's dj.Relvar
+            str = sprintf('%s.%s', self.schema.package, dj.utils.camelCase(self.info.name));
+        end
+        
+        
         
         function erd(self, depth1, depth2)
             % plot the entity relationship diagram of this and connected tables

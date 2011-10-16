@@ -1,4 +1,6 @@
 % manages information about database tables and their dependencies
+% Complete documentation is available at <a href=http://code.google.com/p/datajoint/wiki/TableOfContents>Datajoint wiki</a>
+% See also dj.Table, dj.Relvar
 
 classdef Schema < handle
     

@@ -4,8 +4,8 @@
 %
 % SYNTAX:
 %    obj = dj.Relvar  % can only be called after adding property 'table' of type dj.Table
-%    obj = dj.Relvar(anoterRelvar) % copy constructor, strips derived properties
-%    obj = dj.Relvar(tableObj)     % base relvar without a table-specific class
+%    obj = dj.Relvar(otherRelvar) % copy constructor, strips derived identity
+%    obj = dj.Relvar(tableObj)    % base relvar without a table-specific class
 %
 
 
@@ -18,17 +18,19 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     end
     
     properties(Access = private)
-        sql        % sql statement: source, projection, and restriction clauses
+        sql    % sql statement: source, projection, and restriction clauses
     end
     
     
     methods
         function self = Relvar(copyObj)
             switch true
-                
                 case nargin==0 && ~isempty(self.findprop('table'))
                     % normal constructor with no parameters.
                     % The derived class must have a 'table' property of type dj.Table
+                    assert(strcmp(class(self), getClassname(self.table)), ...
+                        'class name %s does not match table name %s', ...
+                        class(self), getClassname(self.table))
                     self.schema = self.table.schema;
                     self.primaryKey = self.table.primaryKey;
                     self.fields = self.table.fields;
@@ -132,17 +134,17 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         function del(self, doPrompt)
             % del(self) remove all tuples in relation self from its table
-            % and dependent tuples in dependent tables.
+            % and dependent tuples in dependent tables, recursively. By
+            % default, confirmation is requested before deleting the data.
+            % To turn off the confirmation, set second input doPrompt to
+            % false.
             %
             % EXAMPLES:
-            %   del(Scans) -- delete all tuples from table Scans
+            %   del(Scans) -- delete all tuples from table Scans and its
+            %   dependents.
             %   del(Scans('mouse_id=12')) -- delete all Scans for mouse 12
             %   del(Scans - Cells)  -- delete all tuples from table Scans
             %           that do not have a matching tuples in table Cells
-            %
-            % When the second arguments is set to false, no prompt is given
-            % and the data are deleted immediately. Only use this when
-            % noninteractivity is critical.
             
             doPrompt = nargin<2 || doPrompt;
             self.schema.cancelTransaction  % exit ongoing transaction, if any
@@ -179,7 +181,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 end
                 
                 % exclude relvar with no matching tuples
-                include = cellfun(@(x) count(x), rels) > 0;
+                counts = cellfun(@(x) count(x), rels);
+                include =  counts > 0;
+                counts = counts(include);
                 rels = rels(include);
                 downstream = downstream(include);
                 
@@ -187,10 +191,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 if doPrompt
                     disp 'ABOUT TO DELETE:'
                     for iRel = 1:length(rels)
-                        n = count(rels{iRel});
                         fprintf('%s %s: %d', ...
                             rels{iRel}.table.info.tier, ...
-                            self.schema.classNames{downstream(iRel)}, n);
+                            self.schema.classNames{downstream(iRel)}, counts(iRel));
                         if ismember(rels{iRel}.table.info.tier, {'manual','lookup'})
                             fprintf ' !!!'
                         end
@@ -203,16 +206,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >> ', 's'))
                     disp 'delete canceled'
                 else
-                    for iRel = length(rels):-1:1
-                        n = rels{iRel}.count;
-                        if n
-                            self.schema.query(sprintf('DELETE FROM %s%s', ...
+                    for iRel = length(rels):-1:1                        
+                        fprintf('Deleting %d tuples from %s... ', ...
+                                counts(iRel), self.schema.classNames{downstream(iRel)})    
+                        self.schema.query(sprintf('DELETE FROM %s%s', ...
                                 rels{iRel}.sql.src, rels{iRel}.sql.res))
-                            fprintf('Deleted %d tuples from %s\n', ...
-                                n, self.schema.classNames{downstream(iRel)})
-                        end
+                        fprintf 'done\n'
                     end
-                    disp 'delete complete'
                 end
             end
         end
@@ -385,7 +385,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 {R1.fields([R1.fields.isnullable] | [R1.fields.isBlob]).name},...
                 {R2.fields([R2.fields.isnullable] | [R2.fields.isBlob]).name});
             if ~isempty(commonIllegal)
-                error('Attribute ''%s'' is optional or a blob. Exclude it from one of the relations before joining.', commonIllegal{1})
+                error('Attribute ''%s'' is optional or a blob. Exclude it from one of the relations before joining.', ...
+                    commonIllegal{1})
             end
             
             R1 = dj.Relvar(R1);
@@ -857,6 +858,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     
     methods(Access=protected)
         function selfCopy = copyElement(self)
+            % this method is called by matlab.mixin.Copyable/copy for each
+            % copied object and controls how individual properties are copied.
             selfCopy = copyElement@matlab.mixin.Copyable(self);
             if ~isempty(findprop(self,'table')) && ...
                     isempty(findprop(selfCopy,'table'))
