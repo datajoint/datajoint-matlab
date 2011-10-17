@@ -194,10 +194,7 @@ classdef Schema < handle
         function reload(self)
             % load schema information into memory: table names and table
             % dependencies.
-            
-            % connect to the database
-            [trash] = self.query('status');
-            
+                        
             % load table information
             fprintf('loading table definitions from %s/%s... ', self.host, self.dbname)
             tic
@@ -316,11 +313,10 @@ classdef Schema < handle
         
         
         function ret = query(self, queryStr, varargin)
-            %{
-            ret = query(dbname, queryStr, varargin) issue an SQL query.
-            The result of the query is returned in ret.
-            Reuses the same connection, which limits to one database
-            connection at a time.
+            % dj.Schema/query - query(dbname, queryStr, varargin) issue an 
+            % SQL query and return the result if any.
+            % Reuses the same connection, which limits connections to one
+            % database server at a time, but multiple schemas are okay.
             %}
             if isempty(self.connection) || 0<mym(self.connection, 'status')
                 self.connection=mym('open', self.host, self.user, self.password);
@@ -334,6 +330,74 @@ classdef Schema < handle
         
         
         
+        function makeClass(self, className, tier, isAuto)
+            % create a base relvar class for the new className in schema
+            % directory.
+            % 
+            % Example: 
+            %    s = v2p.getSchema;
+            %    s.makeClass('CellOriRegression', 'computed', false) 
+            
+            if nargin<3
+                tier = 'computed';
+            end
+            assert(ismember(tier, dj.utils.allowedTiers), ...
+                'tier must be one of dj.utils.allowedTiers') 
+            isAuto = ismember(tier, {'computed','imported'}) && ...
+                (nargin<4 || isAuto);
+            
+            filename = fileparts(which(sprintf('%s.getSchema', self.package)));
+            assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
+            filename = fullfile(filename, [className '.m']);
+            assert( ~exist(filename,'file'), '%s already exists', filename)
+            
+            f = fopen(filename,'wt');
+            assert(-1 ~= f, 'Could not open %s', filename)
+            
+            % table declaration
+            fprintf(f, '%% %s.%s - my newest table\n', self.package, className);
+            fprintf(f, '%% I will explain what my table does here \n\n');
+            fprintf(f, '%%{\n');
+            fprintf(f, '%s.%s (%s) # my newest table\n\n', self.package, className, tier);
+            fprintf(f, '-----\n\n');
+            fprintf(f, '%%}\n\n');
+            
+            % class definition
+            fprintf(f, 'classdef %s < dj.Relvar', className);
+            if isAuto
+                fprintf(f, ' & dj.AutoPopulate');
+            end
+            
+            % properties
+            fprintf(f, '\n\n\tproperties(Constant)\n');
+            fprintf(f, '\t\ttable = dj.Table(''%s.%s'')\n', self.package, className);
+            if isAuto
+                fprintf(f, '\t\tpopRel = \n');
+            end
+            fprintf(f, '\tend\n');
+
+            % constructor
+            fprintf(f, '\n\tmethods\n');
+            fprintf(f, '\t\tfunction self = %s(varargin)\n', className);
+            fprintf(f, '\t\t\tself.restrict(varargin)\n');
+            fprintf(f, '\t\tend\n');
+            
+            % metod makeTuples
+            if isAuto
+                fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
+                fprintf(f, '\t\t\t ... compute new fields for key ...\n');
+                fprintf(f, '\t\t\tself.insert(key)\n');
+                fprintf(f, '\t\tend\n');
+            end
+            fprintf(f, '\tend\n');
+            fprintf(f, 'end\n');
+            fclose(f);
+            edit(filename)
+        end
+            
+        
+        
+        
         function manageJobs(self, jobReservations)
             if nargin == 1
                 self.jobReservations = [];
@@ -341,12 +405,12 @@ classdef Schema < handle
                 assert(isa(jobReservations, 'dj.Relvar'));
                 self.jobReservations = jobReservations;
             end
-            self.jobKey = [];
+            self.jobKey = {[]}; 
         end
         
         
         
-        function success = setJobStatus(self, key, status, errMsg, errStack)
+        function success = setJobStatus(self, parforIdx, key, status, errMsg, errStack)
             % dj.Schema/setJobStatus - manage jobs
             % This processed is used by dj.AutoPopulate/populate to reserve
             % jobs for distributed processing. Jobs are managed only when a
@@ -354,61 +418,67 @@ classdef Schema < handle
             
             % if no job manager, do nothing
             success = isempty(self.jobReservations);
+            assert(~success || parforIdx==1, ...
+                'parallel jobs require an active jobs table'); 
+            
+            % create a separate job key for every parfor iteration
+            if numel(self.jobKey)<parforIdx
+                self.jobKey{parforIdx} = [];
+            end
             
             if ~success
                 switch status
                     case {'completed','error'}
                         % check that this is the matching job
-                        assert(~isempty(self.jobKey) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey)), ...
+                        assert(~isempty(self.jobKey{parforIdx}) && ...
+                            ~isempty(dj.utils.structJoin(key, self.jobKey{parforIdx})), ...
                             'The job must be reserved first')
-                        
-                        self.jobKey.job_status = status;
+                        self.jobKey{parforIdx}.job_status = status;
                         if nargin>3
-                            self.jobKey.error_message = errMsg;
+                            self.jobKey{parforIdx}.error_message = errMsg;
                         end
                         if nargin>4
-                            self.jobKey.error_stack = errStack;
+                            self.jobKey{parforIdx}.error_stack = errStack;
                         end
-                        self.jobReservations.insert(self.jobKey, 'REPLACE')
-                        self.jobKey = [];
+                        self.jobReservations.insert(self.jobKey{parforIdx}, 'REPLACE')
+                        self.jobKey{parforIdx} = [];
                         success = true;
                         
                     case 'reserved'
                         % check if the job is already ours
-                        success = ~isempty(self.jobKey) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey));
+                        success = ~isempty(self.jobKey{parforIdx}) && ...
+                            ~isempty(dj.utils.structJoin(key, self.jobKey{parforIdx}));
                         
                         if ~success
                             % mark previous job completed
-                            if ~isempty(self.jobKey)
-                                self.jobKey.job_status = 'completed';
-                                self.jobReservations.insert(self.jobKey, 'REPLACE');
-                                self.jobKey = [];
+                            if ~isempty(self.jobKey{parforIdx})
+                                self.jobKey{parforIdx}.job_status = 'completed';
+                                self.jobReservations.insert(...
+                                    self.jobKey{parforIdx}, 'REPLACE');
+                                self.jobKey{parforIdx} = [];
                             end
                             
                             % create the new job key
                             for f = self.jobReservations.primaryKey
                                 try
-                                    self.jobKey.(f{1}) = key.(f{1});
+                                    self.jobKey{parforIdx}.(f{1}) = key.(f{1});
                                 catch e
                                     error 'Incomplete job key: use a more general job reservation table.'
                                 end
                             end
                             
                             % check if the job is available
-                            success = 0 == count(self.jobReservations & self.jobKey);
-                            if ~success
-                                self.jobKey = [];
-                            else
-                                % reserve the job
+                            try 
+                                self.jobReservations.insert(...
+                                    setfield(self.jobKey{parforIdx},'job_status',status))  %#ok
+                                success = true;
                                 disp 'RESERVED JOB:'
-                                disp(self.jobKey)
-
-                                self.jobKey.job_status = status;
-                                self.jobReservations.insert(self.jobKey, 'REPLACE')
-                            end
-                            
+                                disp(self.jobKey{parforIdx})
+                            catch %#ok
+                                % reservation failed due to a duplicate, move on
+                                % to the next job
+                                self.jobKey{parforIdx} = [];
+                            end                            
                         end
                     otherwise
                         error 'invalid job status'
