@@ -101,9 +101,9 @@ classdef AutoPopulate < handle
                             end
                         end
                     end
+                    setJobStatus(key, 'completed');
                 end
             end
-            setJobStatus(key, 'completed');
             
             
             function success = setJobStatus(key, status, varargin)

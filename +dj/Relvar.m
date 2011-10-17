@@ -369,7 +369,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function R1 = rdivide(R1, R2)
-            % dj.Relvar.rdivide is depracated. Use dj.R1.minus instead.
+            % dj.Relvar/rdivide is depracated and will be removed in a future release. 
+            % Use dj.Relvar/minus instead.
             % See also dj.Relvar.minus
             R1 = R1 - R2;
         end
