@@ -11,7 +11,7 @@ classdef(Sealed) utils
         tierPrefixes = {'#', '', '_', '__'}
         macros = struct(...
             'JobFields', {{
-            'table_name: varchar(255)  # table name for which the job is reserved'
+            'table_name: varchar(255)  # schema.table name for which the job is reserved'
             '---'
             'job_status: enum("reserved","completed","error","ignore") # if tuple is missing, the job is available'
             'error_message="": varchar(1023) # error message returned if failed'

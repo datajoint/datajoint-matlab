@@ -107,7 +107,8 @@ classdef AutoPopulate < handle
             
             
             function success = setJobStatus(key, status, varargin)
-                key.table_name = self.table.info.name;
+                key.table_name = sprintf('%s.%s', ...
+                    self.schema.dbname, self.table.info.name);
                 success = self.schema.setJobStatus(key, status, varargin{:});
             end
         end
