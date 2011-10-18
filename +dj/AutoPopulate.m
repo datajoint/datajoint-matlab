@@ -18,7 +18,7 @@ classdef AutoPopulate < handle
     
     properties(SetAccess=private)
         jobKey
-        jobTable
+        jobRel
     end
     
     
@@ -49,18 +49,18 @@ classdef AutoPopulate < handle
     
     methods
         
-        function varargout = parPopulate(self, jobTable, varargin)
+        function varargout = parPopulate(self, jobRel, varargin)
             % dj.AutoPopulate/parPopulate - same as populate but with job
             % reservation for distributed processing.
  
-            assert(isa(jobTable,'dj.Relvar'), ...
-                'The second input must be a job reservation relevar');  
-            assert(all(ismember(jobTable.primaryKey, [self.primaryKey,{'table_name'}])), ...
+            assert(isa(jobRel,'dj.Relvar'), ...
+                'The second input must be a job reservation relvar');  
+            assert(all(ismember(jobRel.primaryKey, [self.primaryKey,{'table_name'}])), ...
                 'The job table''s primary key fields must be a subset of populated table fields');
             
-            self.jobTable = jobTable;
+            self.jobRel = jobRel;
             [varargout{1:nargout}] = self.populate(varargin{:});
-            self.jobTable = [];
+            self.jobRel = [];
             self.jobKey = [];
         end
         
@@ -101,8 +101,8 @@ classdef AutoPopulate < handle
             
             unpopulatedKeys = fetch((self.popRel - self) & varargin);
             if ~isempty(unpopulatedKeys)
-                if ~isempty(self.jobTable)
-                    jobFields = self.jobTable.table.primaryKey(1:end-1);
+                if ~isempty(self.jobRel)
+                    jobFields = self.jobRel.table.primaryKey(1:end-1);
                     unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
                 end
                 for key = unpopulatedKeys'
@@ -124,7 +124,7 @@ classdef AutoPopulate < handle
                                 if nargout > 0
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
                                     errors = [errors; err];         %#ok<AGROW>
-                                elseif isempty(self.jobTable)
+                                elseif isempty(self.jobRel)
                                     % rethrow error only if it's not already returned or logged.
                                     rethrow(err)
                                 end
@@ -148,7 +148,7 @@ classdef AutoPopulate < handle
             % job manager is specified using dj.Schema/setJobManager
             
             % if no job manager, do nothing
-            success = isempty(self.jobTable);
+            success = isempty(self.jobRel);
             
             if ~success
                 key.table_name = ...
@@ -161,7 +161,7 @@ classdef AutoPopulate < handle
                                 'job key mismatch ')
                             self.jobKey = [];
                         end
-                        key = dj.utils.structPro(key, self.jobTable.primaryKey);
+                        key = dj.utils.structPro(key, self.jobRel.primaryKey);
                         key.job_status = status;
                         if nargin>3
                             key.error_message = errMsg;
@@ -169,7 +169,7 @@ classdef AutoPopulate < handle
                         if nargin>4
                             key.error_stack = errStack;
                         end
-                        self.jobTable.insert(key, 'REPLACE')
+                        self.jobRel.insert(key, 'REPLACE')
                         success = true;
                         
                     case 'reserved'
@@ -181,16 +181,16 @@ classdef AutoPopulate < handle
                             % mark previous job completed
                             if ~isempty(self.jobKey)
                                 self.jobKey.job_status = 'completed';
-                                self.jobTable.insert(...
+                                self.jobRel.insert(...
                                     self.jobKey, 'REPLACE');
                             end
                             
                             % create the new job key
-                            self.jobKey = dj.utils.structPro(key, self.jobTable.primaryKey);
+                            self.jobKey = dj.utils.structPro(key, self.jobRel.primaryKey);
                             
                             % check if the job is available
                             try
-                                self.jobTable.insert(...
+                                self.jobRel.insert(...
                                     setfield(self.jobKey,'job_status',status))  %#ok
                                 disp 'RESERVED JOB:'
                                 disp(self.jobKey)
