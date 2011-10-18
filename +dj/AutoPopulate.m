@@ -49,24 +49,19 @@ classdef AutoPopulate < handle
     
     methods
         
-        function [failedKeys, errors] = parPopulate(self, jobTable, varargin)
-            % jobs executed in parallel
-            assert( all(ismember(jobTable.primaryKey, [self.primaryKey,{'table_name'}])), ...
+        function varargout = parPopulate(self, jobTable, varargin)
+            % dj.AutoPopulate/parPopulate - same as populate but with job
+            % reservation for distributed processing.
+ 
+            assert(isa(jobTable,'dj.Relvar'), ...
+                'The second input must be a job reservation relevar');  
+            assert(all(ismember(jobTable.primaryKey, [self.primaryKey,{'table_name'}])), ...
                 'The job table''s primary key fields must be a subset of populated table fields');
             
             self.jobTable = jobTable;
-            self.jobKey = [];
-            switch nargout
-                case 0
-                    self.populate(varargin)
-                case 1
-                    failedKeys = self.populate(varargin);
-                case 2
-                    [failedKeys, errors] = self.populate(varargin);
-                otherwise
-                    error 'too many outputs'
-            end
+            [varargout{1:nargout}] = self.populate(varargin{:});
             self.jobTable = [];
+            self.jobKey = [];
         end
         
         
@@ -117,10 +112,10 @@ classdef AutoPopulate < handle
                         if count(self & key)
                             self.schema.cancelTransaction
                         else
-                            % populate for the key
                             fprintf('Populating %s for:\n', class(self))
                             disp(key)
                             try
+                                % do the work
                                 self.makeTuples(key)
                                 self.schema.commitTransaction
                             catch err
@@ -130,18 +125,16 @@ classdef AutoPopulate < handle
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
                                     errors = [errors; err];         %#ok<AGROW>
                                 elseif isempty(self.jobTable)
-                                    % rethrow error only if it's not
-                                    % already returned or logged.
+                                    % rethrow error only if it's not already returned or logged.
                                     rethrow(err)
                                 end
                             end
                         end
                     end
                 end
+                % complete the last job if non-empty
+                self.setJobStatus(key, 'completed');
             end
-            
-            % complete the last job if non-empty
-            self.setJobStatus(key, 'completed');
         end
     end
     
@@ -190,25 +183,18 @@ classdef AutoPopulate < handle
                                 self.jobKey.job_status = 'completed';
                                 self.jobTable.insert(...
                                     self.jobKey, 'REPLACE');
-                                self.jobKey = [];
                             end
                             
                             % create the new job key
-                            for f = self.jobTable.primaryKey
-                                try
-                                    self.jobKey.(f{1}) = key.(f{1});
-                                catch e
-                                    error 'Incomplete job key: use a more general job reservation table.'
-                                end
-                            end
+                            self.jobKey = dj.utils.structPro(key, self.jobTable.primaryKey);
                             
                             % check if the job is available
                             try
                                 self.jobTable.insert(...
                                     setfield(self.jobKey,'job_status',status))  %#ok
-                                success = true;
                                 disp 'RESERVED JOB:'
                                 disp(self.jobKey)
+                                success = true;
                             catch %#ok
                                 % reservation failed due to a duplicate, move on
                                 % to the next job
