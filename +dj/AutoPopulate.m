@@ -65,14 +65,7 @@ classdef AutoPopulate < handle
             %   [failedKeys, errs] = populate(OriMaps);  % skip errors and return their list
             
             self.schema.cancelTransaction  % rollback any unfinished transaction
-            
-            % if the last input is numeric, interpret it as parforIdx
-            parforIdx = 1;
-            if nargin>1 && isnumeric(varargin{end})
-                parforIdx = varargin{end};
-                varargin(end) = [];
-            end
-            
+                        
             if nargout > 0
                 failedKeys = struct([]);
                 errors = struct([]);
@@ -125,7 +118,7 @@ classdef AutoPopulate < handle
             function success = setJobStatus(key, status, varargin)
                 key.table_name = sprintf('%s.%s', ...
                     self.schema.dbname, self.table.info.name);
-                success = self.schema.setJobStatus(parforIdx, key, status, varargin{:});
+                success = self.schema.setJobStatus(key, status, varargin{:});
             end
         end
     end

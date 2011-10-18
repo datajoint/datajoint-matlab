@@ -410,7 +410,7 @@ classdef Schema < handle
         
         
         
-        function success = setJobStatus(self, parforIdx, key, status, errMsg, errStack)
+        function success = setJobStatus(self, key, status, errMsg, errStack)
             % dj.Schema/setJobStatus - manage jobs
             % This processed is used by dj.AutoPopulate/populate to reserve
             % jobs for distributed processing. Jobs are managed only when a
@@ -418,50 +418,43 @@ classdef Schema < handle
             
             % if no job manager, do nothing
             success = isempty(self.jobReservations);
-            assert(~success || parforIdx==1, ...
-                'parallel jobs require an active jobs table'); 
-            
-            % create a separate job key for every parfor iteration
-            if numel(self.jobKey)<parforIdx
-                self.jobKey{parforIdx} = [];
-            end
             
             if ~success
                 switch status
                     case {'completed','error'}
                         % check that this is the matching job
-                        assert(~isempty(self.jobKey{parforIdx}) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey{parforIdx})), ...
+                        assert(~isempty(self.jobKey) && ...
+                            ~isempty(dj.utils.structJoin(key, self.jobKey)), ...
                             'The job must be reserved first')
-                        self.jobKey{parforIdx}.job_status = status;
+                        self.jobKey.job_status = status;
                         if nargin>3
-                            self.jobKey{parforIdx}.error_message = errMsg;
+                            self.jobKey.error_message = errMsg;
                         end
                         if nargin>4
-                            self.jobKey{parforIdx}.error_stack = errStack;
+                            self.jobKey.error_stack = errStack;
                         end
-                        self.jobReservations.insert(self.jobKey{parforIdx}, 'REPLACE')
-                        self.jobKey{parforIdx} = [];
+                        self.jobReservations.insert(self.jobKey, 'REPLACE')
+                        self.jobKey = [];
                         success = true;
                         
                     case 'reserved'
                         % check if the job is already ours
-                        success = ~isempty(self.jobKey{parforIdx}) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey{parforIdx}));
+                        success = ~isempty(self.jobKey) && ...
+                            ~isempty(dj.utils.structJoin(key, self.jobKey));
                         
                         if ~success
                             % mark previous job completed
-                            if ~isempty(self.jobKey{parforIdx})
-                                self.jobKey{parforIdx}.job_status = 'completed';
+                            if ~isempty(self.jobKey)
+                                self.jobKey.job_status = 'completed';
                                 self.jobReservations.insert(...
-                                    self.jobKey{parforIdx}, 'REPLACE');
-                                self.jobKey{parforIdx} = [];
+                                    self.jobKey, 'REPLACE');
+                                self.jobKey = [];
                             end
                             
                             % create the new job key
                             for f = self.jobReservations.primaryKey
                                 try
-                                    self.jobKey{parforIdx}.(f{1}) = key.(f{1});
+                                    self.jobKey.(f{1}) = key.(f{1});
                                 catch e
                                     error 'Incomplete job key: use a more general job reservation table.'
                                 end
@@ -470,14 +463,14 @@ classdef Schema < handle
                             % check if the job is available
                             try 
                                 self.jobReservations.insert(...
-                                    setfield(self.jobKey{parforIdx},'job_status',status))  %#ok
+                                    setfield(self.jobKey,'job_status',status))  %#ok
                                 success = true;
                                 disp 'RESERVED JOB:'
-                                disp(self.jobKey{parforIdx})
+                                disp(self.jobKey)
                             catch %#ok
                                 % reservation failed due to a duplicate, move on
                                 % to the next job
-                                self.jobKey{parforIdx} = [];
+                                self.jobKey = [];
                             end                            
                         end
                     otherwise
