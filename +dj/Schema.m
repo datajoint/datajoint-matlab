@@ -194,7 +194,7 @@ classdef Schema < handle
         function reload(self)
             % load schema information into memory: table names and table
             % dependencies.
-                        
+            
             % load table information
             fprintf('loading table definitions from %s/%s... ', self.host, self.dbname)
             tic
@@ -313,7 +313,7 @@ classdef Schema < handle
         
         
         function ret = query(self, queryStr, varargin)
-            % dj.Schema/query - query(dbname, queryStr, varargin) issue an 
+            % dj.Schema/query - query(dbname, queryStr, varargin) issue an
             % SQL query and return the result if any.
             % Reuses the same connection, which limits connections to one
             % database server at a time, but multiple schemas are okay.
@@ -333,16 +333,16 @@ classdef Schema < handle
         function makeClass(self, className, tier, isAuto)
             % create a base relvar class for the new className in schema
             % directory.
-            % 
-            % Example: 
+            %
+            % Example:
             %    s = v2p.getSchema;
-            %    s.makeClass('CellOriRegression', 'computed', false) 
+            %    s.makeClass('CellOriRegression', 'computed', false)
             
             if nargin<3
                 tier = 'computed';
             end
             assert(ismember(tier, dj.utils.allowedTiers), ...
-                'tier must be one of dj.utils.allowedTiers') 
+                'tier must be one of dj.utils.allowedTiers')
             isAuto = ismember(tier, {'computed','imported'}) && ...
                 (nargin<4 || isAuto);
             
@@ -375,7 +375,7 @@ classdef Schema < handle
                 fprintf(f, '\t\tpopRel = \n');
             end
             fprintf(f, '\tend\n');
-
+            
             % constructor
             fprintf(f, '\n\tmethods\n');
             fprintf(f, '\t\tfunction self = %s(varargin)\n', className);
@@ -394,7 +394,7 @@ classdef Schema < handle
             fclose(f);
             edit(filename)
         end
-            
+        
         
         
         
@@ -405,7 +405,7 @@ classdef Schema < handle
                 assert(isa(jobReservations, 'dj.Relvar'));
                 self.jobReservations = jobReservations;
             end
-            self.jobKey = []; 
+            self.jobKey = [];
         end
         
         
@@ -423,18 +423,20 @@ classdef Schema < handle
                 switch status
                     case {'completed','error'}
                         % check that this is the matching job
-                        assert(~isempty(self.jobKey) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey)), ...
-                            'The job must be reserved first')
-                        self.jobKey.job_status = status;
+                        if ~isempty(self.jobKey)
+                            assert(~isempty(dj.utils.structJoin(key, self.jobKey)),...
+                                'job key mismatch ')
+                            self.jobKey = [];
+                        end
+                        key = dj.utils.structPro(key, self.jobReservations.primaryKey);
+                        key.job_status = status;
                         if nargin>3
-                            self.jobKey.error_message = errMsg;
+                            key.error_message = errMsg;
                         end
                         if nargin>4
-                            self.jobKey.error_stack = errStack;
+                            key.error_stack = errStack;
                         end
-                        self.jobReservations.insert(self.jobKey, 'REPLACE')
-                        self.jobKey = [];
+                        self.jobReservations.insert(key, 'REPLACE')
                         success = true;
                         
                     case 'reserved'
@@ -461,7 +463,7 @@ classdef Schema < handle
                             end
                             
                             % check if the job is available
-                            try 
+                            try
                                 self.jobReservations.insert(...
                                     setfield(self.jobKey,'job_status',status))  %#ok
                                 success = true;
@@ -471,7 +473,7 @@ classdef Schema < handle
                                 % reservation failed due to a duplicate, move on
                                 % to the next job
                                 self.jobKey = [];
-                            end                            
+                            end
                         end
                     otherwise
                         error 'invalid job status'
