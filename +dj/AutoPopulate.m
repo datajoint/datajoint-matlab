@@ -153,7 +153,9 @@ classdef AutoPopulate < handle
                     sprintf('%s.%s', self.schema.dbname, self.table.info.name);
                 switch status
                     case {'completed','error'}
-                        % if no key checked out, do nothing
+                        % if no key checked out, do nothing. This may
+                        % happen if an error has already been logged and
+                        % the final "completed" is being submitted.
                         if ~isempty(self.jobKey)
                             % assert that the completed job matches the reservation
                             assert(~isempty(dj.utils.structJoin(key, self.jobKey)),...
