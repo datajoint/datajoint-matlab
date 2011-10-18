@@ -17,12 +17,12 @@
 classdef AutoPopulate < handle
     
     properties(SetAccess=private)
-        jobKey
-        jobRel
+        jobKey   % currently reserved job
+        jobRel   % the job reservation table (if any)
     end
     
-    
     methods
+    
         function self = AutoPopulate
             try
                 assert(isa(self, 'dj.Relvar'))
@@ -34,27 +34,15 @@ classdef AutoPopulate < handle
             assert(ismember(self.table.info.tier, {'imported','computed'}), ...
                 'AutoPopulate tables can only be "imported" or "computed"')
         end
-    end
-    
-    
-    methods(Abstract)
+
         
-        makeTuples(self, key)
-        % makeTuples(self, key) must be defined by each automatically
-        % populated relvar. makeTuples copies key as tuple, adds computed
-        % fields to tuple and inserts tuple as self.insert(tuple)
-        
-    end
-    
-    
-    methods
         
         function varargout = parPopulate(self, jobRel, varargin)
             % dj.AutoPopulate/parPopulate - same as populate but with job
             % reservation for distributed processing.
- 
+            
             assert(isa(jobRel,'dj.Relvar'), ...
-                'The second input must be a job reservation relvar');  
+                'The second input must be a job reservation relvar');
             assert(all(ismember(jobRel.primaryKey, [self.primaryKey,{'table_name'}])), ...
                 'The job table''s primary key fields must be a subset of populated table fields');
             
@@ -99,7 +87,7 @@ classdef AutoPopulate < handle
                 errors = struct([]);
             end
             
-            unpopulatedKeys = fetch((self.popRel - self) & varargin);
+            unpopulatedKeys = fetch((self.popRel & varargin) - self);
             if ~isempty(unpopulatedKeys)
                 if numel(self.jobRel)
                     jobFields = self.jobRel.table.primaryKey(1:end-1);
@@ -140,14 +128,24 @@ classdef AutoPopulate < handle
     
     
     
+    methods(Abstract)
+        
+        makeTuples(self, key)
+        % makeTuples(self, key) must be defined by each automatically
+        % populated relvar. makeTuples copies key as tuple, adds computed
+        % fields to tuple and inserts tuple as self.insert(tuple)
+        
+    end
+    
+        
+    
     methods(Access = private)
+    
         function success = setJobStatus(self, key, status, errMsg, errStack)
-            % dj.AutoPopulate/setJobStatus - manage jobs
-            % This processed is used by dj.AutoPopulate/populate to reserve
-            % jobs for distributed processing. Jobs are managed only when a
-            % job manager is specified using dj.Schema/setJobManager
-            
-            % if no job manager, do nothing
+            % dj.AutoPopulate/setJobStatus - update job process for parallel 
+            % execution.  
+            % If self.jobRel is not set, jobs are not being managed.
+
             success = ~numel(self.jobRel);
             
             if ~success
@@ -155,21 +153,20 @@ classdef AutoPopulate < handle
                     sprintf('%s.%s', self.schema.dbname, self.table.info.name);
                 switch status
                     case {'completed','error'}
-                        % check that this is the matching job
+                        % if no key checked out, do nothing
                         if ~isempty(self.jobKey)
+                            % assert that the completed job matches the reservation
                             assert(~isempty(dj.utils.structJoin(key, self.jobKey)),...
                                 'job key mismatch ')
+                            key = dj.utils.structPro(key, self.jobRel.primaryKey);
+                            key.job_status = status;
+                            if strcmp(status, 'error')
+                                key.error_message = errMsg;
+                                key.error_stack = errStack;
+                            end
+                            self.jobRel.insert(key, 'REPLACE')
                             self.jobKey = [];
                         end
-                        key = dj.utils.structPro(key, self.jobRel.primaryKey);
-                        key.job_status = status;
-                        if nargin>3
-                            key.error_message = errMsg;
-                        end
-                        if nargin>4
-                            key.error_stack = errStack;
-                        end
-                        self.jobRel.insert(key, 'REPLACE')
                         success = true;
                         
                     case 'reserved'
@@ -181,8 +178,7 @@ classdef AutoPopulate < handle
                             % mark previous job completed
                             if ~isempty(self.jobKey)
                                 self.jobKey.job_status = 'completed';
-                                self.jobRel.insert(...
-                                    self.jobKey, 'REPLACE');
+                                self.jobRel.insert(self.jobKey, 'REPLACE');
                             end
                             
                             % create the new job key

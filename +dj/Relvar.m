@@ -5,7 +5,7 @@
 % SYNTAX:
 %    obj = dj.Relvar  % can only be called after adding property 'table' of type dj.Table
 %    obj = dj.Relvar(otherRelvar) % copy constructor, strips derived identity
-%    obj = dj.Relvar(tableObj)    % base relvar without a table-specific class
+%    obj = dj.Relvar(tableObj)    % construct a relvar servicing the table
 %
 
 
@@ -66,9 +66,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function display(self, justify)
-            % DJ/disp - displays the contents of a relation.
-            % Only non-blob fields of the first several tuples are shown. The total
-            % number of tuples is printed at the end.
+            % dj.Relvar/disp - display the contents of the relation.
+            % Only non-blob fields of the first several tuples are shown. 
+            % The total number of tuples is printed at the end.
+            
             justify = nargin==1 || justify;
             tic
             display@handle(self)
@@ -211,7 +212,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 end
                 
                 % confirm and delete
-                if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >> ', 's'))
+                if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
                     disp 'delete canceled'
                 else
                     for iRel = length(rels):-1:1                        
@@ -386,8 +387,20 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function R1 = mtimes(R1,R2)
-            %  DJ/mtimes - relational natural join.
-            %  Syntax: r3=r1*r2
+            % dj.Relvar/mtimes - relational natural join.
+            %
+            % SYNTAX: 
+            %   R3=R1*R2
+            %
+            % The result will contain all matching combinations of tuples
+            % in R1 and tuples in R2. Two tuples make a matching
+            % combination if their commonly named attributes contain the
+            % same values.
+            % Blobs and nullable fields should not be joined on. 
+            % To prevent an attribute from being joined on, rename it using
+            % dj.Relvar/pro's rename syntax.
+            %
+            % See also dj.Relvar/pro, dj.Relvar/fetch
             
             % check that the joined relations do not have common fields that are blobs or opional
             commonIllegal = intersect( ...
@@ -428,12 +441,16 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function R1 = minus(R1,R2)
-            % DJ/rdivide - relational natural semidifference.
-            % r1./r2 contains all tuples in r1 that do not have matching tuples in r2.
+            % dj.Relvar/minus - relational natural antijoin (aka semidifference)
             %
-            %  Syntax: r3=r1./r2
+            % SYNTAX: R3 = R1-R2
             %
-            % Semidifference is performed on common non-nullable nonblob attributes
+            % The result R1 contains all tuples in R1 that do not have 
+            % matching tuples in R2. Two tuples are matching if their
+            % commonly named attributes contain equal values. These
+            % commonly fields should not include nullable or blob fields.
+            %
+            % See also dj.Relvar/and
             
             R1 = R1.copy; % shallow copy a the original object, preserves its identity
             
