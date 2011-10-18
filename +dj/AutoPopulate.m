@@ -101,7 +101,7 @@ classdef AutoPopulate < handle
             
             unpopulatedKeys = fetch((self.popRel - self) & varargin);
             if ~isempty(unpopulatedKeys)
-                if ~isempty(self.jobRel)
+                if numel(self.jobRel)
                     jobFields = self.jobRel.table.primaryKey(1:end-1);
                     unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
                 end
@@ -124,7 +124,7 @@ classdef AutoPopulate < handle
                                 if nargout > 0
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
                                     errors = [errors; err];         %#ok<AGROW>
-                                elseif isempty(self.jobRel)
+                                elseif ~numel(self.jobRel)
                                     % rethrow error only if it's not already returned or logged.
                                     rethrow(err)
                                 end
@@ -148,7 +148,7 @@ classdef AutoPopulate < handle
             % job manager is specified using dj.Schema/setJobManager
             
             % if no job manager, do nothing
-            success = isempty(self.jobRel);
+            success = ~numel(self.jobRel);
             
             if ~success
                 key.table_name = ...
