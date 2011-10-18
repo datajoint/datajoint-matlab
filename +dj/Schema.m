@@ -405,7 +405,7 @@ classdef Schema < handle
                 assert(isa(jobReservations, 'dj.Relvar'));
                 self.jobReservations = jobReservations;
             end
-            self.jobKey = {[]}; 
+            self.jobKey = []; 
         end
         
         
