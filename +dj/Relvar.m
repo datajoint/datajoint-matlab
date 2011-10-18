@@ -129,6 +129,14 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         end
         
         
+        function isempty(self)
+            error 'use ~dj.Relvar/count instead'
+        end
+        
+        
+        function length(self)
+            error 'use dj.Relvar/count instead'
+        end
         
         
         
