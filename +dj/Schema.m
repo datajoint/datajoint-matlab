@@ -13,14 +13,12 @@ classdef Schema < handle
         classNames % classes corresponding to tables
         fields  % full list of all table fields
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
-        jobReservations    % a dj.Relvar of the job reservation table
     end
     
     properties(Access = private)
         password
         tableLevels   % levels in dependency hiararchy
         connection
-        jobKey        % currently checked out job
     end
     
     methods
@@ -398,87 +396,5 @@ classdef Schema < handle
         
         
         
-        function manageJobs(self, jobReservations)
-            if nargin == 1
-                self.jobReservations = [];
-            else
-                assert(isa(jobReservations, 'dj.Relvar'));
-                self.jobReservations = jobReservations;
-            end
-            self.jobKey = [];
-        end
-        
-        
-        
-        function success = setJobStatus(self, key, status, errMsg, errStack)
-            % dj.Schema/setJobStatus - manage jobs
-            % This processed is used by dj.AutoPopulate/populate to reserve
-            % jobs for distributed processing. Jobs are managed only when a
-            % job manager is specified using dj.Schema/setJobManager
-            
-            % if no job manager, do nothing
-            success = isempty(self.jobReservations);
-            
-            if ~success
-                switch status
-                    case {'completed','error'}
-                        % check that this is the matching job
-                        if ~isempty(self.jobKey)
-                            assert(~isempty(dj.utils.structJoin(key, self.jobKey)),...
-                                'job key mismatch ')
-                            self.jobKey = [];
-                        end
-                        key = dj.utils.structPro(key, self.jobReservations.primaryKey);
-                        key.job_status = status;
-                        if nargin>3
-                            key.error_message = errMsg;
-                        end
-                        if nargin>4
-                            key.error_stack = errStack;
-                        end
-                        self.jobReservations.insert(key, 'REPLACE')
-                        success = true;
-                        
-                    case 'reserved'
-                        % check if the job is already ours
-                        success = ~isempty(self.jobKey) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey));
-                        
-                        if ~success
-                            % mark previous job completed
-                            if ~isempty(self.jobKey)
-                                self.jobKey.job_status = 'completed';
-                                self.jobReservations.insert(...
-                                    self.jobKey, 'REPLACE');
-                                self.jobKey = [];
-                            end
-                            
-                            % create the new job key
-                            for f = self.jobReservations.primaryKey
-                                try
-                                    self.jobKey.(f{1}) = key.(f{1});
-                                catch e
-                                    error 'Incomplete job key: use a more general job reservation table.'
-                                end
-                            end
-                            
-                            % check if the job is available
-                            try
-                                self.jobReservations.insert(...
-                                    setfield(self.jobKey,'job_status',status))  %#ok
-                                success = true;
-                                disp 'RESERVED JOB:'
-                                disp(self.jobKey)
-                            catch %#ok
-                                % reservation failed due to a duplicate, move on
-                                % to the next job
-                                self.jobKey = [];
-                            end
-                        end
-                    otherwise
-                        error 'invalid job status'
-                end
-            end
-        end
     end
 end

@@ -16,6 +16,12 @@
 
 classdef AutoPopulate < handle
     
+    properties(SetAccess=private)
+        jobKey
+        jobTable
+    end
+    
+    
     methods
         function self = AutoPopulate
             try
@@ -30,14 +36,41 @@ classdef AutoPopulate < handle
         end
     end
     
+    
     methods(Abstract)
+        
         makeTuples(self, key)
         % makeTuples(self, key) must be defined by each automatically
         % populated relvar. makeTuples copies key as tuple, adds computed
         % fields to tuple and inserts tuple as self.insert(tuple)
+        
     end
     
+    
     methods
+        
+        function [failedKeys, errors] = parPopulate(self, jobTable, varargin)
+            % jobs executed in parallel
+            assert( all(ismember(jobTable.primaryKey, [self.primaryKey,{'table_name'}])), ...
+                'The job table''s primary key fields must be a subset of populated table fields');
+            
+            self.jobTable = jobTable;
+            self.jobKey = [];
+            switch nargout
+                case 0
+                    self.populate(varargin)
+                case 1
+                    failedKeys = self.populate(varargin);
+                case 2
+                    [failedKeys, errors] = self.populate(varargin);
+                otherwise
+                    error 'too many outputs'
+            end
+            self.jobTable = [];
+        end
+        
+        
+        
         function [failedKeys, errors] = populate(self, varargin)
             % populates a table based on the contents self.popRel
             %
@@ -65,7 +98,7 @@ classdef AutoPopulate < handle
             %   [failedKeys, errs] = populate(OriMaps);  % skip errors and return their list
             
             self.schema.cancelTransaction  % rollback any unfinished transaction
-                        
+            
             if nargout > 0
                 failedKeys = struct([]);
                 errors = struct([]);
@@ -73,17 +106,12 @@ classdef AutoPopulate < handle
             
             unpopulatedKeys = fetch((self.popRel - self) & varargin);
             if ~isempty(unpopulatedKeys)
-                if ~isempty(self.schema.jobReservations)
-                    jobFields = self.schema.jobReservations.table.primaryKey(1:end-1);
-                    assert(all(isfield(unpopulatedKeys, jobFields)), ...
-                        ['The primary key of job table %s is more specific than'...
-                        ' the primary key of %s.popRel. Use a more general job table'], ...
-                        class(self.schema.jobReservations), class(self));
-                    % group unpopulated keys by job reservation
+                if ~isempty(self.jobTable)
+                    jobFields = self.jobTable.table.primaryKey(1:end-1);
                     unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
                 end
                 for key = unpopulatedKeys'
-                    if setJobStatus(key, 'reserved')    % this also marks previous job as completed
+                    if self.setJobStatus(key, 'reserved')    % this also marks previous job as completed
                         self.schema.startTransaction
                         % check again in case a parallel process has already populated
                         if count(self & key)
@@ -97,11 +125,11 @@ classdef AutoPopulate < handle
                                 self.schema.commitTransaction
                             catch err
                                 self.schema.cancelTransaction
-                                setJobStatus(key, 'error', err.message, err.stack);
+                                self.setJobStatus(key, 'error', err.message, err.stack);
                                 if nargout > 0
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
                                     errors = [errors; err];         %#ok<AGROW>
-                                elseif isempty(self.schema.jobReservations)
+                                elseif isempty(self.jobTable)
                                     % rethrow error only if it's not
                                     % already returned or logged.
                                     rethrow(err)
@@ -112,14 +140,86 @@ classdef AutoPopulate < handle
                 end
             end
             
-            % complete the last job.
-            setJobStatus(key, 'completed');
+            % complete the last job if non-empty
+            self.setJobStatus(key, 'completed');
+        end
+    end
+    
+    
+    
+    methods(Access = private)
+        function success = setJobStatus(self, key, status, errMsg, errStack)
+            % dj.AutoPopulate/setJobStatus - manage jobs
+            % This processed is used by dj.AutoPopulate/populate to reserve
+            % jobs for distributed processing. Jobs are managed only when a
+            % job manager is specified using dj.Schema/setJobManager
             
-            function success = setJobStatus(key, status, varargin)
-                key.table_name = sprintf('%s.%s', ...
-                    self.schema.dbname, self.table.info.name);
-                success = self.schema.setJobStatus(key, status, varargin{:});
+            % if no job manager, do nothing
+            success = isempty(self.jobTable);
+            
+            if ~success
+                key.table_name = ...
+                    sprintf('%s.%s', self.schema.dbname, self.table.info.name);
+                switch status
+                    case {'completed','error'}
+                        % check that this is the matching job
+                        if ~isempty(self.jobKey)
+                            assert(~isempty(dj.utils.structJoin(key, self.jobKey)),...
+                                'job key mismatch ')
+                            self.jobKey = [];
+                        end
+                        key = dj.utils.structPro(key, self.jobTable.primaryKey);
+                        key.job_status = status;
+                        if nargin>3
+                            key.error_message = errMsg;
+                        end
+                        if nargin>4
+                            key.error_stack = errStack;
+                        end
+                        self.jobTable.insert(key, 'REPLACE')
+                        success = true;
+                        
+                    case 'reserved'
+                        % check if the job is already ours
+                        success = ~isempty(self.jobKey) && ...
+                            ~isempty(dj.utils.structJoin(key, self.jobKey));
+                        
+                        if ~success
+                            % mark previous job completed
+                            if ~isempty(self.jobKey)
+                                self.jobKey.job_status = 'completed';
+                                self.jobTable.insert(...
+                                    self.jobKey, 'REPLACE');
+                                self.jobKey = [];
+                            end
+                            
+                            % create the new job key
+                            for f = self.jobTable.primaryKey
+                                try
+                                    self.jobKey.(f{1}) = key.(f{1});
+                                catch e
+                                    error 'Incomplete job key: use a more general job reservation table.'
+                                end
+                            end
+                            
+                            % check if the job is available
+                            try
+                                self.jobTable.insert(...
+                                    setfield(self.jobKey,'job_status',status))  %#ok
+                                success = true;
+                                disp 'RESERVED JOB:'
+                                disp(self.jobKey)
+                            catch %#ok
+                                % reservation failed due to a duplicate, move on
+                                % to the next job
+                                self.jobKey = [];
+                            end
+                        end
+                    otherwise
+                        error 'invalid job status'
+                end
             end
+            
         end
     end
 end
