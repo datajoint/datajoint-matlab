@@ -86,8 +86,12 @@ classdef (Sealed) Table < handle
         
         
         function erd(self, depth1, depth2)
-            % plot the entity relationship diagram of this and connected tables
-            % table.erd([depth1[,depth2]])
+            % dj.Table/erd - plot the entity relationship diagram of tables
+            % that are connected to self. 
+            % 
+            % SYNTAX
+            %   table.erd([depth1[,depth2]])
+            % 
             % depth1 and depth2 specify the connectivity radius upstream
             % (depth<0) and downstream (depth>0) of this table.
             % Omitting both depths defaults to table.erd(-2,2).
@@ -98,6 +102,8 @@ classdef (Sealed) Table < handle
             %   t.erd       % plot two levels above and below
             %   t.erd( 2);  % plot dependents up to 2 levels below
             %   t.erd(-1);  % plot only immediate ancestors
+            %
+            % See also dj.Schema/erd
             
             switch nargin
                 case 1
@@ -110,7 +116,8 @@ classdef (Sealed) Table < handle
             
             i = find(strcmp({self.schema.tables.name}, self.info.name));
             assert(length(i) == 1);
-            
+
+            % find tables on which self depends
             upstream = i;
             nodes = i;
             for j=1:-levels(1)
@@ -118,6 +125,7 @@ classdef (Sealed) Table < handle
                 upstream = [upstream nodes(:)'];  %#ok:<AGROW>
             end
             
+            % find tables dependent on self 
             downstream = [];
             nodes = i;
             for j=1:levels(2)
@@ -125,19 +133,25 @@ classdef (Sealed) Table < handle
                 downstream = [downstream nodes(:)'];  %#ok:<AGROW>
             end
             
-            pool = unique([upstream downstream]);
-            self.schema.erd(pool)
+            % plot the ERD
+            self.schema.erd(unique([upstream downstream]))
         end
         
         
         
         function str = re(self, expandForeignKeys)
-            % dj.Table.re reverse engineer the table declaration.
-            % table.re returns the table declaration that can be used to create
-            % the table from scratch using the dj.Table constrcutor.
-            % When expandForeignKeys is set to true, then references to other
-            % tables are not displayed and foreign key fields are shown as
-            % regular fields.
+            % dj.Table/re - "reverse engineer" the table declaration.
+            %
+            % SYNTAX:
+            %   str = table.re
+            %   str = table.re(true)
+            %
+            % str will contain the table declaration string that can be used 
+            % to create the table using dj.Table.
+            %
+            % When the second input expandForeignKeys is true, then references 
+            % to other tables are not displayed and foreign key fields are shown 
+            % as regular fields.
             %
             % See also dj.Table
             
@@ -227,9 +241,11 @@ classdef (Sealed) Table < handle
         
         
         function drop(self)
-            % dj.Table/drop drop the table and all its dependents.
+            % dj.Table/drop - drop the table and all its dependents.
             % No warning is given when the tables are empty.
             % If the tables have data in them, a warning is given first.
+            %
+            % See also dj.Table, dj.Relvar/del
             
             self.schema.cancelTransaction   % exit ongoing transaction
             
@@ -466,13 +482,6 @@ classdef (Sealed) Table < handle
                             end
                         otherwise
                             % parse field definition
-                            pat = {
-                                '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
-                                '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-                                ':\s*(?<type>\w[\w,"'' ()]+[\w\)])\s*' % datatype
-                                '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
-                                };
-                            fieldInfo = regexp(line, cat(2,pat{:}), 'names');
                             if isempty(fieldInfo)
                                 % try no default value
                                 fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');

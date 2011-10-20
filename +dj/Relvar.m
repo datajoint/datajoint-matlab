@@ -123,7 +123,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.sql.src, self.sql.res));
             else
                 n = self.schema.query(...
-                    sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ...
+                    sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ... 
                     self.sql.pro, self.sql.src, self.sql.res));
             end
             n=n.n;
@@ -131,31 +131,32 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function ret = isempty(self)
-            warning 'dj.Relvar/isemtpy is being deprecated. Use ~dj.Relvar/count instead'
+            warning 'dj.Relvar/isemtpy is deprecated. Use ~dj.Relvar/count instead'
             ret = ~self.count;
         end
         
         
         function ret = length(self)
-            warning 'dj.Relva/length use dj.Relvar/count instead'
+            warning 'dj.Relva/length is deprecated. Use dj.Relvar/count instead'
             ret = self.count;
         end
         
         
         
         function del(self, doPrompt)
-            % del(self) remove all tuples in relation self from its table
-            % and dependent tuples in dependent tables, recursively. By
-            % default, confirmation is requested before deleting the data.
-            % To turn off the confirmation, set second input doPrompt to
-            % false.
+            % dj.Relvar/del - remove all tuples of relation self from its table
+            % as well as all dependent tuples in dependent tables.
+            %
+            % By default, confirmation is requested before deleting the data.
+            % To turn off the confirmation, set the second input doPrompt to false.
             %
             % EXAMPLES:
-            %   del(Scans) -- delete all tuples from table Scans and its
-            %   dependents.
-            %   del(Scans('mouse_id=12')) -- delete all Scans for mouse 12
-            %   del(Scans - Cells)  -- delete all tuples from table Scans
-            %           that do not have a matching tuples in table Cells
+            %   del(Scans) % delete all tuples from table Scans and all tuples in dependent tables.
+            %   del(Scans('mouse_id=12')) % delete all Scans for mouse 12
+            %   del(Scans - Cells)  % delete all tuples from table Scans that do not have matching 
+            %                       % tuples in table Cells
+            % 
+            % See also dj.Table/drop
             
             doPrompt = nargin<2 || doPrompt;
             self.schema.cancelTransaction  % exit ongoing transaction, if any
@@ -240,7 +241,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function self = and(self, arg)
-            % relational restriction
+            % dj.Relvar/and - relational restriction
             %
             % R1 & cond  yeilds a relation containing all the tuples in R1
             % that match the condition cond. The condition cond could be an
@@ -260,24 +261,34 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function self = pro(self, varargin)
-            % r = rel.pro(attr1, ..., attrn) - project relvar rel onto a subset
-            % of its attributes.
-            %
-            % r = relvar.pro(otherRel, attr1, ..., attrn) - project relation
-            % relvar1 onto its attributes and onto aggregate attributes
-            % of relation Q.
+            % dj.Relvar/pro - relational operators that modify the relvar's header: 
+            % project, rename, extend, and aggregate.
+            % 
+            % SYNTAX: 
+            %   r = rel.pro(attr1, ..., attrn) 
+            %   r = rel.pro(otherRel, attr1, ..., attrn) 
             %
             % INPUTS:
             %    'attr1',...,'attrn' is a comma-separated string of attributes.
+            %    otherRel is another relvar for the aggregate operator
             %
-            % Primary key attributes are included implicitly and cannot be excluded.
+            % The result will return another relation with the same number of tuples 
+            % with modified attributes. Primary key attributes are included implicitly 
+            % and cannot be excluded. Thus pro(rel) simply strips all non-key fields. 
             %
-            % To rename an attribute, list it in the form 'old_name->new_name'.
+            % Project: To include an attribute, add its name to the attribute list.
             %
-            % To compute a new attribute, list it as 'expression->new_name', e.g.
-            % 'datediff(exp_date,now())->days_ago'
+            % Rename: To rename an attribute, list it in the form 'old_name->new_name'.
+            % Add '*' to the attribute list to add all the other attributes besides the 
+            % renamed ones.
             %
-            % The expressions may use SQL operators and functions.
+            % Extend: To compute a new attribute, list it as 'expression->new_name', e.g.
+            % 'datediff(exp_date,now())->days_ago'. The computed expressions may use SQL 
+            % operators and functions.
+            %
+            % Aggregate: When the second input is another relvar, the computed 
+            % axpressions may include aggregation functions on attributes of the 
+            % other relvar: max, min, sum, avg, variance, std, and count.
             %
             % EXAMPLES:
             %   Construct relation r2 containing only the primary keys of r1:
@@ -285,9 +296,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             %
             %   Construct relation r3 which contains values for 'operator'
             %   and 'anesthesia' for every tuple in r1:
-            %   >> r3=r1.pro('operator','anesthesia');
+            %   >> r3 = r1.pro('operator','anesthesia');
             %
-            % 	Rename attribute 'anesthesia' to 'anesth' in relation r1:
+            %   Rename attribute 'anesthesia' to 'anesth' in relation r1:
             %   >> r1 = r1.pro('*','anesthesia->anesth');
             %
             %   Add field mouse_age to relation r1 that has the field mouse_dob:
@@ -297,9 +308,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             %   for every tuple in r1. Also add field 'avga' which contains the
             %   average value of field 'a' in r2.
             %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
-            %
-            % You may use the following summary functions: max, min, sum, ...
-            % avg, variance, std, count
+            % 
+            % See also: dj.Relvar/fetch
             
             self = dj.Relvar(self);  % copy into a derived relation
             
