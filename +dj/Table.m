@@ -87,11 +87,11 @@ classdef (Sealed) Table < handle
         
         function erd(self, depth1, depth2)
             % dj.Table/erd - plot the entity relationship diagram of tables
-            % that are connected to self. 
-            % 
+            % that are connected to self.
+            %
             % SYNTAX
             %   table.erd([depth1[,depth2]])
-            % 
+            %
             % depth1 and depth2 specify the connectivity radius upstream
             % (depth<0) and downstream (depth>0) of this table.
             % Omitting both depths defaults to table.erd(-2,2).
@@ -116,7 +116,7 @@ classdef (Sealed) Table < handle
             
             i = find(strcmp({self.schema.tables.name}, self.info.name));
             assert(length(i) == 1);
-
+            
             % find tables on which self depends
             upstream = i;
             nodes = i;
@@ -125,7 +125,7 @@ classdef (Sealed) Table < handle
                 upstream = [upstream nodes(:)'];  %#ok:<AGROW>
             end
             
-            % find tables dependent on self 
+            % find tables dependent on self
             downstream = [];
             nodes = i;
             for j=1:levels(2)
@@ -146,11 +146,11 @@ classdef (Sealed) Table < handle
             %   str = table.re
             %   str = table.re(true)
             %
-            % str will contain the table declaration string that can be used 
+            % str will contain the table declaration string that can be used
             % to create the table using dj.Table.
             %
-            % When the second input expandForeignKeys is true, then references 
-            % to other tables are not displayed and foreign key fields are shown 
+            % When the second input expandForeignKeys is true, then references
+            % to other tables are not displayed and foreign key fields are shown
             % as regular fields.
             %
             % See also dj.Table
@@ -482,6 +482,13 @@ classdef (Sealed) Table < handle
                             end
                         otherwise
                             % parse field definition
+                            pat = {
+                                '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
+                                '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
+                                ':\s*(?<type>\w+([^#"]+|"[^"]*")*\S)\s*' % datatype
+                                '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
+                                };
+                            fieldInfo = regexp(line, cat(2,pat{:}), 'names');
                             if isempty(fieldInfo)
                                 % try no default value
                                 fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
