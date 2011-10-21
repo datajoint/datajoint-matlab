@@ -242,8 +242,7 @@ classdef (Sealed) Table < handle
         
         function drop(self)
             % dj.Table/drop - drop the table and all its dependents.
-            % No warning is given when the tables are empty.
-            % If the tables have data in them, a warning is given first.
+            % Confirmation is requested if the dropped tables contain data.
             %
             % See also dj.Table, dj.Relvar/del
             
@@ -255,34 +254,42 @@ classdef (Sealed) Table < handle
             while ~isempty(nodes)
                 [nodes, ~] = find(self.schema.dependencies(:, nodes));
                 nodes = setdiff(nodes, downstream);
-                downstream = [nodes(:)' downstream];  %#ok:<AGROW>
+                downstream = [downstream nodes(:)'];  %#ok:<AGROW>
             end
-            fprintf('Dropping %s and %d dependent tables...\n',...
-                self.schema.classNames{downstream(end)}, length(downstream)-1)
             
-            % delate and drop tables in reverse order
-            for iTable = downstream
-                name = sprintf('`%s`.`%s`', ...
-                    self.schema.dbname, self.schema.tables(iTable).name);
+            % inform user about what's being deleted
+            fprintf 'ABOUT TO DROP TABLES: \n'
+            names = cell(size(downstream));
+            counts = zeros(size(downstream));
+            for iTable = 1:length(downstream)
+                names{iTable} = sprintf('`%s`.`%s`', ...
+                    self.schema.dbname, self.schema.tables(downstream(iTable)).name);
+                n = self.schema.query(sprintf('SELECT count(*) as n FROM %s', ...
+                    names{iTable}));
+                counts(iTable) = n.n;
+                fprintf('%s... %d tuples \n', names{iTable}, n.n)
+            end
+            fprintf \n
                 
-                % if the table has data, give option to cancel
-                n = self.schema.query(sprintf('SELECT count(*) as n FROM %s',name));
-                if n.n > 0
-                    fprintf('Table %s contains %d tuples.  Do you still want to drop this table? ', ...
-                        self.schema.classNames{iTable}, n.n);
-                    if ~strcmp('yes', input('yes/no? >> ','s'))
-                        fprintf('User cancelled.  Table %s not dropped\n', ...
-                            self.schema.classNames{iTable});
-                        break
-                    end
+            % if any table has data, give option to cancel
+            doDrop = ~any(counts) || ...
+                strncmpi('yes', input('Proceed to drop? yes/no >', 's'), 3);
+            if ~doDrop
+                disp 'User cancelled table drop'
+            else
+                for iTable = length(downstream):-1:1
+                    self.schema.query(sprintf('DROP TABLE %s', names{iTable}))
+                    fprintf('Dropped table %s\n', ...
+                        self.schema.classNames{downstream(iTable)})
                 end
-                self.schema.query(sprintf('DROP TABLE %s', name))
-                fprintf('Dropped table %s\n', self.schema.classNames{iTable})
             end
+            fprintf \n
             
+            % reload the schema.  clear classes is still necessary to reset
+            % constant properties and persistent variables that use the
+            % dropped tables
             self.schema.reload
-        end
-        
+        end        
     end
     
     
