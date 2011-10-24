@@ -16,25 +16,26 @@
 
 classdef AutoPopulate < handle
     
-    properties(SetAccess=private)
+    properties(Access=private)
         jobKey   % currently reserved job
         jobRel   % the job reservation table (if any)
     end
     
     methods
-    
+        
         function self = AutoPopulate
             try
                 assert(isa(self, 'dj.Relvar'))
                 assert(isa(self.table, 'dj.Table'))
                 assert(isa(self.popRel, 'dj.Relvar'))
             catch  %#ok
-                error 'an AutoPopulate class must be derived from dj.Relvar and define properties ''table'' and ''popRel'''
+                error(['an AutoPopulate class must be derived from dj.Relvar ' ...
+                    'and define properties ''table'' and ''popRel'''])
             end
             assert(ismember(self.table.info.tier, {'imported','computed'}), ...
                 'AutoPopulate tables can only be "imported" or "computed"')
         end
-
+        
         
         
         function varargout = parPopulate(self, jobRel, varargin)
@@ -137,15 +138,15 @@ classdef AutoPopulate < handle
         
     end
     
-        
+    
     
     methods(Access = private)
-    
+        
         function success = setJobStatus(self, key, status, errMsg, errStack)
-            % dj.AutoPopulate/setJobStatus - update job process for parallel 
-            % execution.  
+            % dj.AutoPopulate/setJobStatus - update job process for parallel
+            % execution.
             % If self.jobRel is not set, jobs are not being managed.
-
+            
             success = ~numel(self.jobRel);
             
             if ~success

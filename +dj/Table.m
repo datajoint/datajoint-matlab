@@ -244,10 +244,30 @@ classdef (Sealed) Table < handle
             % dj.Table/drop - drop the table and all its dependents.
             % Confirmation is requested if the dropped tables contain data.
             %
+            % Although drop reloads the schema information upon completion,
+            % "clear classes" may be necessary to remove constant object
+            % properties and persistent variables that refer to the dropped
+            % table.
+            %
             % See also dj.Table, dj.Relvar/del
             
             self.schema.cancelTransaction   % exit ongoing transaction
             
+            % warn user if self is a subtable
+            if ismember(self.info.tier, {'imported','computed'}) && ...
+                    ~isempty(which(self.getClassname))
+                rel = eval(self.getClassname);
+                if ~isa(rel,'dj.AutoPopulate')
+                    fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
+                        'drop its parent table instead.\n'], self.getClassname)
+                    if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
+                        fprintf '\ndrop cancelled\n\n'
+                        return
+                    end                    
+                end
+            end
+            
+            % comple the list of dependent tables
             nodes = find(strcmp({self.schema.tables.name}, self.info.name));
             assert(~isempty(nodes));
             downstream = nodes;
@@ -270,7 +290,7 @@ classdef (Sealed) Table < handle
                 fprintf('%s... %d tuples \n', names{iTable}, n.n)
             end
             fprintf \n
-                
+            
             % if any table has data, give option to cancel
             doDrop = ~any(counts) || ...
                 strncmpi('yes', input('Proceed to drop? yes/no >', 's'), 3);
@@ -282,14 +302,13 @@ classdef (Sealed) Table < handle
                     fprintf('Dropped table %s\n', ...
                         self.schema.classNames{downstream(iTable)})
                 end
+                % reload the schema.  clear classes is still necessary to reset
+                % constant properties and persistent variables that use the
+                % dropped tables
+                self.schema.reload
             end
             fprintf \n
-            
-            % reload the schema.  clear classes is still necessary to reset
-            % constant properties and persistent variables that use the
-            % dropped tables
-            self.schema.reload
-        end        
+        end
     end
     
     

@@ -28,6 +28,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 case nargin==0 && ~isempty(self.findprop('table'))
                     % normal constructor with no parameters.
                     % The derived class must have a 'table' property of type dj.Table
+                    assert(isa(self.table,'dj.Table'), 'self.table must be a dj.Table')
                     assert(strcmp(class(self), getClassname(self.table)), ...
                         'class name %s does not match table name %s', ...
                         class(self), getClassname(self.table))
@@ -171,8 +172,12 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 % warn the user if deleting from a subtable
                 if ismember(self.table.info.tier, {'imported','computed'}) ...
                         && ~isa(self, 'dj.AutoPopulate')
-                    fprintf('!!! %s is a subtable. Deleting from a subtable may violate referential constraints.', ...
-                        class(self))
+                    fprintf(['!!! %s is a subtable. For referential integrity, ' ...
+                        'delete from its parent instead.\n'], class(self))
+                    if ~strcmpi('yes', input('Prceed anyway? yes/no >','s'))
+                        disp 'delete cancelled'
+                        return
+                    end
                 end
                 
                 % get the list of dependent tables (only hierarchical dependencies)
