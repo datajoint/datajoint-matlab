@@ -13,14 +13,16 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     
     properties(SetAccess = private)
         schema     % handle to the schema object
-        primaryKey % list of primary key fields
         fields     % list of fieldnames
     end
     
+    properties(Dependent, SetAccess = private)
+        primaryKey   % the list of fields that are in the primary key
+    end
+            
     properties(Access = private)
         sql    % sql statement: source, projection, and restriction clauses
-    end
-    
+    end    
     
     methods
         function self = Relvar(copyObj)
@@ -33,7 +35,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         'class name %s does not match table name %s', ...
                         class(self), getClassname(self.table))
                     self.schema = self.table.schema;
-                    self.primaryKey = self.table.primaryKey;
                     self.fields = self.table.fields;
                     self.sql.pro = '*';
                     self.sql.res = '';
@@ -43,13 +44,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 case nargin==1 && isa(copyObj, 'dj.Relvar')
                     % copy constructor
                     self.schema = copyObj.schema;
-                    self.primaryKey = copyObj.primaryKey;
                     self.sql = copyObj.sql;
                     self.fields = copyObj.fields;
                     
                 case nargin==1 && isa(copyObj, 'dj.Table')
                     % initialization from a dj.Table, not using a table-specific class
-                    self.primaryKey = copyObj.primaryKey;
                     self.schema = copyObj.schema;
                     self.fields = copyObj.fields;
                     self.sql.pro = '*';
@@ -65,21 +64,30 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         end
         
         
+        function key = get.primaryKey(self)
+            if isempty(self.fields)
+                key = {};
+            else
+                key = {self.fields([self.fields.iskey]).name};
+            end
+        end
+
+        
         
         function display(self, justify)
             % dj.Relvar/disp - display the contents of the relation.
-            % Only non-blob fields of the first several tuples are shown. 
+            % Only non-blob fields of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             
             justify = nargin==1 || justify;
             tic
             display@handle(self)
-            % print header
-            fprintf \n
-            ix = find( ~[self.fields.isBlob] );  % fields to display
-            fprintf('  %12.12s', self.fields(ix).name);
-            fprintf \n
             
+            % print header
+            ix = find( ~[self.fields.isBlob] );  % fields to display
+            fprintf \n
+            fprintf('  %12.12s', self.fields(ix).name)
+            fprintf \n
             % print rows
             maxRows = 24;
             tuples = self.fetch(self.fields(ix).name,maxRows+1);
@@ -90,27 +98,27 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     for iField = ix
                         v = s.(self.fields(iField).name);
                         if isnumeric(v)
-                            fprintf('  %12g',v);
+                            fprintf('  %12g',v)
                         else
                             if justify
-                                fprintf('  %12.12s',v);
+                                fprintf('  %12.12s',v)
                             else
-                                fprintf('  ''%12s''', v);
+                                fprintf('  ''%12s''', v)
                             end
                         end
                     end
-                    fprintf('\n');
+                    fprintf '\n'
                 end
             end
             if nTuples > maxRows
                 for iField = ix
-                    fprintf('  %12s','.....');
+                    fprintf('  %12s','.....')
                 end
-                fprintf('\n');
+                fprintf '\n'
             end
             
             % print the total number of tuples
-            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc );
+            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
         end
         
         
@@ -124,7 +132,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.sql.src, self.sql.res));
             else
                 n = self.schema.query(...
-                    sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ... 
+                    sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ...
                     self.sql.pro, self.sql.src, self.sql.res));
             end
             n=n.n;
@@ -154,9 +162,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % EXAMPLES:
             %   del(Scans) % delete all tuples from table Scans and all tuples in dependent tables.
             %   del(Scans('mouse_id=12')) % delete all Scans for mouse 12
-            %   del(Scans - Cells)  % delete all tuples from table Scans that do not have matching 
+            %   del(Scans - Cells)  % delete all tuples from table Scans that do not have matching
             %                       % tuples in table Cells
-            % 
+            %
             % See also dj.Table/drop
             
             doPrompt = nargin<2 || doPrompt;
@@ -223,11 +231,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
                     disp 'delete canceled'
                 else
-                    for iRel = length(rels):-1:1                        
+                    for iRel = length(rels):-1:1
                         fprintf('Deleting %d tuples from %s... ', ...
-                                counts(iRel), self.schema.classNames{downstream(iRel)})    
+                            counts(iRel), self.schema.classNames{downstream(iRel)})
                         self.schema.query(sprintf('DELETE FROM %s%s', ...
-                                rels{iRel}.sql.src, rels{iRel}.sql.res))
+                            rels{iRel}.sql.src, rels{iRel}.sql.res))
                         fprintf 'done\n'
                     end
                 end
@@ -266,33 +274,33 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function self = pro(self, varargin)
-            % dj.Relvar/pro - relational operators that modify the relvar's header: 
+            % dj.Relvar/pro - relational operators that modify the relvar's header:
             % project, rename, extend, and aggregate.
-            % 
-            % SYNTAX: 
-            %   r = rel.pro(attr1, ..., attrn) 
-            %   r = rel.pro(otherRel, attr1, ..., attrn) 
+            %
+            % SYNTAX:
+            %   r = rel.pro(attr1, ..., attrn)
+            %   r = rel.pro(otherRel, attr1, ..., attrn)
             %
             % INPUTS:
             %    'attr1',...,'attrn' is a comma-separated string of attributes.
             %    otherRel is another relvar for the aggregate operator
             %
-            % The result will return another relation with the same number of tuples 
-            % with modified attributes. Primary key attributes are included implicitly 
-            % and cannot be excluded. Thus pro(rel) simply strips all non-key fields. 
+            % The result will return another relation with the same number of tuples
+            % with modified attributes. Primary key attributes are included implicitly
+            % and cannot be excluded. Thus pro(rel) simply strips all non-key fields.
             %
             % Project: To include an attribute, add its name to the attribute list.
             %
             % Rename: To rename an attribute, list it in the form 'old_name->new_name'.
-            % Add '*' to the attribute list to add all the other attributes besides the 
+            % Add '*' to the attribute list to add all the other attributes besides the
             % renamed ones.
             %
             % Extend: To compute a new attribute, list it as 'expression->new_name', e.g.
-            % 'datediff(exp_date,now())->days_ago'. The computed expressions may use SQL 
+            % 'datediff(exp_date,now())->days_ago'. The computed expressions may use SQL
             % operators and functions.
             %
-            % Aggregate: When the second input is another relvar, the computed 
-            % axpressions may include aggregation functions on attributes of the 
+            % Aggregate: When the second input is another relvar, the computed
+            % axpressions may include aggregation functions on attributes of the
             % other relvar: max, min, sum, avg, variance, std, and count.
             %
             % EXAMPLES:
@@ -313,7 +321,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             %   for every tuple in r1. Also add field 'avga' which contains the
             %   average value of field 'a' in r2.
             %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
-            % 
+            %
             % See also: dj.Relvar/fetch
             
             self = dj.Relvar(self);  % copy into a derived relation
@@ -330,11 +338,12 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             [include,aliases,computedAttrs] = parseAttrList(self, params);
             
             if ~all(include) || ~all(cellfun(@isempty,aliases)) || ~isempty(computedAttrs)
+
+                % drop attributes that were not included
                 self.fields = self.fields(include);
                 aliases = aliases(include);
-                self.primaryKey={self.fields([self.fields.iskey]).name};
                 
-                % add selected attributes
+                % rename attributes
                 fieldList = '';
                 c = '';
                 for iField=1:length(self.fields)
@@ -395,7 +404,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function R1 = rdivide(R1, R2)
-            % dj.Relvar/rdivide is depracated and will be removed in a future release. 
+            % dj.Relvar/rdivide is depracated and will be removed in a future release.
             % Use dj.Relvar/minus instead.
             % See also dj.Relvar.minus
             R1 = R1 - R2;
@@ -406,14 +415,14 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         function R1 = mtimes(R1,R2)
             % dj.Relvar/mtimes - relational natural join.
             %
-            % SYNTAX: 
+            % SYNTAX:
             %   R3=R1*R2
             %
             % The result will contain all matching combinations of tuples
             % in R1 and tuples in R2. Two tuples make a matching
             % combination if their commonly named attributes contain the
             % same values.
-            % Blobs and nullable fields should not be joined on. 
+            % Blobs and nullable fields should not be joined on.
             % To prevent an attribute from being joined on, rename it using
             % dj.Relvar/pro's rename syntax.
             %
@@ -433,7 +442,6 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % merge field lists
             [~, ix] = setdiff({R2.fields.name},{R1.fields.name});
             R1.fields = [R1.fields;R2.fields(sort(ix))];
-            R1.primaryKey = {R1.fields([R1.fields.iskey]).name}';
             
             % form the join query
             if strcmp(R1.sql.pro,'*') && isempty(R1.sql.res)
@@ -458,14 +466,14 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function R1 = minus(R1,R2)
-            % dj.Relvar/minus - relational natural antijoin (aka semidifference)
+            % dj.Relvar/minus - relational antijoin (aka semidifference)
             %
             % SYNTAX: R3 = R1-R2
             %
-            % The result R1 contains all tuples in R1 that do not have 
+            % The result R3 contains all tuples in R1 that do not have
             % matching tuples in R2. Two tuples are matching if their
             % commonly named attributes contain equal values. These
-            % commonly fields should not include nullable or blob fields.
+            % common fields should not include nullable or blob fields.
             %
             % See also dj.Relvar/and
             
@@ -475,8 +483,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 {R1.fields([R1.fields.isnullable] | [R1.fields.isBlob]).name},...
                 {R2.fields([R2.fields.isnullable] | [R2.fields.isBlob]).name});
             if ~isempty(commonIllegal)
-                error('Attribute ''%s'' is optional or a blob and cannot be compared. You may project it out first.',...
-                    commonIllegal{1})
+                error(['Attribute ''%s'' is optional or a blob and cannot be compared. '...
+                    'You may project it out first.'], commonIllegal{1})
             end
             
             commonAttrs = intersect({R1.fields.name}, {R2.fields.name});
@@ -529,7 +537,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                             cond = self.struct2cond(cond);
                         end
                         assert(ischar(cond), ...
-                            'restricting condition must be a structure, an string, or another relation')
+                            'restricting condition must be a struct, a string, or a relvar')
                         
                         if ~isempty(cond)
                             % put the source in a subquery if it has any renames
