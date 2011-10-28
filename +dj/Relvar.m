@@ -12,17 +12,18 @@
 classdef Relvar < matlab.mixin.Copyable & dynamicprops
     
     properties(SetAccess = private)
-        schema     % handle to the schema object
-        fields     % list of fieldnames
+        schema  % handle to the schema object
     end
     
     properties(Dependent, SetAccess = private)
-        primaryKey   % the list of fields that are in the primary key
+        primaryKey   % primary key attribute names
+        nonKeyFields % non-key attribute names
     end
-            
+    
     properties(Access = private)
-        sql    % sql statement: source, projection, and restriction clauses
-    end    
+        attrs   % struct array of attribute info, updated by relational operators
+        sql     % sql statement: source, projection, and restriction clauses
+    end
     
     methods
         function self = Relvar(copyObj)
@@ -31,11 +32,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     % normal constructor with no parameters.
                     % The derived class must have a 'table' property of type dj.Table
                     assert(isa(self.table,'dj.Table'), 'self.table must be a dj.Table')
-                    assert(strcmp(class(self), getClassname(self.table)), ...
+                    assert(strcmp(class(self), self.table.className), ...
                         'class name %s does not match table name %s', ...
-                        class(self), getClassname(self.table))
+                        class(self), self.table.className)
                     self.schema = self.table.schema;
-                    self.fields = self.table.fields;
+                    self.attrs = self.table.attrs;
                     self.sql.pro = '*';
                     self.sql.res = '';
                     self.sql.src = sprintf('`%s`.`%s`', ...
@@ -45,12 +46,24 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     % copy constructor
                     self.schema = copyObj.schema;
                     self.sql = copyObj.sql;
-                    self.fields = copyObj.fields;
+                    self.attrs = copyObj.attrs;
+                    
+                case nargin==1 && ischar(copyObj)
+                    % initialization as dj.Relvar('schema.ClassName')
+                    copyObj = dj.Table(copyObj);
+                    self.schema = copyObj.schema;
+                    self.attrs = copyObj.attrs;
+                    self.sql.pro = '*';
+                    self.sql.res = '';
+                    self.sql.src = sprintf('`%s`.`%s`', ...
+                        copyObj.schema.dbname, copyObj.info.name);
+                    self.addprop('table');
+                    self.table = copyObj;
                     
                 case nargin==1 && isa(copyObj, 'dj.Table')
                     % initialization from a dj.Table, not using a table-specific class
                     self.schema = copyObj.schema;
-                    self.fields = copyObj.fields;
+                    self.attrs = copyObj.attrs;
                     self.sql.pro = '*';
                     self.sql.res = '';
                     self.sql.src = sprintf('`%s`.`%s`', ...
@@ -64,39 +77,48 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         end
         
         
-        function key = get.primaryKey(self)
-            if isempty(self.fields)
-                key = {};
+        function names = get.primaryKey(self)
+            if isempty(self.attrs)
+                names = {};
             else
-                key = {self.fields([self.fields.iskey]).name};
+                names = {self.attrs([self.attrs.iskey]).name};
             end
         end
-
+        
+        
+        function names = get.nonKeyFields(self)
+            if isempty(self.attrs)
+                names = {};
+            else
+                names = {self.attrs(~[self.attrs.iskey]).name};
+            end
+        end
         
         
         function display(self, justify)
             % dj.Relvar/disp - display the contents of the relation.
-            % Only non-blob fields of the first several tuples are shown.
+            % Only non-blob attrs of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             
             justify = nargin==1 || justify;
             tic
             display@handle(self)
+            nTuples = self.count;
             
-            % print header
-            ix = find( ~[self.fields.isBlob] );  % fields to display
-            fprintf \n
-            fprintf('  %12.12s', self.fields(ix).name)
-            fprintf \n
-            % print rows
-            maxRows = 24;
-            tuples = self.fetch(self.fields(ix).name,maxRows+1);
-            nTuples = count(self);
             
             if nTuples>0
+                % print header
+                ix = find( ~[self.attrs.isBlob] );  % attrs to display
+                fprintf \n
+                fprintf('  %12.12s', self.attrs(ix).name)
+                fprintf \n
+                maxRows = 12;
+                tuples = self.fetch(self.attrs(ix).name,maxRows+1);
+                
+                % print rows
                 for s = tuples(1:min(end,maxRows))'
                     for iField = ix
-                        v = s.(self.fields(iField).name);
+                        v = s.(self.attrs(iField).name);
                         if isnumeric(v)
                             fprintf('  %12g',v)
                         else
@@ -109,12 +131,12 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     end
                     fprintf '\n'
                 end
-            end
-            if nTuples > maxRows
-                for iField = ix
-                    fprintf('  %12s','.....')
+                if nTuples > maxRows
+                    for iField = ix
+                        fprintf('  %12s','.....')
+                    end
+                    fprintf '\n'
                 end
-                fprintf '\n'
             end
             
             % print the total number of tuples
@@ -140,13 +162,15 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         function ret = isempty(self)
-            warning 'dj.Relvar/isemtpy is deprecated. Use ~dj.Relvar/count instead'
+            warning('DataJoint:deprecation',...
+                'dj.Relvar/isemtpy is deprecated. Use ~dj.Relvar/count instead')
             ret = ~self.count;
         end
         
         
         function ret = length(self)
-            warning 'dj.Relva/length is deprecated. Use dj.Relvar/count instead'
+            warning('DataJoint:deprecation',...
+                'dj.Relva/length is deprecated. Use dj.Relvar/count instead')
             ret = self.count;
         end
         
@@ -287,7 +311,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             %
             % The result will return another relation with the same number of tuples
             % with modified attributes. Primary key attributes are included implicitly
-            % and cannot be excluded. Thus pro(rel) simply strips all non-key fields.
+            % and cannot be excluded. Thus pro(rel) simply strips all non-key attrs.
             %
             % Project: To include an attribute, add its name to the attribute list.
             %
@@ -338,18 +362,18 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             [include,aliases,computedAttrs] = parseAttrList(self, params);
             
             if ~all(include) || ~all(cellfun(@isempty,aliases)) || ~isempty(computedAttrs)
-
+                
                 % drop attributes that were not included
-                self.fields = self.fields(include);
+                self.attrs = self.attrs(include);
                 aliases = aliases(include);
                 
                 % rename attributes
                 fieldList = '';
                 c = '';
-                for iField=1:length(self.fields)
-                    fieldList=sprintf('%s%s`%s`',fieldList,c,self.fields(iField).name);
+                for iField=1:length(self.attrs)
+                    fieldList=sprintf('%s%s`%s`',fieldList,c,self.attrs(iField).name);
                     if ~isempty(aliases{iField})
-                        self.fields(iField).name=aliases{iField};
+                        self.attrs(iField).name=aliases{iField};
                         fieldList=sprintf('%s as `%s`',fieldList,aliases{iField});
                     end
                     c = ',';
@@ -357,7 +381,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 
                 % add computed attributes
                 for iComp = 1:size(computedAttrs,1)
-                    self.fields(end+1) = struct(...
+                    self.attrs(end+1) = struct(...
                         'table','', ...
                         'name',computedAttrs{iComp,2},...
                         'iskey',false,...
@@ -422,16 +446,16 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % in R1 and tuples in R2. Two tuples make a matching
             % combination if their commonly named attributes contain the
             % same values.
-            % Blobs and nullable fields should not be joined on.
+            % Blobs and nullable attrs should not be joined on.
             % To prevent an attribute from being joined on, rename it using
             % dj.Relvar/pro's rename syntax.
             %
             % See also dj.Relvar/pro, dj.Relvar/fetch
             
-            % check that the joined relations do not have common fields that are blobs or opional
+            % check that the joined relations do not have common attrs that are blobs or opional
             commonIllegal = intersect( ...
-                {R1.fields([R1.fields.isnullable] | [R1.fields.isBlob]).name},...
-                {R2.fields([R2.fields.isnullable] | [R2.fields.isBlob]).name});
+                {R1.attrs([R1.attrs.isnullable] | [R1.attrs.isBlob]).name},...
+                {R2.attrs([R2.attrs.isnullable] | [R2.attrs.isBlob]).name});
             if ~isempty(commonIllegal)
                 error('Attribute ''%s'' is optional or a blob. Exclude it from one of the relations before joining.', ...
                     commonIllegal{1})
@@ -440,8 +464,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             R1 = dj.Relvar(R1);
             
             % merge field lists
-            [~, ix] = setdiff({R2.fields.name},{R1.fields.name});
-            R1.fields = [R1.fields;R2.fields(sort(ix))];
+            [~, ix] = setdiff({R2.attrs.name},{R1.attrs.name});
+            R1.attrs = [R1.attrs;R2.attrs(sort(ix))];
             
             % form the join query
             if strcmp(R1.sql.pro,'*') && isempty(R1.sql.res)
@@ -473,21 +497,21 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % The result R3 contains all tuples in R1 that do not have
             % matching tuples in R2. Two tuples are matching if their
             % commonly named attributes contain equal values. These
-            % common fields should not include nullable or blob fields.
+            % common attrs should not include nullable or blob attrs.
             %
             % See also dj.Relvar/and
             
             R1 = R1.copy; % shallow copy a the original object, preserves its identity
             
             commonIllegal = intersect( ...
-                {R1.fields([R1.fields.isnullable] | [R1.fields.isBlob]).name},...
-                {R2.fields([R2.fields.isnullable] | [R2.fields.isBlob]).name});
+                {R1.attrs([R1.attrs.isnullable] | [R1.attrs.isBlob]).name},...
+                {R2.attrs([R2.attrs.isnullable] | [R2.attrs.isBlob]).name});
             if ~isempty(commonIllegal)
                 error(['Attribute ''%s'' is optional or a blob and cannot be compared. '...
                     'You may project it out first.'], commonIllegal{1})
             end
             
-            commonAttrs = intersect({R1.fields.name}, {R2.fields.name});
+            commonAttrs = intersect({R1.attrs.name}, {R2.attrs.name});
             
             if isempty(commonAttrs)
                 % commonAttrs is empty, R1 is the empty relation
@@ -578,7 +602,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % conventions as in dj.Relvar.pro, including renamed
             % attributed, and computed arguments.  In particular, if the second
             % input argument is another relvar, the computed arguments can
-            % include summary operations on the fields of the second relvar.
+            % include summary operations on the attrs of the second relvar.
             %
             % For example:
             %   s = R.fetch(Q, 'count(*)->n');
@@ -601,7 +625,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
             
             
-            [limit, args] = dj.Relvar.limitToSQL(varargin{:});
+            [limit, args] = dj.Relvar.getLimitClause(varargin{:});
             self = pro(self, args{:});
             ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
@@ -657,7 +681,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 'The number of outputs must match the number of requested attributes');
             assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetchn()');
             
-            [limit, args] = dj.Relvar.limitToSQL(varargin{:});
+            [limit, args] = dj.Relvar.getLimitClause(varargin{:});
             
             % submit query
             self = self.pro(args{:});
@@ -684,7 +708,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % The optional argument 'command' allows replacing the MySQL
             % command from the default INSERT to INSERT IGNORE or REPLACE.
             %
-            % Duplicates, unmatched fields, or missing required fields will
+            % Duplicates, unmatched attrs, or missing required attrs will
             % cause an error, unless command is specified.
             
             assert(~isempty(findprop(self,'table')), ...
@@ -699,36 +723,36 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             end
             assert(ismember(upper(command),{'INSERT', 'INSERT IGNORE', 'REPLACE'}))
             
-            % validate fields
+            % validate attrs
             fnames = fieldnames(tuples);
-            found = ismember(fnames,{self.fields.name});
+            found = ismember(fnames,{self.attrs.name});
             if ~all(found)
                 error('Field %s is not found in the table %s', ...
                     fnames{find(~found,1,'first')}, class(self));
             end
             
             % form query
-            ix = ismember({self.fields.name}, fnames);
+            ix = ismember({self.attrs.name}, fnames);
             for tuple=tuples(:)'
                 queryStr = '';
                 blobs = {};
                 for i = find(ix)
-                    v = tuple.(self.fields(i).name);
-                    if self.fields(i).isString
+                    v = tuple.(self.attrs(i).name);
+                    if self.attrs(i).isString
                         assert(ischar(v), ...
                             'The field %s must be a character string', ...
-                            self.fields(i).name)
+                            self.attrs(i).name)
                         if isempty(v)
                             queryStr = sprintf('%s`%s`="",', ...
-                                queryStr, self.fields(i).name);
+                                queryStr, self.attrs(i).name);
                         else
                             queryStr = sprintf('%s`%s`="{S}",', ...
-                                queryStr,self.fields(i).name);
+                                queryStr,self.attrs(i).name);
                             blobs{end+1} = v;  %#ok<AGROW>
                         end
-                    elseif self.fields(i).isBlob
+                    elseif self.attrs(i).isBlob
                         queryStr = sprintf('%s`%s`="{M}",', ...
-                            queryStr,self.fields(i).name);
+                            queryStr,self.attrs(i).name);
                         if islogical(v) % mym doesn't accept logicals
                             v = uint8(v);
                         end
@@ -739,10 +763,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         end
                         assert(isscalar(v) && isnumeric(v),...
                             'The field %s must be a numeric scalar value', ...
-                            self.fields(i).name)
+                            self.attrs(i).name)
                         if ~isnan(v)  % nans are not passed: assumed missing.
                             queryStr = sprintf('%s`%s`=%1.16g,',...
-                                queryStr, self.fields(i).name, v);
+                                queryStr, self.attrs(i).name, v);
                         end
                     end
                 end
@@ -783,14 +807,14 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % update expression
             
             commonIllegal = intersect( ...
-                {R1.fields([R1.fields.isBlob]).name},...
-                {R2.fields([R2.fields.isBlob]).name});
+                {R1.attrs([R1.attrs.isBlob]).name},...
+                {R2.attrs([R2.attrs.isBlob]).name});
             if ~isempty(commonIllegal)
                 error('Attribute ''%s'' is a blob and cannot be compared. You may project it out first.',...
                     commonIllegal{1})
             end
             
-            commonAttrs = intersect({R1.fields.name},{R2.fields.name});
+            commonAttrs = intersect({R1.attrs.name},{R2.attrs.name});
             
             % if commonAttrs is empty, R1 is unchanged
             if ~isempty(commonAttrs)
@@ -830,16 +854,16 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             else
                 % convert the structure key into an SQL condition (string)
                 keyFields = fieldnames(key)';
-                foundAttributes = ismember(keyFields, {self.fields.name});
+                foundAttributes = ismember(keyFields, {self.attrs.name});
                 word = '';
                 cond = '';
                 for field = keyFields(foundAttributes)
                     value = key.(field{1});
                     if ~isempty(value)
-                        iField = find(strcmp(field{1}, {self.fields.name}));
-                        assert(~self.fields(iField).isBlob,...
-                            'The key must not include blob fields.');
-                        if self.fields(iField).isString
+                        iField = find(strcmp(field{1}, {self.attrs.name}));
+                        assert(~self.attrs(iField).isBlob,...
+                            'The key must not include blob attrs.');
+                        if self.attrs(iField).isString
                             assert( ischar(value), ...
                                 'Value for key.%s must be a string', field{1})
                             value=sprintf('"%s"',value);
@@ -849,7 +873,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                             value=sprintf('%1.16g',value);
                         end
                         cond = sprintf('%s%s`%s`=%s', ...
-                            cond, word, self.fields(iField).name, value);
+                            cond, word, self.attrs(iField).name, value);
                         word = ' AND';
                     end
                 end
@@ -862,13 +886,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % This is a helper function for dj.Revlar.pro.
             % Parse and validate the list of relation attributes in attrList.
             % OUTPUT:
-            %    include: a logical array marking which fields of self must be included
-            %    aliases: a string array containing aliases for each of self's fields or '' if not aliased
+            %    include: a logical array marking which attrs of self must be included
+            %    aliases: a string array containing aliases for each of self's attrs or '' if not aliased
             %  computedAttrs: pairs of SQL expressions and their aliases.
             %
             
-            include = [self.fields.iskey];  % implicitly include the primary key
-            aliases = repmat({''},size(self.fields));  % one per each self.fields
+            include = [self.attrs.iskey];  % implicitly include the primary key
+            aliases = repmat({''},size(self.attrs));  % one per each self.attrs
             computedAttrs = {};
             
             for iAttr=1:length(attrList)
@@ -879,11 +903,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     toks = regexp( attrList{iAttr}, ...
                         '^([a-z]\w*)\s*->\s*(\w+)', 'tokens' );
                     if ~isempty(toks)
-                        ix = find(strcmp(toks{1}{1},{self.fields.name}));
+                        ix = find(strcmp(toks{1}{1},{self.attrs.name}));
                         assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
                         include(ix)=true;
                         assert(~ismember(toks{1}{2},aliases) ...
-                            && ~ismember(toks{1}{2},{self.fields.name})...
+                            && ~ismember(toks{1}{2},{self.attrs.name})...
                             ,'Duplicate attribute alias `%s`',toks{1}{2});
                         aliases{ix}=toks{1}{2};
                     else
@@ -894,7 +918,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                             computedAttrs(end+1,:) = toks{:};   %#ok<AGROW>
                         else
                             % process a regular attribute
-                            ix = find(strcmp(attrList{iAttr},{self.fields.name}));
+                            ix = find(strcmp(attrList{iAttr},{self.attrs.name}));
                             assert(length(ix)==1,'Attribute `%s` not found', ...
                                 attrList{iAttr});
                             include(ix)=true;
@@ -925,7 +949,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     
     methods(Access=private, Static)
         
-        function [limit, args] = limitToSQL(varargin)
+        function [limit, args] = getLimitClause(varargin)
+            % makes the SQL limit clause from fetch() input arguments.
+            % If the last one or two inputs are numeric, a LIMIT clause is
+            % created.
             limit = '';
             args = varargin;
             if nargin>1 && isnumeric(args{end})

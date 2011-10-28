@@ -11,7 +11,7 @@ classdef Schema < handle
         dbname  % database (schema) name
         tables  % full list of tables
         classNames % classes corresponding to tables
-        fields  % full list of all table fields
+        attrs  % full list of all table attrs
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
@@ -142,8 +142,12 @@ classdef Schema < handle
         
         
         function backup(self, backupDir, tiers)
-            % Saves tables into .mat files
-            % Each tables must be small enough to be loaded into memory.
+            % dj.Schema/backup - saves tables into .mat files
+            % SYNTAX:
+            %    s.backup(folder)    -- save all lookup and manual tables 
+            %    s.backup(folder, {'manual'})    -- save all manual tables
+            %    s.backup(folder, {'manual','imported'})  
+            % Each table must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
             if nargin<3
                 tiers = {'lookup','manual'};
@@ -221,7 +225,7 @@ classdef Schema < handle
             % read field information
             if ~isempty(self.tables)
                 fprintf('%.3g s\nloading field information... ', toc), tic
-                self.fields = query(self, sprintf([...
+                self.attrs = query(self, sprintf([...
                     'SELECT table_name AS `table`, column_name as `name`,'...
                     '(column_key="PRI") AS `iskey`,column_type as `type`,'...
                     '(is_nullable="YES") AS isnullable, column_comment as `comment`,'...
@@ -229,20 +233,20 @@ classdef Schema < handle
                     ' AS `default` FROM information_schema.columns '...
                     'WHERE table_schema="%s"'],...
                     self.dbname));
-                self.fields.isnullable = logical(self.fields.isnullable);
-                self.fields.iskey = logical(self.fields.iskey);
-                self.fields.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.fields.type);
-                self.fields.isString = ~cellfun(@(x) isempty(regexp(char(x'), '^((var)?char|enum|date|timestamp)','once')), self.fields.type);
-                self.fields.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), '^(tiny|medium|long)?blob', 'once')), self.fields.type);
+                self.attrs.isnullable = logical(self.attrs.isnullable);
+                self.attrs.iskey = logical(self.attrs.iskey);
+                self.attrs.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.attrs.type);
+                self.attrs.isString = ~cellfun(@(x) isempty(regexp(char(x'), '^((var)?char|enum|date|timestamp)','once')), self.attrs.type);
+                self.attrs.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), '^(tiny|medium|long)?blob', 'once')), self.attrs.type);
                 % strip field lengths off integer types
-                self.fields.type = cellfun(@(x) regexprep(char(x'), '((tiny|long|small|)int)\(\d+\)','$1'), self.fields.type, 'UniformOutput', false);
-                self.fields = dj.utils.structure2array(self.fields);
-                self.fields = self.fields(ismember({self.fields.table}, {self.tables.name}));
-                validFields = [self.fields.isNumeric] | [self.fields.isString] | [self.fields.isBlob];
+                self.attrs.type = cellfun(@(x) regexprep(char(x'), '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
+                self.attrs = dj.utils.structure2array(self.attrs);
+                self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
+                validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];
                 if ~all(validFields)
                     ix = find(~validFields, 1, 'first');
                     error('unsupported field type "%s" in %s.%s', ...
-                        self.fields(ix).type, self.fields.table(ix), self.fields.name(ix));
+                        self.attrs(ix).type, self.attrs.table(ix), self.attrs.name(ix));
                 end
                 
                 % load table dependencies
@@ -383,7 +387,7 @@ classdef Schema < handle
             % metod makeTuples
             if isAuto
                 fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
-                fprintf(f, '\t\t\t ... compute new fields for key ...\n');
+                fprintf(f, '\t\t\t ... compute new attrs for key ...\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
                 fprintf(f, '\t\tend\n');
             end

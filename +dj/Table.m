@@ -5,8 +5,9 @@
 %    table = dj.Table('package.ClassName')
 %
 % If the table does not exist, it is created based on the definition
-% specified in the first multi-line percent-brace comment block
-% of +package/ClassName.m
+% specified in the first percent-brace comment block in the file whose path
+% is returned by which('package.ClassName'), which will normally contain the
+% class definition of the derived class that works with this table. 
 %
 % The file +package/ClassName.m need not exist if the table already exists
 % in the database. Only if the table does not exist will dj.Table access
@@ -22,8 +23,11 @@ classdef (Sealed) Table < handle
     properties(SetAccess = private)
         schema           % handle to a schema object
         info             % name, tier, comment.  See self.Schema
-        primaryKey       % a column cell array containing primary key names
-        fields           % structure array describing fields
+        attrs           % structure array describing attrs
+    end
+    
+    properties(Dependent, SetAccess = private)
+        className    % the name of the class that should be associated with this table
     end
     
     methods
@@ -63,9 +67,8 @@ classdef (Sealed) Table < handle
             
             % table exists, initialize
             self.info = self.schema.tables(ix);
-            self.fields = self.schema.fields(strcmp(self.info.name, ...
-                {self.schema.fields.table}));
-            self.primaryKey = {self.fields([self.fields.iskey]).name};
+            self.attrs = self.schema.attrs(strcmp(self.info.name, ...
+                {self.schema.attrs.table}));
         end
         
         
@@ -77,12 +80,11 @@ classdef (Sealed) Table < handle
         end
         
         
-        function str = getClassname(self)
-            % dj.Table.getClassname - returns the class name for the
-            % table's dj.Relvar
+        function str = get.className(self)
             str = sprintf('%s.%s', self.schema.package, dj.utils.camelCase(self.info.name));
         end
         
+               
         
         
         function erd(self, depth1, depth2)
@@ -150,8 +152,8 @@ classdef (Sealed) Table < handle
             % to create the table using dj.Table.
             %
             % When the second input expandForeignKeys is true, then references
-            % to other tables are not displayed and foreign key fields are shown
-            % as regular fields.
+            % to other tables are not displayed and foreign key attrs are shown
+            % as regular attrs.
             %
             % See also dj.Table
             
@@ -169,7 +171,7 @@ classdef (Sealed) Table < handle
             assert(~isempty(tableIdx), ...
                 'class %s does not appear in the class list of the schema', className);
             
-            keyFields = {self.fields([self.fields.iskey]).name};
+            keyFields = {self.attrs([self.attrs.iskey]).name};
             
             if ~expandForeignKeys
                 % list parent references
@@ -177,24 +179,24 @@ classdef (Sealed) Table < handle
                     refIds = find(self.schema.dependencies(tableIdx,:)==1);
                     for i=refIds
                         str = sprintf('%s\n-> %s',str, self.schema.classNames{i});
-                        excludeFields = {self.schema.fields([self.schema.fields.iskey]...
-                            & strcmp({self.schema.fields.table},self.schema.tables(i).name)).name};
+                        excludeFields = {self.schema.attrs([self.schema.attrs.iskey]...
+                            & strcmp({self.schema.attrs.table},self.schema.tables(i).name)).name};
                         keyFields = keyFields(~ismember(keyFields, excludeFields));
                     end
                 end
             end
             
-            for i=find(ismember({self.fields.name}, keyFields))
-                comment = self.fields(i).comment;
+            for i=find(ismember({self.attrs.name}, keyFields))
+                comment = self.attrs(i).comment;
                 str = sprintf('%s\n%-40s# %s', str, ...
-                    sprintf('%-16s: %s', self.fields(i).name, self.fields(i).type), ...
+                    sprintf('%-16s: %s', self.attrs(i).name, self.attrs(i).type), ...
                     comment);
             end
             
             % dividing line
             str = sprintf('%s\n---', str);
             
-            dependentFields = {self.fields(~[self.fields.iskey]).name};
+            dependentFields = {self.attrs(~[self.attrs.iskey]).name};
             
             % list other references
             if ~expandForeignKeys
@@ -202,27 +204,27 @@ classdef (Sealed) Table < handle
                     refIds = find(self.schema.dependencies(tableIdx,:)==2);
                     for i=refIds
                         str = sprintf('%s\n-> %s',str, self.schema.classNames{i});
-                        excludeFields = {self.schema.fields([self.schema.fields.iskey]...
-                            & strcmp({self.schema.fields.table},self.schema.tables(i).name)).name};
+                        excludeFields = {self.schema.attrs([self.schema.attrs.iskey]...
+                            & strcmp({self.schema.attrs.table},self.schema.tables(i).name)).name};
                         dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
                     end
                 end
             end
             
-            % list remaining fields
-            for i=find(ismember({self.fields.name}, dependentFields))
-                if self.fields(i).isnullable
+            % list remaining attrs
+            for i=find(ismember({self.attrs.name}, dependentFields))
+                if self.attrs(i).isnullable
                     default = '=null';
-                elseif strcmp(char(self.fields(i).default(:)'), '<<<none>>>')
+                elseif strcmp(char(self.attrs(i).default(:)'), '<<<none>>>')
                     default = '';
-                elseif self.fields(i).isNumeric || strcmp(self.fields(i).default,'CURRENT_TIMESTAMP')
-                    default = ['=' self.fields(i).default];
+                elseif self.attrs(i).isNumeric || strcmp(self.attrs(i).default,'CURRENT_TIMESTAMP')
+                    default = ['=' self.attrs(i).default];
                 else
-                    default = ['="' self.fields(i).default '"'];
+                    default = ['="' self.attrs(i).default '"'];
                 end
-                comment = self.fields(i).comment;
+                comment = self.attrs(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
-                    sprintf('%-28s: %s', [self.fields(i).name default], self.fields(i).type), ...
+                    sprintf('%-28s: %s', [self.attrs(i).name default], self.attrs(i).type), ...
                     comment);
             end
             str = sprintf('%s\n', str);
@@ -255,11 +257,11 @@ classdef (Sealed) Table < handle
             
             % warn user if self is a subtable
             if ismember(self.info.tier, {'imported','computed'}) && ...
-                    ~isempty(which(self.getClassname))
-                rel = eval(self.getClassname);
+                    ~isempty(which(self.className))
+                rel = eval(self.className);
                 if ~isa(rel,'dj.AutoPopulate')
                     fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
-                        'drop its parent table instead.\n'], self.getClassname)
+                        'drop its parent table instead.\n'], self.className)
                     if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
                         fprintf '\ndrop cancelled\n\n'
                         return
@@ -329,41 +331,41 @@ classdef (Sealed) Table < handle
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', schemaObj.dbname, tableName);
             
-            % add inherited primary key fields
+            % add inherited primary key attrs
             primaryKeyFields = {};
             for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.fields.iskey])
-                    field = parents{iRef}.fields(iField);
+                for iField = find([parents{iRef}.table.attrs.iskey])
+                    field = parents{iRef}.table.attrs(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        assert(~field.isnullable, 'primary key fields cannot be nullable')
+                        assert(~field.isnullable, 'primary key attrs cannot be nullable')
                         sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                     end
                 end
             end
             
-            % add the new primary key fields
+            % add the new primary key attrs
             if ~isempty(fieldDefs)
                 for iField = find([fieldDefs.iskey])
                     field = fieldDefs(iField);
                     primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
                     assert(~strcmpi(field.default,'NULL'), ...
-                        'primary key fields cannot be nullable')
+                        'primary key attrs cannot be nullable')
                     sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                 end
             end
             
-            % add secondary foreign key fields
+            % add secondary foreign key attrs
             for iRef = 1:length(references)
-                for iField = find([parents{iRef}.fields.iskey])
-                    field = references{iRef}.fields(iField);
+                for iField = find([parents{iRef}.table.attrs.iskey])
+                    field = references{iRef}.table.attrs(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
                     end
                 end
             end
             
-            % add dependent fields
+            % add dependent attrs
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
@@ -392,7 +394,7 @@ classdef (Sealed) Table < handle
                 end
                 sql = sprintf(...
                     '%sCONSTRAINT FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-                    sql, fieldList, ref{1}.schema.dbname, ref{1}.table.info.name, fieldList);
+                    sql, fieldList, ref{1}.table.schema.dbname, ref{1}.table.info.name, fieldList);
             end
             
             % close the declaration
@@ -410,11 +412,11 @@ classdef (Sealed) Table < handle
         
         
         function sql = fieldToSQL(field)
-            % convert the structure field with fields {'name' 'type' 'default' 'comment'}
+            % convert the structure field with attrs {'name' 'type' 'default' 'comment'}
             % to the SQL column declaration
             
             if strcmpi(field.default, 'NULL')
-                % all nullable fields default to null
+                % all nullable attrs default to null
                 field.default = 'DEFAULT NULL';
             else
                 if strcmp(field.default,'<<<none>>>')
