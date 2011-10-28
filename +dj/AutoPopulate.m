@@ -91,7 +91,7 @@ classdef AutoPopulate < handle
             unpopulatedKeys = fetch((self.popRel & varargin) - self);
             if ~isempty(unpopulatedKeys)
                 if numel(self.jobRel)
-                    jobFields = self.jobRel.table.primaryKey(1:end-1);
+                    jobFields = self.jobRel.primaryKey(1:end-1);
                     unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
                 end
                 for key = unpopulatedKeys'
