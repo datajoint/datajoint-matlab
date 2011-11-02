@@ -352,7 +352,7 @@ classdef (Sealed) Table < handle
             
             % add secondary foreign key attrs
             for iRef = 1:length(references)
-                for iField = find([parents{iRef}.table.attrs.iskey])
+                for iField = find([references{iRef}.table.attrs.iskey])
                     field = references{iRef}.table.attrs(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
