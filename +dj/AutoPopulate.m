@@ -120,7 +120,8 @@ classdef AutoPopulate < handle
                                 self.makeTuples(key)
                                 self.schema.commitTransaction
                             catch err
-                                fprintf('\n** Error in %s.makeTuples:\n', class(self))
+                                fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
+                                fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line);                               
                                 fprintf('"%s"\n\n',err.message)
                                 self.schema.cancelTransaction
                                 self.setJobStatus(key, 'error', err.message, err.stack);
