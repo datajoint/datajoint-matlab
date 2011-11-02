@@ -498,7 +498,7 @@ classdef (Sealed) Table < handle
                             p = eval(line(3:end));
                             assert(isa(p, 'dj.Relvar'), ...
                                 'foreign keys must be base relvars')
-                            if inKey
+                            if inKey  
                                 parents{end+1} = p;     %#ok:<AGROW>
                             else
                                 references{end+1} = p;   %#ok:<AGROW>
@@ -508,7 +508,7 @@ classdef (Sealed) Table < handle
                             pat = {
                                 '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-                                ':\s*(?<type>\w+([^#"]+|"[^"]*")*\S)\s*' % datatype
+                                ':\s*(?<type>\w[^#]*\S)\s*' % datatype
                                 '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');

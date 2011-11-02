@@ -105,7 +105,7 @@ classdef AutoPopulate < handle
                     jobFields = self.jobRel.primaryKey(1:end-1);
                     unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
                 end
-                fprintf('** Found %d unpopulated keys\n', length(unpopulatedKeys))
+                fprintf('\n** Found %d unpopulated keys\n\n', length(unpopulatedKeys))
                 for key = unpopulatedKeys'
                     if self.setJobStatus(key, 'reserved')    % this also marks previous job as completed
                         self.schema.startTransaction
@@ -202,9 +202,9 @@ classdef AutoPopulate < handle
                                 success = true;
                             catch %#ok
                                 % job already reserved
-                                self.jobKey = [];
                                 disp '** skipped unavailable job:'
                                 disp(self.jobKey);
+                                self.jobKey = [];
                             end
                         end
                     otherwise
