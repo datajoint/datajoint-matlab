@@ -233,11 +233,6 @@ classdef (Sealed) Table < handle
                 str = sprintf('%s%%}\n', str);
                 str = sprintf('%s<END DECLARATION CODE>\n',str);
             end
-            
-            % if no output argument, then print to stdout
-            if nargout==0
-                fprintf('\n%s\n', str)
-            end
         end
         
         

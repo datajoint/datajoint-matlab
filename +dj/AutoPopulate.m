@@ -36,7 +36,18 @@ classdef AutoPopulate < handle
                 'AutoPopulate tables can only be "imported" or "computed"')
         end
         
+    end
+    
+    methods(Abstract)
         
+        makeTuples(self, key)
+        % makeTuples(self, key) must be defined by each automatically
+        % populated relvar. makeTuples copies key as tuple, adds computed
+        % fields to tuple and inserts tuple as self.insert(tuple)
+        
+    end
+    
+    methods
         
         function varargout = parPopulate(self, jobRel, varargin)
             % dj.AutoPopulate/parPopulate - same as populate but with job
@@ -94,6 +105,7 @@ classdef AutoPopulate < handle
                     jobFields = self.jobRel.primaryKey(1:end-1);
                     unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
                 end
+                fprintf('** Found %d unpopulated keys\n', length(unpopulatedKeys))
                 for key = unpopulatedKeys'
                     if self.setJobStatus(key, 'reserved')    % this also marks previous job as completed
                         self.schema.startTransaction
@@ -108,6 +120,8 @@ classdef AutoPopulate < handle
                                 self.makeTuples(key)
                                 self.schema.commitTransaction
                             catch err
+                                fprintf('\n** Error in %s.makeTuples:\n', class(self))
+                                fprintf('"%s"\n\n',err.message)
                                 self.schema.cancelTransaction
                                 self.setJobStatus(key, 'error', err.message, err.stack);
                                 if nargout > 0
@@ -129,15 +143,6 @@ classdef AutoPopulate < handle
     
     
     
-    methods(Abstract)
-        
-        makeTuples(self, key)
-        % makeTuples(self, key) must be defined by each automatically
-        % populated relvar. makeTuples copies key as tuple, adds computed
-        % fields to tuple and inserts tuple as self.insert(tuple)
-        
-    end
-    
     
     
     methods(Access = private)
@@ -145,8 +150,8 @@ classdef AutoPopulate < handle
         function success = setJobStatus(self, key, status, errMsg, errStack)
             % dj.AutoPopulate/setJobStatus - update job process for parallel
             % execution.
-            % If self.jobRel is not set, jobs are not being managed.
             
+            % If self.jobRel is not set, skip job management
             success = ~numel(self.jobRel);
             
             if ~success
@@ -191,13 +196,14 @@ classdef AutoPopulate < handle
                             try
                                 self.jobRel.insert(...
                                     setfield(self.jobKey,'job_status',status))  %#ok
-                                disp 'RESERVED JOB:'
+                                disp '** reserved job:'
                                 disp(self.jobKey)
                                 success = true;
                             catch %#ok
-                                % reservation failed due to a duplicate, move on
-                                % to the next job
+                                % job already reserved
                                 self.jobKey = [];
+                                disp '** skipped unavailable job:'
+                                disp(self.jobKey);
                             end
                         end
                     otherwise
