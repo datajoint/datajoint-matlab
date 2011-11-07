@@ -35,6 +35,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     assert(strcmp(class(self), self.table.className), ...
                         'class name %s does not match table name %s', ...
                         class(self), self.table.className)
+                    self.table.init
                     self.schema = self.table.schema;
                     self.attrs = self.table.attrs;
                     self.sql.pro = '*';

@@ -7,7 +7,7 @@
 % If the table does not exist, it is created based on the definition
 % specified in the first percent-brace comment block in the file whose path
 % is returned by which('package.ClassName'), which will normally contain the
-% class definition of the derived class that works with this table. 
+% class definition of the derived class that works with this table.
 %
 % The file +package/ClassName.m need not exist if the table already exists
 % in the database. Only if the table does not exist will dj.Table access
@@ -21,70 +21,66 @@
 classdef (Sealed) Table < handle
     
     properties(SetAccess = private)
-        schema           % handle to a schema object
-        info             % name, tier, comment.  See self.Schema
-        attrs           % structure array describing attrs
-    end
-    
-    properties(Dependent, SetAccess = private)
+        schema   % handle to a schema object
+        info     % name, tier, comment.  See self.Schema
+        attrs    % structure array describing attrs
         className    % the name of the class that should be associated with this table
     end
     
     methods
         function self = Table(className)
             % obj = dj.Table('package.className')
-            assert(nargin==1 && ischar(className),  ...
-                'dj.Table requres input ''package.ClassName''')
-            assert(~isempty(regexp(className,'\w+\.[A-Z]\w+','once')), ...
-                'invalid table identification ''%s''. Should be package.ClassName', ...
-                className)
-            schemaFunction = regexprep(className, '\.\w+$', '.getSchema');
-            self.schema = eval(schemaFunction);
-            assert(isa(self.schema, 'dj.Schema'), ...
-                [schemaFunction ' must return an instance of dj.Schema']);
-            
-            % find table in the schema
-            ix = strcmp(className, self.schema.classNames);
-            if ~any(ix)
-                % table does not exist. Create it.
-                path = which(className);
-                assert(~isempty(path), [className ' not found']');
-                declaration = dj.utils.readPreamble(path);
-                if ~isempty(declaration)
-                    try
-                        dj.Table.create(declaration);
-                        self.schema.reload
-                        ix = strcmp(className, self.schema.classNames);
-                    catch e
-                        fprintf('!!! Error while parsing the table declaration for %s:\n%s\n', ...
-                            className, e.message)
-                        rethrow(e)
-                    end
-                    
-                end
-                assert(any(ix), 'Table %s is not found', className);
-            end
-            
-            % table exists, initialize
-            self.info = self.schema.tables(ix);
-            self.attrs = self.schema.attrs(strcmp(self.info.name, ...
-                {self.schema.attrs.table}));
+            self.className = className;
         end
         
-        
+        function init(self)
+            if isempty(self.info)
+                assert(nargin==1 && ischar(self.className),  ...
+                    'dj.Table requres input ''package.ClassName''')
+                assert(~isempty(regexp(self.className,'\w+\.[A-Z]\w+','once')), ...
+                    'invalid table identification ''%s''. Should be package.ClassName', ...
+                    self.className)
+                schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
+                self.schema = eval(schemaFunction);
+                assert(isa(self.schema, 'dj.Schema'), ...
+                    [schemaFunction ' must return an instance of dj.Schema']);
+                
+                % find table in the schema
+                ix = strcmp(self.className, self.schema.classNames);
+                if ~any(ix)
+                    % table does not exist. Create it.
+                    path = which(self.className);
+                    assert(~isempty(path), [self.className ' not found']');
+                    declaration = dj.utils.readPreamble(path);
+                    if ~isempty(declaration)
+                        try
+                            dj.Table.create(declaration);
+                            self.schema.reload
+                            ix = strcmp(self.className, self.schema.classNames);
+                        catch e
+                            fprintf('!!! Error while parsing the table declaration for %s:\n%s\n', ...
+                                self.className, e.message)
+                            rethrow(e)
+                        end
+                        
+                    end
+                    assert(any(ix), 'Table %s is not found', self.className);
+                end
+                
+                % table exists, initialize
+                self.info = self.schema.tables(ix);
+                self.attrs = self.schema.attrs(strcmp(self.info.name, ...
+                    {self.schema.attrs.table}));
+            end
+        end
+                
         
         function display(self)
+            self.init
             display@handle(self)
             disp(self.re(true))
             fprintf \n
         end
-        
-        
-        function str = get.className(self)
-            str = sprintf('%s.%s', self.schema.package, dj.utils.camelCase(self.info.name));
-        end
-        
-               
         
         
         function erd(self, depth1, depth2)
@@ -107,6 +103,7 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Schema/erd
             
+            self.init
             switch nargin
                 case 1
                     levels = [-2 2];
@@ -157,19 +154,20 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Table
             
+            self.init
+            
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
-            className = [self.schema.package '.' dj.utils.camelCase(self.info.name)];
             if expandForeignKeys
                 str = '';
             else
                 str = sprintf('<BEGIN DECLARATION CODE>\n%%{\n');
             end
             str = sprintf('%s%s (%s) # %s\n', ...
-                str, className, self.info.tier, self.info.comment);
-            tableIdx = find(strcmp(self.schema.classNames, className));
+                str, self.className, self.info.tier, self.info.comment);
+            tableIdx = find(strcmp(self.schema.classNames, self.className));
             assert(~isempty(tableIdx), ...
-                'class %s does not appear in the class list of the schema', className);
+                'class %s does not appear in the class list of the schema', self.className);
             
             keyFields = {self.attrs([self.attrs.iskey]).name};
             
@@ -248,6 +246,7 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Table, dj.Relvar/del
             
+            self.init
             self.schema.cancelTransaction   % exit ongoing transaction
             
             % warn user if self is a subtable
@@ -260,7 +259,7 @@ classdef (Sealed) Table < handle
                     if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
                         fprintf '\ndrop cancelled\n\n'
                         return
-                    end                    
+                    end
                 end
             end
             
@@ -498,7 +497,7 @@ classdef (Sealed) Table < handle
                             p = eval(line(3:end));
                             assert(isa(p, 'dj.Relvar'), ...
                                 'foreign keys must be base relvars')
-                            if inKey  
+                            if inKey
                                 parents{end+1} = p;     %#ok:<AGROW>
                             else
                                 references{end+1} = p;   %#ok:<AGROW>
@@ -506,9 +505,9 @@ classdef (Sealed) Table < handle
                         otherwise
                             % parse field definition
                             pat = {
-                                '^\s*(?<name>[a-z][a-z0-9_]*)\s*' % field name
+                                '^\s*(?<name>[a-z][a-z\d_]*)\s*'  % field name
                                 '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-                                ':\s*(?<type>\w[^#]*\S)\s*' % datatype
+                                ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
                                 '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
                                 };
                             fieldInfo = regexp(line, cat(2,pat{:}), 'names');
