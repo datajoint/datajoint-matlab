@@ -27,7 +27,7 @@ classdef AutoPopulate < handle
             try
                 assert(isa(self, 'dj.Relvar'))
                 assert(isa(self.table, 'dj.Table'))
-                assert(isa(self.popRel, 'dj.Relvar'))
+                assert(isa(self.popRel, 'dj.Relvar') || isa(self.popRel,'function_handle'))
             catch  %#ok
                 error(['an AutoPopulate class must be derived from dj.Relvar ' ...
                     'and define properties ''table'' and ''popRel'''])
@@ -99,14 +99,19 @@ classdef AutoPopulate < handle
                 errors = struct([]);
             end
             
-            unpopulatedKeys = fetch((self.popRel & varargin) - self);
-            if ~isempty(unpopulatedKeys)
+            unpopulated = self.popRel;
+            if isa(unpopulated, 'function_handle')
+                unpopulated = unpopulated();
+            end
+            assert(isa(unpopulated, 'dj.Relvar'), 'property popRel must be a dj.Relvar')
+            unpopulated = fetch((unpopulated & varargin) - self);
+            if ~isempty(unpopulated)
                 if numel(self.jobRel)
                     jobFields = self.jobRel.primaryKey(1:end-1);
-                    unpopulatedKeys = dj.utils.structSort(unpopulatedKeys, jobFields);
+                    unpopulated = dj.utils.structSort(unpopulated, jobFields);
                 end
-                fprintf('\n** Found %d unpopulated keys\n\n', length(unpopulatedKeys))
-                for key = unpopulatedKeys'
+                fprintf('\n** Found %d unpopulated keys\n\n', length(unpopulated))
+                for key = unpopulated'
                     if self.setJobStatus(key, 'reserved')    % this also marks previous job as completed
                         self.schema.startTransaction
                         % check again in case a parallel process has already populated
