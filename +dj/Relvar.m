@@ -23,6 +23,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     properties(Access = private)
         attrs   % struct array of attribute info, updated by relational operators
         sql     % sql statement: source, projection, and restriction clauses
+        tab     % private dj.Table object, copied from public self.table
     end
     
     methods
@@ -35,7 +36,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     assert(strcmp(class(self), self.table.className), ...
                         'class name %s does not match table name %s', ...
                         class(self), self.table.className)
-                    initFromTable
+                    self.tab = self.table;
                     
                 case nargin==1 && isa(copyObj, 'dj.Relvar')
                     % copy constructor
@@ -45,29 +46,25 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     
                 case nargin==1 && ischar(copyObj)
                     % initialization as dj.Relvar('schema.ClassName')
-                    self.addprop('table');
-                    self.table = dj.Table(copyObj);
-                    initFromTable
-                    
+                    self.tab = dj.Table(copyObj);
+                                       
                 case nargin==1 && isa(copyObj, 'dj.Table')
                     % initialization from a dj.Table without a table-specific class
-                    self.addprop('table');
-                    self.table = copyObj;
-                    initFromTable
+                    self.tab = copyObj;
                     
                 otherwise
                     error 'invalid initatlization'
                     
             end
             
-            function initFromTable
-                self.table.init
-                self.schema = self.table.schema;
-                self.attrs = self.table.attrs;
+            if isempty(self.attrs)
+                self.tab.init
+                self.schema = self.tab.schema;
+                self.attrs = self.tab.attrs;
                 self.sql.pro = '*';
                 self.sql.res = '';
                 self.sql.src = sprintf('`%s`.`%s`', ...
-                    self.schema.dbname, self.table.info.name);
+                    self.schema.dbname, self.tab.info.name);
             end
         end
         
@@ -192,12 +189,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             if self.count==0
                 disp 'nothing to delete'
             else
-                assert(~isempty(findprop(self,'table')) ...
-                    && isa(self.table, 'dj.Table'), ...
-                    'Cannot delete from a derived relvar');
+                assert(~isempty(self.tab), 'Cannot delete from a derived relvar')
                 
                 % warn the user if deleting from a subtable
-                if ismember(self.table.info.tier, {'imported','computed'}) ...
+                if ismember(self.tab.info.tier, {'imported','computed'}) ...
                         && ~isa(self, 'dj.AutoPopulate')
                     fprintf(['!!! %s is a subtable. For referential integrity, ' ...
                         'delete from its parent instead.\n'], class(self))
@@ -208,7 +203,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 end
                 
                 % get the list of dependent tables (only hierarchical dependencies)
-                nodes = find(strcmp({self.schema.tables.name}, self.table.info.name));
+                nodes = find(strcmp({self.schema.tables.name}, self.tab.info.name));
                 assert(numel(nodes)==1);
                 downstream = nodes;
                 while ~isempty(nodes)
@@ -236,9 +231,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     disp 'ABOUT TO DELETE:'
                     for iRel = 1:length(rels)
                         fprintf('%s %s: %d', ...
-                            rels{iRel}.table.info.tier, ...
+                            rels{iRel}.tab.info.tier, ...
                             self.schema.classNames{downstream(iRel)}, counts(iRel));
-                        if ismember(rels{iRel}.table.info.tier, {'manual','lookup'})
+                        if ismember(rels{iRel}.tab.info.tier, {'manual','lookup'})
                             fprintf ' !!!'
                         end
                         fprintf \n
@@ -257,14 +252,14 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                                 counts(iRel), self.schema.classNames{downstream(iRel)})
                             self.schema.query(sprintf('DELETE FROM %s%s', ...
                                 rels{iRel}.sql.src, rels{iRel}.sql.res))
-                            fprintf 'done\n'
+                            fprintf 'done (not committed)\n'
                         end
                         self.schema.commitTransaction
                         fprintf 'committed delete\n'
                     catch err
-                        fprintf 'delete rolled back due to to error'
+                        fprintf '\n ** delete rolled back due to to error\n'
                         self.schema.cancelTransaction
-                        retrhow(err)
+                        rethrow(err)
                     end
                 end
             end
@@ -297,8 +292,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             self = self.copy;
             self.restrict(arg)
         end
-        
-        
+                       
         
         
         function self = pro(self, varargin)
@@ -933,23 +927,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         end
     end
     
-    
-    
-    methods(Access=protected)
-        function selfCopy = copyElement(self)
-            % this method is called by matlab.mixin.Copyable/copy for each
-            % copied object and controls how individual properties are copied.
-            selfCopy = copyElement@matlab.mixin.Copyable(self);
-            if ~isempty(findprop(self,'table')) && ...
-                    isempty(findprop(selfCopy,'table'))
-                % copy the dynamic property table
-                selfCopy.addprop('table');
-                selfCopy.table = self.table;
-            end
-        end
-    end
-    
-    
+        
     
     methods(Access=private, Static)
         
