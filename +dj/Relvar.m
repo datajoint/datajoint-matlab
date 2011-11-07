@@ -35,13 +35,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     assert(strcmp(class(self), self.table.className), ...
                         'class name %s does not match table name %s', ...
                         class(self), self.table.className)
-                    self.table.init
-                    self.schema = self.table.schema;
-                    self.attrs = self.table.attrs;
-                    self.sql.pro = '*';
-                    self.sql.res = '';
-                    self.sql.src = sprintf('`%s`.`%s`', ...
-                        self.table.schema.dbname, self.table.info.name);
+                    initFromTable
                     
                 case nargin==1 && isa(copyObj, 'dj.Relvar')
                     % copy constructor
@@ -51,29 +45,29 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     
                 case nargin==1 && ischar(copyObj)
                     % initialization as dj.Relvar('schema.ClassName')
-                    copyObj = dj.Table(copyObj);
-                    self.schema = copyObj.schema;
-                    self.attrs = copyObj.attrs;
-                    self.sql.pro = '*';
-                    self.sql.res = '';
-                    self.sql.src = sprintf('`%s`.`%s`', ...
-                        copyObj.schema.dbname, copyObj.info.name);
                     self.addprop('table');
-                    self.table = copyObj;
+                    self.table = dj.Table(copyObj);
+                    initFromTable
                     
                 case nargin==1 && isa(copyObj, 'dj.Table')
-                    % initialization from a dj.Table, not using a table-specific class
-                    self.schema = copyObj.schema;
-                    self.attrs = copyObj.attrs;
-                    self.sql.pro = '*';
-                    self.sql.res = '';
-                    self.sql.src = sprintf('`%s`.`%s`', ...
-                        copyObj.schema.dbname, copyObj.info.name);
+                    % initialization from a dj.Table without a table-specific class
                     self.addprop('table');
                     self.table = copyObj;
+                    initFromTable
                     
                 otherwise
                     error 'invalid initatlization'
+                    
+            end
+            
+            function initFromTable
+                self.table.init
+                self.schema = self.table.schema;
+                self.attrs = self.table.attrs;
+                self.sql.pro = '*';
+                self.sql.res = '';
+                self.sql.src = sprintf('`%s`.`%s`', ...
+                    self.schema.dbname, self.table.info.name);
             end
         end
         
@@ -256,12 +250,21 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
                     disp 'delete canceled'
                 else
-                    for iRel = length(rels):-1:1
-                        fprintf('Deleting %d tuples from %s... ', ...
-                            counts(iRel), self.schema.classNames{downstream(iRel)})
-                        self.schema.query(sprintf('DELETE FROM %s%s', ...
-                            rels{iRel}.sql.src, rels{iRel}.sql.res))
-                        fprintf 'done\n'
+                    self.schema.startTransaction
+                    try
+                        for iRel = length(rels):-1:1
+                            fprintf('Deleting %d tuples from %s... ', ...
+                                counts(iRel), self.schema.classNames{downstream(iRel)})
+                            self.schema.query(sprintf('DELETE FROM %s%s', ...
+                                rels{iRel}.sql.src, rels{iRel}.sql.res))
+                            fprintf 'done\n'
+                        end
+                        self.schema.commitTransaction
+                        fprintf 'committed delete\n'
+                    catch err
+                        fprintf 'delete rolled back due to to error'
+                        self.schema.cancelTransaction
+                        retrhow(err)
                     end
                 end
             end
