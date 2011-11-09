@@ -389,21 +389,26 @@ classdef Schema < handle
         
         
         
-        function makeClass(self, className, tier, isAuto)
-            % create a base relvar class for the new className in schema
-            % directory.
+        function makeClass(self, className)
+            % create a base relvar class for the new className in schema directory.
             %
             % Example:
-            %    s = v2p.getSchema;
-            %    s.makeClass('CellOriRegression', 'computed', false)
+            %    makeClass(v2p.getSchema, 'RegressionModel')
             
-            if nargin<3
-                tier = 'computed';
+            choice = 'x';
+            while ~ismember(choice,'lmic')
+                choice = input('Choose lookup (l), manual (m), imported (i), or computed (c) > ', 's');
             end
-            assert(ismember(tier, dj.utils.allowedTiers), ...
-                'tier must be one of dj.utils.allowedTiers')
-            isAuto = ismember(tier, {'computed','imported'}) && ...
-                (nargin<4 || isAuto);
+            tier = struct('c','computed','l','lookup','m','manual','i','imported');
+            tier = tier.(choice);
+            isAuto = ismember(tier, {'computed','imported'});
+            if isAuto
+                choice = '';
+                while ~ismember(choice, {'yes','no'})
+                    choice = input('Is this a subtable? yes/no > ', 's');
+                end
+                isAuto = strcmp('no',choice);
+            end
             
             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
             assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
@@ -430,10 +435,12 @@ classdef Schema < handle
             % properties
             fprintf(f, '\n\n\tproperties(Constant)\n');
             fprintf(f, '\t\ttable = dj.Table(''%s.%s'')\n', self.package, className);
-            if isAuto
-                fprintf(f, '\t\tpopRel = \n');
-            end
             fprintf(f, '\tend\n');
+            if isAuto
+                fprintf(f, '\tproperties\n');
+                fprintf(f, '\t\tpopRel = %% populate relation\n');
+                fprintf(f, '\tend\n');
+            end
             
             % constructor
             fprintf(f, '\n\tmethods\n');
@@ -444,7 +451,7 @@ classdef Schema < handle
             % metod makeTuples
             if isAuto
                 fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
-                fprintf(f, '\t\t\t ... compute new attrs for key ...\n');
+                fprintf(f, '\t\t\terror ''not done yet''   %%... compute new attrs for key ...\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
                 fprintf(f, '\t\tend\n');
             end
