@@ -202,21 +202,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     end
                 end
                 
-                % get the list of dependent tables (only hierarchical dependencies)
-                nodes = find(strcmp({self.schema.tables.name}, self.tab.info.name));
-                assert(numel(nodes)==1);
-                downstream = nodes;
-                while ~isempty(nodes)
-                    [nodes, ~] = find(self.schema.dependencies(:, nodes)==1);
-                    nodes = setdiff(nodes, downstream);
-                    downstream = [downstream nodes(:)'];  %#ok:<AGROW>
-                end
+                % get the list of dependent tables
+                downstream = self.schema.getNeighbors(self.tab.className, 0, +1000, false);
                 
                 % construct relvars to be deleted
                 rels = {self};
                 for iRel = downstream(2:end)
-                    rels{end+1} = dj.Relvar(dj.Table(self.schema.classNames{iRel})) ...
-                        & self; %#ok:<AGROW>
+                    rels{end+1} = dj.Relvar(self.schema.classNames{iRel}) & self; %#ok:<AGROW>
                 end
                 
                 % exclude relvar with no matching tuples
@@ -249,13 +241,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     try
                         for iRel = length(rels):-1:1
                             fprintf('Deleting %d tuples from %s... ', ...
-                                counts(iRel), self.schema.classNames{downstream(iRel)})
+                                counts(iRel), rels{iRel}.tab.className)
                             self.schema.query(sprintf('DELETE FROM %s%s', ...
                                 rels{iRel}.sql.src, rels{iRel}.sql.res))
                             fprintf 'done (not committed)\n'
                         end
                         self.schema.commitTransaction
-                        fprintf 'committed delete\n'
+                        fprintf ' ** delete committed\n'
                     catch err
                         fprintf '\n ** delete rolled back due to to error\n'
                         self.schema.cancelTransaction
@@ -771,7 +763,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 
                 % issue query
                 self.schema.query(sprintf('%s `%s`.`%s` SET %s', ...
-                    command, self.schema.dbname, self.table.info.name, ...
+                    command, self.schema.dbname, self.tab.info.name, ...
                     queryStr(1:end-1)), blobs{:})
             end
         end

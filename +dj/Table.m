@@ -83,7 +83,7 @@ classdef (Sealed) Table < handle
         end
         
         
-        function erd(self, depth1, depth2)
+        function erd(self, varargin)
             % dj.Table/erd - plot the entity relationship diagram of tables
             % that are connected to self.
             %
@@ -102,38 +102,8 @@ classdef (Sealed) Table < handle
             %   t.erd(-1);  % plot only immediate ancestors
             %
             % See also dj.Schema/erd
-            
             self.init
-            switch nargin
-                case 1
-                    levels = [-2 2];
-                case 2
-                    levels = sort([0 depth1]);
-                case 3
-                    levels = sort([depth1 depth2]);
-            end
-            
-            i = find(strcmp({self.schema.tables.name}, self.info.name));
-            assert(length(i) == 1);
-            
-            % find tables on which self depends
-            upstream = i;
-            nodes = i;
-            for j=1:-levels(1)
-                [~, nodes] = find(self.schema.dependencies(nodes,:));
-                upstream = [upstream nodes(:)'];  %#ok:<AGROW>
-            end
-            
-            % find tables dependent on self
-            downstream = [];
-            nodes = i;
-            for j=1:levels(2)
-                [nodes, ~] = find(self.schema.dependencies(:, nodes));
-                downstream = [downstream nodes(:)'];  %#ok:<AGROW>
-            end
-            
-            % plot the ERD
-            self.schema.erd(unique([upstream downstream]))
+            self.schema.erd(self.schema.getNeighbors(self.className, varargin{:}))
         end
         
         

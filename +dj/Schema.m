@@ -17,8 +17,8 @@ classdef Schema < handle
     
     properties(Access = private)
         password
+        connection    % connection to the database
         tableLevels   % levels in dependency hiararchy
-        connection
     end
     
     methods
@@ -35,6 +35,63 @@ classdef Schema < handle
             self.password = password;
             self.dbname = dbname;
             self.reload
+        end
+        
+        
+        
+        function neighbors = getNeighbors(self, className, depth1, depth2, nonHierarchical)
+            % get indices of the neighbors of table with className
+            %
+            % depth1 and depth2 specify the connectivity radius upstream
+            % (depth<0) and downstream (depth>0) of this table.
+            % Omitting both depths defaults to table.erd(-2,2).
+            % Omitting any one of the depths sets it to zero.
+            %
+            % Examples:
+            %   schema.getNeighbors(className);    % two levels up and two levels down
+            %   schema.getNeighbors(className, 2); % two levels down
+            %   schema.getNeighbors(className, -1);  % only the immediate ancestors
+            %   schema.getNeighbors(className, -1, 1);  % immediate neighbors
+            %
+            % If nonHierarchical is specified as false, then only
+            % hierarchical foreign keys are traversed.
+            
+            switch nargin
+                case 2
+                    levels = [-2 2];
+                case 3
+                    levels = sort([0 depth1]);
+                otherwise
+                    levels = sort([depth1 depth2]);
+            end
+            if nargin<5 || nonHierarchical  
+                test = @(x) x>=1;  % all foreign keys
+            else 
+                test = @(x) x==1;  % only hierarchical foreign keys
+            end
+            
+            i = find(strcmp(self.classNames, className));
+            assert(length(i) == 1, 'could not find className %s', className)
+                        
+            % find tables on which self depends
+            upstream = i;
+            nodes = i;
+            for j=1:-levels(1)
+                [~, nodes] = find(test(self.dependencies(nodes,:)));
+                upstream = [upstream nodes(:)'];  %#ok:<AGROW>
+            end
+            
+            % find tables dependent on self
+            downstream = [];
+            nodes = i;
+            for j=1:levels(2)
+                [nodes,~] = find(test(self.dependencies(:,nodes)));
+                downstream = [downstream nodes(:)'];  %#ok:<AGROW>
+            end
+            
+            neighbors = unique([upstream downstream]);
+            [~,order] = sort(self.tableLevels(neighbors));
+            neighbors = neighbors(order);
         end
         
         
@@ -144,9 +201,9 @@ classdef Schema < handle
         function backup(self, backupDir, tiers)
             % dj.Schema/backup - saves tables into .mat files
             % SYNTAX:
-            %    s.backup(folder)    -- save all lookup and manual tables 
+            %    s.backup(folder)    -- save all lookup and manual tables
             %    s.backup(folder, {'manual'})    -- save all manual tables
-            %    s.backup(folder, {'manual','imported'})  
+            %    s.backup(folder, {'manual','imported'})
             % Each table must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
             if nargin<3
@@ -396,9 +453,5 @@ classdef Schema < handle
             fclose(f);
             edit(filename)
         end
-        
-        
-        
-        
     end
 end
