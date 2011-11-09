@@ -21,7 +21,7 @@ classdef(Sealed) utils
     end
     
     methods(Static)
-        function str = readPreamble(filename)
+        function str = readPercentBraceComment(filename)
             % reads the initial comment block %{ ... %}
             
             f = fopen(filename, 'rt');

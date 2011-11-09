@@ -49,21 +49,8 @@ classdef (Sealed) Table < handle
                 ix = strcmp(self.className, self.schema.classNames);
                 if ~any(ix)
                     % table does not exist. Create it.
-                    path = which(self.className);
-                    assert(~isempty(path), [self.className ' not found']');
-                    declaration = dj.utils.readPreamble(path);
-                    if ~isempty(declaration)
-                        try
-                            dj.Table.create(declaration);
-                            self.schema.reload
-                            ix = strcmp(self.className, self.schema.classNames);
-                        catch e
-                            fprintf('!!! Error while parsing the table declaration for %s:\n%s\n', ...
-                                self.className, e.message)
-                            rethrow(e)
-                        end
-                        
-                    end
+                    self.create
+                    ix = strcmp(self.className, self.schema.classNames);
                     assert(any(ix), 'Table %s is not found', self.className);
                 end
                 
@@ -73,7 +60,15 @@ classdef (Sealed) Table < handle
                     {self.schema.attrs.table}));
             end
         end
-                
+        
+        
+        function reset(self)
+            % undo the effect of self.init
+            self.schema = [];
+            self.info = [];
+            self.attrs = [];
+        end
+        
         
         function display(self)
             self.init
@@ -204,6 +199,46 @@ classdef (Sealed) Table < handle
         end
         
         
+        function alter(self)
+            % dj.Table/alter - alter the table definition
+            %
+            % Datajoint tables are defined in the first percent-brace block
+            % comment of the file <package>.<className>.m.
+            %
+            % If the new table definition matches the current definition,
+            % dj.Table/alter does nothing.
+            %
+            % If the table is empty, the table and its dependents are
+            % simply dropped.  The tables will then be recreated automatically
+            % upon next use.
+            %
+            % If the table is not empty, dj.Table/alter compares the column
+            % definitions. If a column name is not present in the new definition,
+            % dj.Table/alter will prompt the user to match it to a new column or
+            % to drop it altogether.  For new columns that are not matched to
+            % existing columns and do not have a default value, dj.Table/alter
+            % prompts the user to provide a temporary default value that is
+            % applied only once during the transition.
+            %
+            % Any alterations of the primary key are propagated to the dependent
+            % tables.  The database will reject this operation if referential
+            % constraints are caused to be violated.
+            
+            if ~count(dj.Relvar(self))
+                % if empty, simply drop the table
+                self.drop
+            else
+                keyChange = false;
+                [tableInfo parents references fieldDefs] = ...
+                    dj.Table.parseDeclaration(self.getDeclaration);
+                tableIdx = find(strcmp(self.schema.classNames, self.className), 1, 'first');
+                parentIdx = find(self.schema.dependencies(tableIdx,:)==1);
+                error 'not implemented yet'
+            end
+        end
+        
+        
+        
         
         function drop(self)
             % dj.Table/drop - drop the table and all its dependents.
@@ -234,14 +269,7 @@ classdef (Sealed) Table < handle
             end
             
             % comple the list of dependent tables
-            nodes = find(strcmp({self.schema.tables.name}, self.info.name));
-            assert(~isempty(nodes));
-            downstream = nodes;
-            while ~isempty(nodes)
-                [nodes, ~] = find(self.schema.dependencies(:, nodes));
-                nodes = setdiff(nodes, downstream);
-                downstream = [downstream nodes(:)'];  %#ok:<AGROW>
-            end
+            downstream = self.schema.getNeighbors(self.className, 0, +1000, false);
             
             % inform user about what's being deleted
             fprintf 'ABOUT TO DROP TABLES: \n'
@@ -274,26 +302,37 @@ classdef (Sealed) Table < handle
                 self.schema.reload
             end
             fprintf \n
+            self.reset
         end
     end
     
     
     
-    methods(Static, Access=private)
+    methods(Access=private)
+
+        function declaration = getDeclaration(self)          
+            path = which(self.className);
+            assert(~isempty(path), 'Could not find table definition file %s', path)
+            declaration = dj.utils.readPercentBraceComment(path);
+            assert(~isempty(declaration), 'Could not find the table declaration in %s', path)
+        end
+
         
-        function sql = create(declaration)
-            % create a new table
+        function create(self)     
             disp 'CREATING TABLE IN THE DATABASE: '
-            
-            [tableInfo parents references fieldDefs] = dj.Table.parseDeclaration(declaration);
-            schemaObj = eval(sprintf('%s.getSchema', tableInfo.package));
+
+            [tableInfo parents references fieldDefs] = ...
+                dj.Table.parseDeclaration(self.getDeclaration);
+            cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
+            assert(strcmp(cname, self.className), ...
+                'Table name %s does not match in file %s', cname, self.className)           
             
             % compile the CREATE TABLE statement
             tableName = [...
                 dj.utils.tierPrefixes{strcmp(tableInfo.tier, dj.utils.allowedTiers)}, ...
                 dj.utils.camelCase(tableInfo.className, true)];
             
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', schemaObj.dbname, tableName);
+            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
             % add inherited primary key attrs
             primaryKeyFields = {};
@@ -370,10 +409,13 @@ classdef (Sealed) Table < handle
             
             % execute declaration
             if nargout==0
-                schemaObj.query(sql);
+                self.schema.query(sql);
             end
-        end
-        
+            self.schema.reload
+        end       
+    end
+    
+    methods(Static, Access=private)               
         
         function sql = fieldToSQL(field)
             % convert the structure field with attrs {'name' 'type' 'default' 'comment'}
