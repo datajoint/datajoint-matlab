@@ -15,6 +15,10 @@ classdef Schema < handle
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
+    events 
+        ChangedDefinitions
+    end
+    
     properties(Access = private)
         password
         connection    % connection to the database
@@ -245,6 +249,7 @@ classdef Schema < handle
             % matlab.
             disp 'closing DataJoint connections'
             mym closeall
+            self.notify('ChangedDefinitions')
             self.delete@handle
         end
         
@@ -347,8 +352,9 @@ classdef Schema < handle
                 end
                 fprintf('%.3g s\n', toc)
                 
-                self.tableLevels = levels;
+                self.tableLevels = levels;                
             end
+            self.notify('ChangedDefinitions')
         end
         
         
@@ -395,40 +401,68 @@ classdef Schema < handle
             % Example:
             %    makeClass(v2p.getSchema, 'RegressionModel')
             
-            choice = 'x';
-            while ~ismember(choice,'lmic')
-                choice = input('Choose lookup (l), manual (m), imported (i), or computed (c) > ', 's');
+            filename = fileparts(which(sprintf('%s.getSchema', self.package)));
+            assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
+            filename = fullfile(filename, [className '.m']);
+            if exist(filename,'file')
+                fprintf('%s already exists\n', filename)
+                edit(filename)
+                return
             end
-            tier = struct('c','computed','l','lookup','m','manual','i','imported');
-            tier = tier.(choice);
-            isAuto = ismember(tier, {'computed','imported'});
+                        
+            existingTable = [];
+            try
+                % Check if the table already exists and create the class to
+                % match the table definition
+ 
+                existingTable = dj.Table([self.package '.' className]);
+                fprintf('Table %s already exists, Creating matching class\n', ...
+                    [self.package '.' className])
+                existingTable.init
+                isAuto = ismember(existingTable.info.tier, {'computed','imported'}); 
+ 
+            catch err
+                % The table does not exist, proceed as normal
+                if ~strcmp(err.identifier, 'DataJoint:MissingTableDefnition')
+                    rethrow(err)
+                end
+                choice = 'x';
+                while ~ismember(choice,'lmic')
+                    choice = input('Choose lookup (l), manual (m), imported (i), or computed (c) > ', 's');
+                end
+                tier = struct('c','computed','l','lookup','m','manual','i','imported');
+                tier = tier.(choice);
+                isAuto = ismember(tier, {'computed','imported'});
+            end
+ 
+                            
+            isSubtable = false;
             if isAuto
                 choice = '';
                 while ~ismember(choice, {'yes','no'})
                     choice = input('Is this a subtable? yes/no > ', 's');
                 end
-                isAuto = strcmp('no',choice);
+                isSubtable = strcmp('yes',choice);
             end
             
-            filename = fileparts(which(sprintf('%s.getSchema', self.package)));
-            assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
-            filename = fullfile(filename, [className '.m']);
-            assert( ~exist(filename,'file'), '%s already exists', filename)
             
             f = fopen(filename,'wt');
             assert(-1 ~= f, 'Could not open %s', filename)
             
             % table declaration
-            fprintf(f, '%% %s.%s - my newest table\n', self.package, className);
-            fprintf(f, '%% I will explain what my table does here \n\n');
-            fprintf(f, '%%{\n');
-            fprintf(f, '%s.%s (%s) # my newest table\n\n', self.package, className, tier);
-            fprintf(f, '-----\n\n');
-            fprintf(f, '%%}\n\n');
-            
+            if numel(existingTable)
+                fprintf(f, '%s', existingTable.re);
+            else
+                fprintf(f, '%% %s.%s - my newest table\n', self.package, className);
+                fprintf(f, '%% I will explain what my table does here \n\n');
+                fprintf(f, '%%{\n');
+                fprintf(f, '%s.%s (%s) # my newest table\n\n', self.package, className, tier);
+                fprintf(f, '-----\n\n');
+                fprintf(f, '%%}');
+            end
             % class definition
-            fprintf(f, 'classdef %s < dj.Relvar', className);
-            if isAuto
+            fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
+            if isAuto && ~isSubtable
                 fprintf(f, ' & dj.AutoPopulate');
             end
             
@@ -436,9 +470,9 @@ classdef Schema < handle
             fprintf(f, '\n\n\tproperties(Constant)\n');
             fprintf(f, '\t\ttable = dj.Table(''%s.%s'')\n', self.package, className);
             fprintf(f, '\tend\n');
-            if isAuto
+            if isAuto && ~isSubtable
                 fprintf(f, '\tproperties\n');
-                fprintf(f, '\t\tpopRel = %% populate relation\n');
+                fprintf(f, '\t\tpopRel  %% =    !!! define the populate relation\n');
                 fprintf(f, '\tend\n');
             end
             
@@ -451,7 +485,7 @@ classdef Schema < handle
             % metod makeTuples
             if isAuto
                 fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
-                fprintf(f, '\t\t\terror ''not done yet''   %%... compute new attrs for key ...\n');
+                fprintf(f, '\t\t%%!!! compute the new attrs for key here\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
                 fprintf(f, '\t\tend\n');
             end

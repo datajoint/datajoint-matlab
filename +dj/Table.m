@@ -26,24 +26,32 @@ classdef (Sealed) Table < handle
         attrs    % structure array describing attrs
         className    % the name of the class that should be associated with this table
     end
+    properties(Access=private)
+        updateListener   % listens for schema definition changes
+    end
+    
     
     methods
         function self = Table(className)
             % obj = dj.Table('package.className')
             self.className = className;
+            assert(nargin==1 && ischar(self.className),  ...
+                'dj.Table requres input ''package.ClassName''')
+            assert(~isempty(regexp(self.className,'\w+\.[A-Z]\w+','once')), ...
+                'invalid table identification ''%s''. Should be package.ClassName', ...
+                self.className)
+            schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
+            assert(~isempty(which(schemaFunction)), ['Not found: ' schemaFunction])
+            self.schema = eval(schemaFunction);
+            self.updateListener = event.listener(self.schema, ...
+                'ChangedDefinitions', @(eventSrc,eventData) self.reset);
+            assert(isa(self.schema, 'dj.Schema'), ...
+                [schemaFunction ' must return an instance of dj.Schema'])
         end
+        
         
         function init(self)
             if isempty(self.info)
-                assert(nargin==1 && ischar(self.className),  ...
-                    'dj.Table requres input ''package.ClassName''')
-                assert(~isempty(regexp(self.className,'\w+\.[A-Z]\w+','once')), ...
-                    'invalid table identification ''%s''. Should be package.ClassName', ...
-                    self.className)
-                schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
-                self.schema = eval(schemaFunction);
-                assert(isa(self.schema, 'dj.Schema'), ...
-                    [schemaFunction ' must return an instance of dj.Schema']);
                 
                 % find table in the schema
                 ix = strcmp(self.className, self.schema.classNames);
@@ -64,7 +72,6 @@ classdef (Sealed) Table < handle
         
         function reset(self)
             % undo the effect of self.init
-            self.schema = [];
             self.info = [];
             self.attrs = [];
         end
@@ -126,7 +133,7 @@ classdef (Sealed) Table < handle
             if expandForeignKeys
                 str = '';
             else
-                str = sprintf('<BEGIN DECLARATION CODE>\n%%{\n');
+                str = sprintf('%%{\n');
             end
             str = sprintf('%s%s (%s) # %s\n', ...
                 str, self.className, self.info.tier, self.info.comment);
@@ -194,7 +201,6 @@ classdef (Sealed) Table < handle
             
             if ~expandForeignKeys
                 str = sprintf('%s%%}\n', str);
-                str = sprintf('%s<END DECLARATION CODE>\n',str);
             end
         end
         
@@ -302,7 +308,6 @@ classdef (Sealed) Table < handle
                 self.schema.reload
             end
             fprintf \n
-            self.reset
         end
     end
     
@@ -311,10 +316,12 @@ classdef (Sealed) Table < handle
     methods(Access=private)
 
         function declaration = getDeclaration(self)          
-            path = which(self.className);
-            assert(~isempty(path), 'Could not find table definition file %s', path)
-            declaration = dj.utils.readPercentBraceComment(path);
-            assert(~isempty(declaration), 'Could not find the table declaration in %s', path)
+            file = which(self.className);
+            assert(~isempty(file), 'DataJoint:MissingTableDefnition', ...
+                'Could not find table definition file %s', file)
+            declaration = dj.utils.readPercentBraceComment(file);
+            assert(~isempty(declaration), 'DataJoint:MissingTableDefnition', ...
+                'Could not find the table declaration in %s', file)
         end
 
         
