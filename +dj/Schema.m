@@ -410,15 +410,14 @@ classdef Schema < handle
                 return
             end
                         
-            existingTable = [];
             try
                 % Check if the table already exists and create the class to
                 % match the table definition
  
                 existingTable = dj.Table([self.package '.' className]);
+                existingTable.init
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
-                existingTable.init
                 isAuto = ismember(existingTable.info.tier, {'computed','imported'}); 
  
             catch err
@@ -426,6 +425,7 @@ classdef Schema < handle
                 if ~strcmp(err.identifier, 'DataJoint:MissingTableDefnition')
                     rethrow(err)
                 end
+                existingTable = [];
                 choice = 'x';
                 while ~ismember(choice,'lmic')
                     choice = input('Choose lookup (l), manual (m), imported (i), or computed (c) > ', 's');

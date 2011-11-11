@@ -326,7 +326,6 @@ classdef (Sealed) Table < handle
 
         
         function create(self)     
-            disp 'CREATING TABLE IN THE DATABASE: '
 
             [tableInfo parents references fieldDefs] = ...
                 dj.Table.parseDeclaration(self.getDeclaration);
