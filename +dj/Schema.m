@@ -52,10 +52,10 @@ classdef Schema < handle
             % Omitting any one of the depths sets it to zero.
             %
             % Examples:
-            %   schema.getNeighbors(className);    % two levels up and two levels down
-            %   schema.getNeighbors(className, 2); % two levels down
-            %   schema.getNeighbors(className, -1);  % only the immediate ancestors
-            %   schema.getNeighbors(className, -1, 1);  % immediate neighbors
+            %   schema.getNeighbors(className);    % self and two levels up and two levels down
+            %   schema.getNeighbors(className, 2); % self and two levels down
+            %   schema.getNeighbors(className, -1);  % only the immediate ancestors and self
+            %   schema.getNeighbors(className, -1, 1);  % immediate neighbors and self
             %
             % If nonHierarchical is specified as false, then only
             % hierarchical foreign keys are traversed.
@@ -452,12 +452,21 @@ classdef Schema < handle
             % table declaration
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.re);
+                parentIndices = self.getNeighbors([self.package '.' className],-1);
+                parentIndices(end) = [];  % remove this table
             else
                 fprintf(f, '%% %s.%s - my newest table\n', self.package, className);
                 fprintf(f, '%% I will explain what my table does here \n\n');
                 fprintf(f, '%%{\n');
-                fprintf(f, '%s.%s (%s) # my newest table\n\n', self.package, className, tier);
-                fprintf(f, '-----\n\n');
+                fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
+                [sortedClassNames, order] = sort(self.classNames);
+                disp 'Selected parent table(s)'
+                parentIndices = order(...
+                    listdlg('ListString',sortedClassNames,'PromptString','Select parent table(s)'));
+                for i = parentIndices
+                    fprintf(f, '-> %s\n', self.classNames{i});
+                end
+                fprintf(f, '\n-----\n\n');
                 fprintf(f, '%%}');
             end
             % class definition
@@ -472,7 +481,16 @@ classdef Schema < handle
             fprintf(f, '\tend\n');
             if isAuto && ~isSubtable
                 fprintf(f, '\tproperties\n');
-                fprintf(f, '\t\tpopRel  %% =    !!! define the populate relation\n');
+                fprintf(f, '\t\tpopRel');
+                for i = 1:length(parentIndices)
+                    if i>1
+                        fprintf(f, '*');
+                    else
+                        fprintf(f, ' = ');
+                    end
+                    fprintf(f, '%s', self.classNames{parentIndices(i)});                    
+                end
+                fprintf(f, '  %% !!! update the populate relation\n');
                 fprintf(f, '\tend\n');
             end
             
@@ -485,7 +503,7 @@ classdef Schema < handle
             % metod makeTuples
             if isAuto
                 fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
-                fprintf(f, '\t\t%%!!! compute the new attrs for key here\n');
+                fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
                 fprintf(f, '\t\tend\n');
             end

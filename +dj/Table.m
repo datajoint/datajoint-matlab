@@ -85,6 +85,7 @@ classdef (Sealed) Table < handle
         end
         
         
+        
         function erd(self, varargin)
             % dj.Table/erd - plot the entity relationship diagram of tables
             % that are connected to self.
@@ -203,6 +204,18 @@ classdef (Sealed) Table < handle
                 str = sprintf('%s%%}\n', str);
             end
         end
+        
+        
+        function optimize(self)
+            % optimizes the table if it has become fragmented after repeated inserts and deletes.  
+            % See http://dev.mysql.com/doc/refman/5.6/en/optimize-table.html
+            self.init
+            fprintf 'optimizing ...'
+            status = self.schema.query(sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
+                self.schema.dbname, self.info.name));
+            disp(status.Msg_text{end})
+        end
+            
         
         
         function alter(self)
