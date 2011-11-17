@@ -642,11 +642,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % validate input
             attrs = varargin(cellfun(@ischar, varargin));
             assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1),...
-                'The number of outputs must match the number of requested attributes');
-            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()');
+                'The number of outputs must match the number of requested attributes')
+            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()')
             
             s = self.fetch(varargin{:});
-            assert(isscalar(s),'fetch1 can only retrieve a single existing tuple.');
+            assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
             
             % copy into output arguments
             varargout = cell(length(attrs));
@@ -929,8 +929,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % created.
             limit = '';
             args = varargin;
-            if nargin>1 && isnumeric(args{end})
-                if nargin>2 && isnumeric(args{end-1})
+            if nargin>0 && isnumeric(args{end})
+                if nargin>1 && isnumeric(args{end-1})
                     limit = sprintf(' LIMIT %d, %d', args{end-1:end});
                     args(end-1:end) = [];
                 else
