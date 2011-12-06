@@ -185,9 +185,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 format(iCol) = {enumValues'};
             end
             data = fetch(self, columns{:});
-            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
+            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
                 'MenuBar', 'none');
-            uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
+            uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
                 'ColumnName', columns, 'ColumnEditable', false(1,length(columns)), ...
                 'ColumnFormat', format, 'Data', struct2cell(data)');
         end
@@ -199,27 +199,30 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % dj.Relvar/enter - manually enter data into the table,
             % matching the given key.
             
-            error 'Under development, Incomplete'
+            assert(~isempty(self.tab), 'Cannot enter data into a derived relation')
+            assert(ismember(self.tab.info.tier, {'manual','lookup'}), 'cannot enter data into automatic tables')
             
             if nargin<2
                 key = struct;
             end
             
             hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
-                'MenuBar', 'none');
+                'MenuBar', 'none', 'Name', self.tab.className);
             
             % buttons
-            buttNew = uicontrol('Parent', hfig, 'String', '+',...
-                'Style', 'pushbutton', 'Position', [15 15 15 18], 'Callback', {@newTuple});
-            buttCommit = uicontrol('Parent', hfig','String','commit', ...
-                'Style', 'pushbutton', 'Position', [50 15 80 18], 'Callback', {@commit});
-            buttRefresh = uicontrol('Parent', hfig, 'String', 'refresh',...
-                'Style', 'pushbutton', 'Position', [140 15 80 18], 'Callback', {@refresh});
+            uicontrol('Parent', hfig, 'String', '+','Style', 'pushbutton', ...
+                'Position', [15 15 15 18], 'Callback', {@newTuple});
+            uicontrol('Parent', hfig','String','commit','Style','pushbutton', ...
+                'Position', [50 15 80 18], 'Callback', {@commit});
+            uicontrol('Parent', hfig, 'String', 'refresh','Style', 'pushbutton',...
+                'Position', [140 15 80 18], 'Callback', {@refresh});
+            hstat = uicontrol('Parent', hfig, 'Style','text',...
+                'Position', [250 15 450 16]);
             
-            columns = {self.attrs.name};
+            columns = {'committed', self.attrs.name};
             
-            % specify column
-            format = cell(1,length(columns));
+            % create table UI
+            format = cell(1,length(columns)-1);
             format([self.attrs.isString]) = {'char'};
             format([self.attrs.isNumeric]) = {'numeric'};
             for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
@@ -227,28 +230,112 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
                 format(iCol) = {enumValues'};
             end
+            format = [{'logical'} format];
             htab = uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
-                'ColumnName', columns, 'ColumnEditable', ~isfield(key,columns), ...
-                'ColumnFormat', format, 'CellEditCallback', {@cellEdit});
-            data = [];
+                'ColumnName', columns, 'ColumnEditable', [false ~isfield(key,columns)], ...
+                'ColumnFormat', format, 'CellEditCallback', {@cellEdit}, ...
+                'CellSelectionCallback', {@selectCell});
+            data = {};
             refresh;
             
             
             function refresh(varargin)
-                data = fetch(self & key, columns{:});
-                set(htab, 'Data', struct2cell(data)');
+                data = struct2cell(fetch(self & key, columns{2:end}))';
+                data = [num2cell(true(size(data,1),1)) data];
+                set(htab, 'Data', data)
+                set(hstat, 'String', 'status: ok');
             end
+            
+            function selectCell(~,selection)
+                idx = selection.Indices;
+                if ~isempty(idx)
+                    if ~self.attrs(idx(2)-1).iskey && ~all([data{:,1}])
+                        set(hstat, 'String', 'status: Cannot modify committed tuples when uncommitted tuples exist. Commit first.')
+                    else
+                        set(hstat, 'String', 'status: ok')
+                    end
+                end
+            end
+            
             
             function cellEdit(htab, change)
-                disp(change)
+                idx = change.Indices;
+                if data{idx(1),1}   % if modifiying committed data
+                    if ~self.attrs(idx(2)-1).iskey  % allow only if everything else is committed
+                        if ~all([data{:,1}])
+                            set(hstat, 'String', 'status: Cannot modify committed tuples when uncommitted tuples exist. Commit or refresh first.')
+                        else
+                            choice = questdlg('Are you sure you want to update a committed tuple?', ...
+                                'update confirmation', 'Update', 'Cancel', 'Cancel');
+                            if strcmp(choice,'Update')
+                                ikey = find([self.attrs.iskey]);
+                                updateKey = cell2struct(data(idx(1), ikey+1), columns(ikey+1)');
+                                update(self & updateKey, columns{idx(2)}, change.NewData)
+                                data{idx(1),idx(2)} = change.NewData;
+                            end
+                            set(hstat, 'String', 'status: ok')
+                        end
+                    else
+                        % if modified a key field in a committed tuple, duplicate the tuple
+                        data = data([1:idx idx:end],:);
+                        idx(1) = idx(1)+1;
+                        data{idx(1),idx(2)} = change.NewData;
+                        data{idx(1),1}= false;
+                        set(hstat,'String','status: you have uncommitted tuples');
+                    end
+                else
+                    data{idx(1),idx(2)} = change.NewData;
+                    data{idx(1),1}= false;
+                    set(hstat,'String','status: you have uncommitted tuples');
+                end
+                set(htab, 'Data', data);
             end
             
-            function newTuple(~)
-                disp(varagin)
+            
+            function newTuple(~,~)
+                if size(data,1)>0
+                    tuple = data(end,:);
+                    tuple{1} = false;
+                else
+                    tuple(find(~[self.attrs.isNumeric])+1)={''};
+                    tuple{1} = false;
+                    for icol=2:length(columns)
+                        switch true
+                            case isfield(key,columns{icol})
+                                tuple{icol} = key.(columns{icol});
+                            case ~strcmp(self.attrs(icol-1).default, '<<<none>>>') && ~self.attrs(icol-1).isnullable
+                                if self.attrs(icol-1).isNumeric
+                                    tuple{icol} = str2double(self.attrs(icol-1).default);
+                                else
+                                    tuple{icol} = self.attrs(icol-1).default;
+                                end
+                            case strncmpi('ENUM', self.attrs(icol-1).type, 4)
+                                tuple{icol} = format{icol}{1};
+                        end
+                    end
+                end
+                data = [data; tuple];
+                set(htab, 'Data', data)
             end
             
-            function commit(~)
-                disp(varargin)
+            function commit(~,~)
+                ix = find(~[data{:,1}]);
+                if isempty(ix)
+                    set(hstat, 'String', 'status: nothing to commit')
+                else
+                    v = data(ix,2:end);
+                    f = columns(2:end);
+                    tuples = cell2struct(v',f');
+                    for i=1:length(tuples)
+                        try
+                            insert(self,tuples(i));
+                            data{ix(i),1}=true;
+                        catch err
+                            set(hstat, 'error: %s', err.message)
+                        end
+                    end
+                    disp(varargin)
+                end
             end
         end
         
@@ -789,10 +876,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % Duplicates, unmatched attrs, or missing required attrs will
             % cause an error, unless command is specified.
             
-            assert(~isempty(findprop(self,'table')), ...
-                'Cannot insert into a derived relation')
-            assert(isstruct(tuples), ...
-                'Tuples must be a non-empty structure array')
+            assert(~isempty(self.tab), 'Cannot insert into a derived relation')
+            assert(isstruct(tuples), 'Tuples must be a non-empty structure array')
             if isempty(tuples)
                 return
             end
@@ -864,12 +949,72 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % discarded, for example.
             insert(self, tuples, 'INSERT IGNORE')
         end
-    end
+    
+    
+    
+        function update(self, attrname, value)
+            % dj.Relvar/update - update an existing tuple
+            % Updates can cause violations of referential integrity and should
+            % not be used routinely.
+            %
+            % Safety constraints:
+            %    1. self must contain exactly one tuple
+            %    2. the update attribute must not be in primary key
+            % 
+            % EXAMPLES:
+            %   update(v2p.Mice(key), 'mouse_dob',   '2011-01-01')
+            %   update(v2p.Scan(key), 'lens', NaN)   % set numeric value to NULL
+            %   update(v2p.Stat(key), 'img', [])  % set blob value to NULL 
+            
+            assert(~isempty(self.tab),  'Cannot insert into a derived relation')
+            assert(count(self)==1, 'Update is only allowed on one tuple at a time for now')
+            ix = find(strcmp(attrname,{self.attrs.name}));
+            assert(numel(ix)==1, 'invalid attribute name')
+            assert(~self.attrs(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
+            
+            switch true
+                case self.attrs(ix).isString
+                    assert(ischar(value), 'Value must be a string')
+                    queryStr = '"{S}"';
+                    value = {value};
+                case self.attrs(ix).isBlob
+                    if isempty(value) && self.attrs(ix).isnullable
+                        queryStr = NULL;
+                        value = {};
+                    else
+                        queryStr = '"{M}"';
+                        if islogical(value)
+                            value = uint8(value);
+                        end
+                        value = {value};
+                    end
+                case self.attrs(ix).isNumeric
+                    if islogical(value)
+                        value = uint8(valuealue);
+                    end
+                    assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
+                    if isnan(value)
+                        assert(self.attrs(ix).isnullable, ...
+                            'attribute `%s` is not nullable. NaNs not allowed', attrname)
+                        queryStr = 'NULL';
+                        value = {};
+                    else
+                        queryStr = sprintf('%1.16g',value);
+                        value = {};
+                    end
+                otherwise
+                    error 'Invalid condition: report to DataJoint developers'
+            end
+            queryStr = sprintf('UPDATE %s SET `%s`=%s%s', self.sql.src, ...
+                attrname, queryStr, self.sql.res);
+            self.schema.query(queryStr, value{:})
+        end        
+    end    
+    
     
     
     
     methods(Access=private)
-        
         
         function semijoin(R1, R2)
             % relational natural semijoin performed in place.
