@@ -47,7 +47,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 case nargin==1 && ischar(copyObj)
                     % initialization as dj.Relvar('schema.ClassName')
                     self.tab = dj.Table(copyObj);
-                                       
+                    
                 case nargin==1 && isa(copyObj, 'dj.Table')
                     % initialization from a dj.Table without a table-specific class
                     self.tab = copyObj;
@@ -172,10 +172,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         function view(self)
             % dj.Relvar/view - view the data in speadsheet form
             
-            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
-                'MenuBar', 'none');
-                       
             columns = {self.attrs.name};
+            assert(~any([self.attrs.isBlob]), 'cannot view blobs')
             
             % specify column
             format = cell(1,length(columns));
@@ -187,11 +185,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 format(iCol) = {enumValues'};
             end
             data = fetch(self, columns{:});
+            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
+                'MenuBar', 'none');
             uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
                 'ColumnName', columns, 'ColumnEditable', false(1,length(columns)), ...
-                'ColumnFormat', format, 'Data', struct2cell(data)');            
+                'ColumnFormat', format, 'Data', struct2cell(data)');
         end
-
+        
         
         
         
@@ -206,19 +206,19 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             end
             
             hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
-                'MenuBar', 'none');          
+                'MenuBar', 'none');
             
             % buttons
             buttNew = uicontrol('Parent', hfig, 'String', '+',...
                 'Style', 'pushbutton', 'Position', [15 15 15 18], 'Callback', {@newTuple});
             buttCommit = uicontrol('Parent', hfig','String','commit', ...
-                'Style', 'pushbutton', 'Position', [50 15 80 18], 'Callback', {@commit}); 
+                'Style', 'pushbutton', 'Position', [50 15 80 18], 'Callback', {@commit});
             buttRefresh = uicontrol('Parent', hfig, 'String', 'refresh',...
                 'Style', 'pushbutton', 'Position', [140 15 80 18], 'Callback', {@refresh});
             
             columns = {self.attrs.name};
-
-            % specify column 
+            
+            % specify column
             format = cell(1,length(columns));
             format([self.attrs.isString]) = {'char'};
             format([self.attrs.isNumeric]) = {'numeric'};
@@ -233,13 +233,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             data = [];
             refresh;
             
-
+            
             function refresh(varargin)
                 data = fetch(self & key, columns{:});
                 set(htab, 'Data', struct2cell(data)');
             end
             
-            function cellEdit(htab, change) 
+            function cellEdit(htab, change)
                 disp(change)
             end
             
@@ -249,7 +249,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             
             function commit(~)
                 disp(varargin)
-            end            
+            end
         end
         
         
@@ -372,7 +372,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             self = self.copy;
             self.restrict(arg)
         end
-                       
+        
         
         
         function self = pro(self, varargin)
@@ -1007,7 +1007,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         end
     end
     
-        
+    
     
     methods(Access=private, Static)
         
