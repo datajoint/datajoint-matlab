@@ -356,7 +356,7 @@ classdef (Sealed) Table < handle
             % add inherited primary key attrs
             primaryKeyFields = {};
             for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.table.attrs.iskey])
+                for iField = find([parents{iRef}.table.attrs.iskey])                    
                     field = parents{iRef}.table.attrs(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>

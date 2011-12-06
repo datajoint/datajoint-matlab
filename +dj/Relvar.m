@@ -168,6 +168,94 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         
         
         
+        
+        function view(self)
+            % dj.Relvar/view - view the data in speadsheet form
+            
+            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
+                'MenuBar', 'none');
+                       
+            columns = {self.attrs.name};
+            
+            % specify column
+            format = cell(1,length(columns));
+            format([self.attrs.isString]) = {'char'};
+            format([self.attrs.isNumeric]) = {'numeric'};
+            for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
+                enumValues = textscan(self.attrs(iCol).type(6:end-1),'%s','Delimiter',',');
+                enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
+                format(iCol) = {enumValues'};
+            end
+            data = fetch(self, columns{:});
+            uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
+                'ColumnName', columns, 'ColumnEditable', false(1,length(columns)), ...
+                'ColumnFormat', format, 'Data', struct2cell(data)');            
+        end
+
+        
+        
+        
+        function enter(self, key)
+            % dj.Relvar/enter - manually enter data into the table,
+            % matching the given key.
+            
+            error 'Under development, Incomplete'
+            
+            if nargin<2
+                key = struct;
+            end
+            
+            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
+                'MenuBar', 'none');          
+            
+            % buttons
+            buttNew = uicontrol('Parent', hfig, 'String', '+',...
+                'Style', 'pushbutton', 'Position', [15 15 15 18], 'Callback', {@newTuple});
+            buttCommit = uicontrol('Parent', hfig','String','commit', ...
+                'Style', 'pushbutton', 'Position', [50 15 80 18], 'Callback', {@commit}); 
+            buttRefresh = uicontrol('Parent', hfig, 'String', 'refresh',...
+                'Style', 'pushbutton', 'Position', [140 15 80 18], 'Callback', {@refresh});
+            
+            columns = {self.attrs.name};
+
+            % specify column 
+            format = cell(1,length(columns));
+            format([self.attrs.isString]) = {'char'};
+            format([self.attrs.isNumeric]) = {'numeric'};
+            for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
+                enumValues = textscan(self.attrs(iCol).type(6:end-1),'%s','Delimiter',',');
+                enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
+                format(iCol) = {enumValues'};
+            end
+            htab = uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
+                'ColumnName', columns, 'ColumnEditable', ~isfield(key,columns), ...
+                'ColumnFormat', format, 'CellEditCallback', {@cellEdit});
+            data = [];
+            refresh;
+            
+
+            function refresh(varargin)
+                data = fetch(self & key, columns{:});
+                set(htab, 'Data', struct2cell(data)');
+            end
+            
+            function cellEdit(htab, change) 
+                disp(change)
+            end
+            
+            function newTuple(~)
+                disp(varagin)
+            end
+            
+            function commit(~)
+                disp(varargin)
+            end            
+        end
+        
+        
+        
+        
+        
         function del(self, doPrompt)
             % dj.Relvar/del - remove all tuples of relation self from its table
             % as well as all dependent tuples in dependent tables.

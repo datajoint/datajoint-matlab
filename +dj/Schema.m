@@ -23,21 +23,23 @@ classdef Schema < handle
         password
         connection    % connection to the database
         tableLevels   % levels in dependency hiararchy
+        initFun       % initializing function executed for each new session
     end
     
     methods
         
-        function self = Schema(package, host, dbname, user, password,  port)
+        function self = Schema(package, host, dbname, user, password, initFun)
             assert(nargin>=5, 'missing database credentials');
-            if nargin<6
-                self.host = host;
-            else
-                self.host = sprintf('%s:%d', host, port);
-            end
+            assert(nargin<6 || isa(initFun, 'function_handle'), ...
+                'The last input must be a function handle')
+            self.host = host;
             self.package = package;
             self.user = user;
             self.password = password;
             self.dbname = dbname;
+            if nargin>=6
+                self.initFun = initFun;
+            end
             self.reload
         end
         
@@ -385,6 +387,9 @@ classdef Schema < handle
             %}
             if isempty(self.connection) || 0<mym(self.connection, 'status')
                 self.connection=mym('open', self.host, self.user, self.password);
+                if ~isempty(self.initFun)
+                    self.initFun(self);
+                end
             end
             if nargout>0
                 ret=mym(self.connection, queryStr, varargin{:});
