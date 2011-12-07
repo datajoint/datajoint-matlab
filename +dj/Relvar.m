@@ -1033,7 +1033,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 self.schema = self.tab.schema;
                 self.attrs = self.tab.attrs;
                 self.sql.pro = '*';
-                if ~ismember(self.sql, 'res')
+                if ~isfield(self.sql, 'res')
                     self.sql.res = '';
                 end
                 self.sql.src = sprintf('`%s`.`%s`', ...
