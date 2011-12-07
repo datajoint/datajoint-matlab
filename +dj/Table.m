@@ -22,14 +22,13 @@ classdef (Sealed) Table < handle
     
     properties(SetAccess = private)
         schema   % handle to a schema object
-        info     % name, tier, comment.  See self.Schema
-        attrs    % structure array describing attrs
         className    % the name of the class that should be associated with this table
     end
-    properties(Access=private)
-        updateListener   % listens for schema definition changes
-    end
     
+    properties(Dependent, SetAccess = private)
+        info     % name, tier, comment.  See self.Schema
+        attrs    % structure array describing attrs
+    end
     
     methods
         function self = Table(className)
@@ -43,48 +42,34 @@ classdef (Sealed) Table < handle
             schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
             assert(~isempty(which(schemaFunction)), ['Not found: ' schemaFunction])
             self.schema = eval(schemaFunction);
-            self.updateListener = event.listener(self.schema, ...
-                'ChangedDefinitions', @(eventSrc,eventData) self.reset);
+    
             assert(isa(self.schema, 'dj.Schema'), ...
                 [schemaFunction ' must return an instance of dj.Schema'])
         end
+
         
-        
-        function init(self)
-            if isempty(self.info)
-                
-                % find table in the schema
+        function info = get.info(self) 
+            ix = strcmp(self.className, self.schema.classNames);
+            if ~any(ix)   % table does not exist. Create it.
+                self.create
                 ix = strcmp(self.className, self.schema.classNames);
-                if ~any(ix)
-                    % table does not exist. Create it.
-                    self.create
-                    ix = strcmp(self.className, self.schema.classNames);
-                    assert(any(ix), 'Table %s is not found', self.className);
-                end
-                
-                % table exists, initialize
-                self.info = self.schema.tables(ix);
-                self.attrs = self.schema.attrs(strcmp(self.info.name, ...
-                    {self.schema.attrs.table}));
+                assert(any(ix), 'Table %s is not found', self.className);
             end
+            info = self.schema.tables(ix);
         end
         
         
-        function reset(self)
-            % undo the effect of self.init
-            self.info = [];
-            self.attrs = [];
+        function attrs = get.attrs(self)
+            attrs = self.schema.attrs(strcmp(self.info.name, {self.schema.attrs.table}));
         end
-        
+                        
         
         function display(self)
-            self.init
             display@handle(self)
             disp(self.re(true))
             fprintf \n
         end
-        
-        
+                
         
         function erd(self, varargin)
             % dj.Table/erd - plot the entity relationship diagram of tables
@@ -105,7 +90,6 @@ classdef (Sealed) Table < handle
             %   t.erd(-1);  % plot only immediate ancestors
             %
             % See also dj.Schema/erd
-            self.init
             self.schema.erd(self.schema.getNeighbors(self.className, varargin{:}))
         end
         
@@ -126,9 +110,7 @@ classdef (Sealed) Table < handle
             % as regular attrs.
             %
             % See also dj.Table
-            
-            self.init
-            
+                       
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
             if expandForeignKeys
@@ -209,7 +191,6 @@ classdef (Sealed) Table < handle
         function optimize(self)
             % optimizes the table if it has become fragmented after repeated inserts and deletes.  
             % See http://dev.mysql.com/doc/refman/5.6/en/optimize-table.html
-            self.init
             fprintf 'optimizing ...'
             status = self.schema.query(sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
                 self.schema.dbname, self.info.name));
@@ -270,7 +251,6 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Table, dj.Relvar/del
             
-            self.init
             self.schema.cancelTransaction   % exit ongoing transaction
             
             % warn user if self is a subtable

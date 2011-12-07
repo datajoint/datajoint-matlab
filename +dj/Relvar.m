@@ -21,6 +21,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     end
     
     properties(Access = private)
+        updateListener   % listens for schema definition changes
         attrs   % struct array of attribute info, updated by relational operators
         sql     % sql statement: source, projection, and restriction clauses
         tab     % private dj.Table object, copied from public self.table
@@ -39,10 +40,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.tab = self.table;
                     
                 case nargin==1 && isa(copyObj, 'dj.Relvar')
-                    % copy constructor
+                    % (almost) copy constructor. Makes a derived relation. 
                     self.schema = copyObj.schema;
                     self.sql = copyObj.sql;
                     self.attrs = copyObj.attrs;
+                    self.tab = []; % derived relation has no table object
                     
                 case nargin==1 && ischar(copyObj)
                     % initialization as dj.Relvar('schema.ClassName')
@@ -57,16 +59,29 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     
             end
             
-            if isempty(self.attrs)
-                self.tab.init
+            self.updateListener = event.listener(self.schema, ...
+                'ChangedDefinitions', @(eventSrc,eventData) self.reset);
+            
+            if isempty(self.attrs) 
+                self.reset;
+            end
+        end
+        
+        
+        
+        function reset(self)
+            if isempty(self.attrs) || ~isempty(self.tab)
                 self.schema = self.tab.schema;
                 self.attrs = self.tab.attrs;
                 self.sql.pro = '*';
                 self.sql.res = '';
                 self.sql.src = sprintf('`%s`.`%s`', ...
                     self.schema.dbname, self.tab.info.name);
-            end
+            end                
         end
+        
+        
+        
         
         
         function names = get.primaryKey(self)
@@ -231,8 +246,20 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 format(iCol) = {enumValues'};
             end
             format = [{'logical'} format];
+            columnName = columns;
+            for iCol = 1:length(columns)
+                if iCol == 1
+                    columnName{iCol} = ['<html><i><font color="red">' columnName{iCol} '</i></font></html>'];
+                else
+                    if self.attrs(iCol-1).iskey
+                        columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
+                    else
+                        columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
+                    end
+                end
+            end                       
             htab = uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
-                'ColumnName', columns, 'ColumnEditable', [false ~isfield(key,columns)], ...
+                'ColumnName', columnName, 'ColumnEditable', [false ~isfield(key,columns)], ...
                 'ColumnFormat', format, 'CellEditCallback', {@cellEdit}, ...
                 'CellSelectionCallback', {@selectCell});
             data = {};
@@ -248,7 +275,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             
             function selectCell(~,selection)
                 idx = selection.Indices;
-                if ~isempty(idx)
+                if ~isempty(idx) && idx(2)>1
                     if ~self.attrs(idx(2)-1).iskey && ~all([data{:,1}])
                         set(hstat, 'String', 'status: Cannot modify committed tuples when uncommitted tuples exist. Commit first.')
                     else
