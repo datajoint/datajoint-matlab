@@ -62,26 +62,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             self.updateListener = event.listener(self.schema, ...
                 'ChangedDefinitions', @(eventSrc,eventData) self.reset);
             
-            if isempty(self.attrs) 
-                self.reset;
-            end
-        end
-        
-        
-        
-        function reset(self)
-            if isempty(self.attrs) || ~isempty(self.tab)
-                self.schema = self.tab.schema;
-                self.attrs = self.tab.attrs;
-                self.sql.pro = '*';
-                self.sql.res = '';
-                self.sql.src = sprintf('`%s`.`%s`', ...
-                    self.schema.dbname, self.tab.info.name);
-            end                
-        end
-        
-        
-        
+            self.reset;
+        end        
         
         
         function names = get.primaryKey(self)
@@ -1042,6 +1024,23 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
     
     
     methods(Access=private)
+        
+        function reset(self)
+            % initialize or reinitialize the base relvar.
+            % reset is executed when at construction and then again if
+            % table definitions have changed.
+            if isempty(self.attrs) || ~isempty(self.tab) 
+                self.schema = self.tab.schema;
+                self.attrs = self.tab.attrs;
+                self.sql.pro = '*';
+                if ~ismember(self.sql, 'res')
+                    self.sql.res = '';
+                end
+                self.sql.src = sprintf('`%s`.`%s`', ...
+                    self.schema.dbname, self.tab.info.name);
+            end
+        end
+
         
         function semijoin(R1, R2)
             % relational natural semijoin performed in place.
