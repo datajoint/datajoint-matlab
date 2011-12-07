@@ -330,11 +330,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         try
                             insert(self,tuples(i));
                             data{ix(i),1}=true;
+                            set(htab,'Data',data)
                         catch err
                             set(hstat, 'error: %s', err.message)
                         end
                     end
-                    disp(varargin)
                 end
             end
         end
