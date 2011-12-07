@@ -172,7 +172,16 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             columns = {self.attrs.name};
             assert(~any([self.attrs.isBlob]), 'cannot view blobs')
             
-            % specify column
+            % specify table header
+            columnName = columns;
+            for iCol = 1:length(columns)
+                
+                if self.attrs(iCol).iskey
+                    columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
+                else
+                    columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
+                end
+            end
             format = cell(1,length(columns));
             format([self.attrs.isString]) = {'char'};
             format([self.attrs.isNumeric]) = {'numeric'};
@@ -181,11 +190,13 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
                 format(iCol) = {enumValues'};
             end
+            
+            % display table
             data = fetch(self, columns{:});
             hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
                 'MenuBar', 'none');
             uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
-                'ColumnName', columns, 'ColumnEditable', false(1,length(columns)), ...
+                'ColumnName', columnName, 'ColumnEditable', false(1,length(columns)), ...
                 'ColumnFormat', format, 'Data', struct2cell(data)');
         end
         
