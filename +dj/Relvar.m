@@ -249,7 +249,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             
             
             function refresh(varargin)
-                data = struct2cell(fetch(self & key, columns{2:end}))';
+                data = struct2cell(fetch(self & key, columns{2:end}));
+                data = reshape(data, size(data,1), size(data,2))';  % this is necessary when data is empty
                 data = [num2cell(true(size(data,1),1)) data];
                 set(htab, 'Data', data)
                 set(hstat, 'String', 'status: ok');
