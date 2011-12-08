@@ -211,13 +211,15 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         function enter(self, key)
             % dj.Relvar/enter - manually enter data into the table,
             % matching the given key.
-            
+        
             assert(~isempty(self.tab), 'Cannot enter data into a derived relation')
             assert(ismember(self.tab.info.tier, {'manual','lookup'}), 'cannot enter data into automatic tables')
             
             if nargin<2
                 key = struct;
             end
+            
+            self.schema.cancelTransaction   % rollback an ongoing transcation
             
             hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
                 'MenuBar', 'none', 'Name', self.tab.className);
