@@ -420,7 +420,6 @@ classdef Schema < handle
                 % match the table definition
  
                 existingTable = dj.Table([self.package '.' className]);
-                existingTable.init
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
                 isAuto = ismember(existingTable.info.tier, {'computed','imported'}); 
@@ -432,8 +431,8 @@ classdef Schema < handle
                 end
                 existingTable = [];
                 choice = 'x';
-                while ~ismember(choice,'lmic')
-                    choice = input('Choose lookup (l), manual (m), imported (i), or computed (c) > ', 's');
+                while length(choice)~=1 || ~ismember(choice,'lmic')
+                    choice = lower(input('Choose table tier:  L=lookup, M=manual, I=imported, or C=computed > ', 's'));
                 end
                 tier = struct('c','computed','l','lookup','m','manual','i','imported');
                 tier = tier.(choice);

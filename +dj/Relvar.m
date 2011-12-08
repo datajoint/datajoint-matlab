@@ -905,7 +905,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             if nargin<=2
                 command = 'INSERT';
             end
-            assert(ismember(upper(command),{'INSERT', 'INSERT IGNORE', 'REPLACE'}))
+            assert(any(strcmpi(command,{'INSERT', 'INSERT IGNORE', 'REPLACE'})), ...
+                'invalid insert command')
             
             % validate attrs
             fnames = fieldnames(tuples);
@@ -922,35 +923,37 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 blobs = {};
                 for i = find(ix)
                     v = tuple.(self.attrs(i).name);
-                    if self.attrs(i).isString
-                        assert(ischar(v), ...
-                            'The field %s must be a character string', ...
-                            self.attrs(i).name)
-                        if isempty(v)
-                            queryStr = sprintf('%s`%s`="",', ...
-                                queryStr, self.attrs(i).name);
-                        else
-                            queryStr = sprintf('%s`%s`="{S}",', ...
+                    if ~isempty(v)  % empty values are treated as unspecified values
+                        if self.attrs(i).isString
+                            assert(ischar(v), ...
+                                'The field %s must be a character string', ...
+                                self.attrs(i).name)
+                            if isempty(v)
+                                queryStr = sprintf('%s`%s`="",', ...
+                                    queryStr, self.attrs(i).name);
+                            else
+                                queryStr = sprintf('%s`%s`="{S}",', ...
+                                    queryStr,self.attrs(i).name);
+                                blobs{end+1} = v;  %#ok<AGROW>
+                            end
+                        elseif self.attrs(i).isBlob
+                            queryStr = sprintf('%s`%s`="{M}",', ...
                                 queryStr,self.attrs(i).name);
-                            blobs{end+1} = v;  %#ok<AGROW>
-                        end
-                    elseif self.attrs(i).isBlob
-                        queryStr = sprintf('%s`%s`="{M}",', ...
-                            queryStr,self.attrs(i).name);
-                        if islogical(v) % mym doesn't accept logicals
-                            v = uint8(v);
-                        end
-                        blobs{end+1} = v;    %#ok<AGROW>
-                    else
-                        if islogical(v)  % mym doesn't accept logicals
-                            v = uint8(v);
-                        end
-                        assert(isscalar(v) && isnumeric(v),...
-                            'The field %s must be a numeric scalar value', ...
-                            self.attrs(i).name)
-                        if ~isnan(v)  % nans are not passed: assumed missing.
-                            queryStr = sprintf('%s`%s`=%1.16g,',...
-                                queryStr, self.attrs(i).name, v);
+                            if islogical(v) % mym doesn't accept logicals
+                                v = uint8(v);
+                            end
+                            blobs{end+1} = v;    %#ok<AGROW>
+                        else
+                            if islogical(v)  % mym doesn't accept logicals
+                                v = uint8(v);
+                            end
+                            assert(isscalar(v) && isnumeric(v),...
+                                'The field %s must be a numeric scalar value', ...
+                                self.attrs(i).name)
+                            if ~isnan(v)  % nans are not passed: assumed missing.
+                                queryStr = sprintf('%s`%s`=%1.16g,',...
+                                    queryStr, self.attrs(i).name, v);
+                            end
                         end
                     end
                 end
