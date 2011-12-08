@@ -169,35 +169,40 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         function view(self)
             % dj.Relvar/view - view the data in speadsheet form
             
-            columns = {self.attrs.name};
-            assert(~any([self.attrs.isBlob]), 'cannot view blobs')
-            
-            % specify table header
-            columnName = columns;
-            for iCol = 1:length(columns)
+            if ~count(self)
+                disp('empty relation')
+            else
+                columns = {self.attrs.name};
                 
-                if self.attrs(iCol).iskey
-                    columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
-                else
-                    columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
+                assert(~any([self.attrs.isBlob]), 'cannot view blobs')
+                
+                % specify table header
+                columnName = columns;
+                for iCol = 1:length(columns)
+                    
+                    if self.attrs(iCol).iskey
+                        columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
+                    else
+                        columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
+                    end
                 end
+                format = cell(1,length(columns));
+                format([self.attrs.isString]) = {'char'};
+                format([self.attrs.isNumeric]) = {'numeric'};
+                for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
+                    enumValues = textscan(self.attrs(iCol).type(6:end-1),'%s','Delimiter',',');
+                    enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
+                    format(iCol) = {enumValues'};
+                end
+                
+                % display table
+                data = fetch(self, columns{:});
+                hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
+                    'MenuBar', 'none');
+                uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
+                    'ColumnName', columnName, 'ColumnEditable', false(1,length(columns)), ...
+                    'ColumnFormat', format, 'Data', struct2cell(data)');
             end
-            format = cell(1,length(columns));
-            format([self.attrs.isString]) = {'char'};
-            format([self.attrs.isNumeric]) = {'numeric'};
-            for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
-                enumValues = textscan(self.attrs(iCol).type(6:end-1),'%s','Delimiter',',');
-                enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
-                format(iCol) = {enumValues'};
-            end
-            
-            % display table
-            data = fetch(self, columns{:});
-            hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
-                'MenuBar', 'none');
-            uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
-                'ColumnName', columnName, 'ColumnEditable', false(1,length(columns)), ...
-                'ColumnFormat', format, 'Data', struct2cell(data)');
         end
         
         
@@ -290,7 +295,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                                 'update confirmation', 'Update', 'Cancel', 'Cancel');
                             if strcmp(choice,'Update')
                                 ikey = find([self.attrs.iskey]);
-                                updateKey = cell2struct(data(idx(1), ikey+1), columns(ikey+1)');
+                                updateKey = cell2struct(data(idx(1), ikey+1)', columns(ikey+1)');
                                 update(self & updateKey, columns{idx(2)}, change.NewData)
                                 data{idx(1),idx(2)} = change.NewData;
                             end
@@ -335,7 +340,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         end
                     end
                 end
-                data = [data; tuple];
+                if isempty(data)
+                    data = tuple;
+                else
+                    data = [data; tuple];
+                end
                 set(htab, 'Data', data)
             end
             
