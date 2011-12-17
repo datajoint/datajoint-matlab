@@ -213,7 +213,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % matching the given key.
         
             assert(~isempty(self.tab), 'Cannot enter data into a derived relation')
-            assert(ismember(self.tab.info.tier, {'manual','lookup'}), 'cannot enter data into automatic tables')
+            assert(~any([self.attrs.isBlob]), 'Cannot mannually edith a table with blobs')
             
             if nargin<2
                 key = struct;

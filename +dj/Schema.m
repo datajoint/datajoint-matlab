@@ -50,7 +50,7 @@ classdef Schema < handle
             %
             % depth1 and depth2 specify the connectivity radius upstream
             % (depth<0) and downstream (depth>0) of this table.
-            % Omitting both depths defaults to table.erd(-2,2).
+            % Omitting both depths defaults to (-2,2).
             % Omitting any one of the depths sets it to zero.
             %
             % Examples:
@@ -105,13 +105,18 @@ classdef Schema < handle
         function erd(self, subset)
             % plot the Entity Relationship Diagram of the entire schema
             % INPUTS:
-            %    subset -- indices schema.table to include in the diagram.
+            %    subset -- indices of tables to include in the diagram
+            %    (intended for internal use)
             
             if nargin==1
                 subset = 1:length(self.tableLevels);
             end
             levels = -self.tableLevels(subset);
             C = self.dependencies(subset,subset);  % connectivity matrix
+            if sum(C)==0
+                disp 'No dependencies found. Nothing to plot'
+                return
+            end
             
             yi = levels;
             xi = zeros(size(yi));
@@ -149,19 +154,16 @@ classdef Schema < handle
             
             
             % plot nodes
-            plot(xi, yi, 'o', 'MarkerSize', 10);
+            plot(xi, yi, 'ko', 'MarkerSize', 10);
             hold on;
-            c = hsv(16);
             % plot edges
             for i=1:size(C,1)
-                ci = round((yi(i)-min(yi))/(max(yi)-min(yi))*15)+1;
-                cc = c(ci,:)*0.3+0.4;
                 for j=1:size(C,2)
                     switch C(i,j)
                         case 1
-                            connectNodes(xi([i j]), yi([i j]), '-', cc);
+                            connectNodes(xi([i j]), yi([i j]), 'k-')
                         case 2
-                            connectNodes(xi([i j]), yi([i j]), '--', cc);
+                            connectNodes(xi([i j]), yi([i j]), 'k--')
                     end
                     hold on
                 end
@@ -192,13 +194,13 @@ classdef Schema < handle
             disp done
             
             
-            function connectNodes(x, y, lineStyle, color)
+            function connectNodes(x, y, lineStyle)
                 assert(length(x)==2 && length(y)==2)
                 plot(x, y, 'k.')
                 t = 0:0.05:1;
                 x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
                 y = y(1) + (y(2)-y(1))*t;
-                plot(x, y, lineStyle, 'Color', color)
+                plot(x, y, lineStyle)
             end
         end
         
@@ -432,7 +434,7 @@ classdef Schema < handle
                 existingTable = [];
                 choice = 'x';
                 while length(choice)~=1 || ~ismember(choice,'lmic')
-                    choice = lower(input('Choose table tier:  L=lookup, M=manual, I=imported, or C=computed > ', 's'));
+                    choice = lower(input('\nChoose table tier:\n    L=lookup\n    M=manual\n    I=imported\n    C=computed\n  > ', 's'));
                 end
                 tier = struct('c','computed','l','lookup','m','manual','i','imported');
                 tier = tier.(choice);
@@ -463,12 +465,14 @@ classdef Schema < handle
                 fprintf(f, '%% I will explain what my table does here \n\n');
                 fprintf(f, '%%{\n');
                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
-                [sortedClassNames, order] = sort(self.classNames);
-                disp 'Selected parent table(s)'
-                parentIndices = order(...
-                    listdlg('ListString',sortedClassNames,'PromptString','Select parent table(s)'));
-                for i = parentIndices
-                    fprintf(f, '-> %s\n', self.classNames{i});
+                if ~isempty(self.classNames)
+                    [sortedClassNames, order] = sort(self.classNames);
+                    disp 'Selecting parent table(s)'
+                    parentIndices = order(...
+                        listdlg('ListString',sortedClassNames,'PromptString','Select parent table(s)'));
+                    for i = parentIndices
+                        fprintf(f, '-> %s\n', self.classNames{i});
+                    end
                 end
                 fprintf(f, '\n-----\n\n');
                 fprintf(f, '%%}');
