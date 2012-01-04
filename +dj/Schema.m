@@ -15,7 +15,7 @@ classdef Schema < handle
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
-    events 
+    events
         ChangedDefinitions
     end
     
@@ -70,15 +70,15 @@ classdef Schema < handle
                 otherwise
                     levels = sort([depth1 depth2]);
             end
-            if nargin<5 || nonHierarchical  
+            if nargin<5 || nonHierarchical
                 test = @(x) x>=1;  % all foreign keys
-            else 
+            else
                 test = @(x) x==1;  % only hierarchical foreign keys
             end
             
             i = find(strcmp(self.classNames, className));
             assert(length(i) == 1, 'could not find className %s', className)
-                        
+            
             % find tables on which self depends
             upstream = i;
             nodes = i;
@@ -356,7 +356,7 @@ classdef Schema < handle
                 end
                 fprintf('%.3g s\n', toc)
                 
-                self.tableLevels = levels;                
+                self.tableLevels = levels;
             end
             self.notify('ChangedDefinitions')
         end
@@ -408,6 +408,12 @@ classdef Schema < handle
             % Example:
             %    makeClass(v2p.getSchema, 'RegressionModel')
             
+            if nargin<2
+                className = input('Enter class name >', 's');
+            end
+            className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
+            assert(~isempty(className), 'invalid class name')
+            
             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
             assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
             filename = fullfile(filename, [className '.m']);
@@ -416,21 +422,15 @@ classdef Schema < handle
                 edit(filename)
                 return
             end
-                        
-            try
+            
+            if ismember([self.package '.' className], self.classNames)
                 % Check if the table already exists and create the class to
                 % match the table definition
- 
                 existingTable = dj.Table([self.package '.' className]);
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
-                isAuto = ismember(existingTable.info.tier, {'computed','imported'}); 
- 
-            catch err
-                % The table does not exist, proceed as normal
-                if ~strcmp(err.identifier, 'DataJoint:MissingTableDefnition')
-                    rethrow(err)
-                end
+                isAuto = ismember(existingTable.info.tier, {'computed','imported'});
+            else
                 existingTable = [];
                 choice = 'x';
                 while length(choice)~=1 || ~ismember(choice,'lmic')
@@ -440,8 +440,8 @@ classdef Schema < handle
                 tier = tier.(choice);
                 isAuto = ismember(tier, {'computed','imported'});
             end
- 
-                            
+            
+            
             isSubtable = false;
             if isAuto
                 choice = '';
@@ -496,7 +496,7 @@ classdef Schema < handle
                     else
                         fprintf(f, ' = ');
                     end
-                    fprintf(f, '%s', self.classNames{parentIndices(i)});                    
+                    fprintf(f, '%s', self.classNames{parentIndices(i)});
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
                 fprintf(f, '\tend\n');
