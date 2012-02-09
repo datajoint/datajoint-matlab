@@ -199,13 +199,25 @@ classdef Schema < handle
             % INPUTS:
             %    subset -- classNames to include in the diagram
             
-            ix = find(~ismember(subset,self.classNames));
-            if ~isempty(ix)
-                error('Unknown table %d', subset(ix(1)));
+            C = self.dependencies;
+            levels = -self.tableLevels;
+            names = self.classNames;
+            tiers = {self.tables.tier};
+            tiers = [tiers repmat({'external'},1,length(names)-length(tiers))];
+            
+            if nargin>=2
+                % limit to the subset
+                ix = find(~ismember(subset,self.classNames));
+                if ~isempty(ix)
+                    error('Unknown table %d', subset(ix(1)));
+                end
+                subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
+                levels = levels(subset);
+                C = C(subset,subset);  % connectivity matrix
+                names = self.classNames(subset);
+                tiers = tiers(subset);
             end
-            subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset); 
-            levels = -self.tableLevels(subset);
-            C = self.dependencies(subset,subset);  % connectivity matrix
+            
             if sum(C)==0
                 disp 'No dependencies found. Nothing to plot'
                 return
@@ -270,14 +282,10 @@ classdef Schema < handle
                 'imported', [0.0 0.0 1.0], ...
                 'computed', [0.5 0.0 0.0]);
             
-            for i=1:length(subset)
-                isExternal = subset(i)>length(self.tables);
-                if isExternal
-                    c = fontColor.external;
-                else
-                    c = fontColor.(self.tables(subset(i)).tier);
-                end
-                name = self.classNames{subset(i)};
+            for i=1:length(levels)
+                name = names{i};
+                isExternal = ~strncmp(name, self.package, length(self.package));
+
                 edgeColor = [0.3 0.3 0.3];
                 fontSize = 9;
                 if isExternal
@@ -295,7 +303,7 @@ classdef Schema < handle
                 end
                 text(xi(i), yi(i), [name '  '], ...
                     'HorizontalAlignment', 'right', 'interpreter', 'none', ...
-                    'Color', c, 'FontSize', fontSize, 'edgeColor', edgeColor);
+                    'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
                 hold on;
             end
             
