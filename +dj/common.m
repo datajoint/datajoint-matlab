@@ -1,4 +1,4 @@
-classdef(Sealed) utils
+classdef(Sealed) common
     
     properties(Constant)
         % Table naming convention
@@ -6,8 +6,7 @@ classdef(Sealed) utils
         %   manual:   tableName starts with a letter
         %   imported: tableName with a '_'
         %   computed: tableName with '__'
-        
-        allowedTiers = {'lookup','manual','imported','computed'}
+        allowedTiers = {'lookup' 'manual' 'imported' 'computed'}
         tierPrefixes = {'#', '', '_', '__'}
         macros = struct(...
             'JobFields', {{
@@ -19,6 +18,7 @@ classdef(Sealed) utils
             'job_timestamp=CURRENT_TIMESTAMP: timestamp # automatic timestamp'
             }})
     end
+    
     
     methods(Static)
         function str = readPercentBraceComment(filename)
@@ -49,7 +49,6 @@ classdef(Sealed) utils
         end
         
         
-        
         function ret = str2cell(str, delims)
             % converts string into cell array of strings
             
@@ -62,9 +61,7 @@ classdef(Sealed) utils
                 2:length(pos),'UniformOutput', false);
             ret = ret(~cellfun(@isempty, ret));
             ret = ret(:);  % convert to column
-        end
-        
-        
+        end    
         
         
         function str = camelCase(str, reverse)
@@ -106,7 +103,6 @@ classdef(Sealed) utils
                 str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
             end
         end
-        
         
         
         function s = structure2array(s)
@@ -166,7 +162,6 @@ classdef(Sealed) utils
                 end
             end
         end
-        
         
         
         function sorted = structSort(s, fieldNames)

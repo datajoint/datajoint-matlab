@@ -6,400 +6,71 @@ classdef Schema < handle
     
     properties(SetAccess = private)
         package % the package (directory starting with a +) that stores schema classes, must be on path
-        host
-        user
         dbname  % database (schema) name
-        tables  % full list of tables
-        classNames % classes corresponding to tables
-        attrs  % full list of all table attrs
+        conn    % handle to the dj.Connection object
+        
+        % table information loaded from the schema
+        loaded = false
+        classNames    % classes corresponding to self.tables plus all referenced tables from other schemas.
+        tables        % full list of tables
+        attrs         % full list of all table attrs
+        tableLevels   % levels in dependency hiararchy
+    end
+    
+    properties(Access=private)
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
     events
+        % lets relvar objects know that table definitions may have changed
         ChangedDefinitions
     end
     
-    properties(Access = private)
-        password
-        connection    % connection to the database
-        tableLevels   % levels in dependency hiararchy
-        initFun       % initializing function executed for each new session
-    end
     
     methods
         
-        function self = Schema(package, host, dbname, user, password, initFun)
-            assert(nargin>=5, 'missing database credentials');
-            assert(nargin<6 || isa(initFun, 'function_handle'), ...
-                'The last input must be a function handle')
-            self.host = host;
-            self.package = package;
-            self.user = user;
-            self.password = password;
+        function self = Schema(conn, package, dbname)
+            self.conn = conn;
             self.dbname = dbname;
-            if nargin>=6
-                self.initFun = initFun;
-            end
-            self.reload
+            self.package = package;
+            addPackage(self.conn, dbname, package);
         end
         
         
-        
-        function neighbors = getNeighbors(self, className, depth1, depth2, nonHierarchical)
-            % get indices of the neighbors of table with className
-            %
-            % depth1 and depth2 specify the connectivity radius upstream
-            % (depth<0) and downstream (depth>0) of this table.
-            % Omitting both depths defaults to (-2,2).
-            % Omitting any one of the depths sets it to zero.
-            %
-            % Examples:
-            %   schema.getNeighbors(className);    % self and two levels up and two levels down
-            %   schema.getNeighbors(className, 2); % self and two levels down
-            %   schema.getNeighbors(className, -1);  % only the immediate ancestors and self
-            %   schema.getNeighbors(className, -1, 1);  % immediate neighbors and self
-            %
-            % If nonHierarchical is specified as false, then only
-            % hierarchical foreign keys are traversed.
-            
-            switch nargin
-                case 2
-                    levels = [-2 2];
-                case 3
-                    levels = sort([0 depth1]);
-                otherwise
-                    levels = sort([depth1 depth2]);
+        function val = get.classNames(self)
+            if ~self.loaded
+                self.reload
             end
-            if nargin<5 || nonHierarchical
-                test = @(x) x>=1;  % all foreign keys
-            else
-                test = @(x) x==1;  % only hierarchical foreign keys
-            end
-            
-            i = find(strcmp(self.classNames, className));
-            assert(length(i) == 1, 'could not find className %s', className)
-            
-            % find tables on which self depends
-            upstream = i;
-            nodes = i;
-            for j=1:-levels(1)
-                [~, nodes] = find(test(self.dependencies(nodes,:)));
-                upstream = [upstream nodes(:)'];  %#ok:<AGROW>
-            end
-            
-            % find tables dependent on self
-            downstream = [];
-            nodes = i;
-            for j=1:levels(2)
-                [nodes,~] = find(test(self.dependencies(:,nodes)));
-                downstream = [downstream nodes(:)'];  %#ok:<AGROW>
-            end
-            
-            neighbors = unique([upstream downstream]);
-            [~,order] = sort(self.tableLevels(neighbors));
-            neighbors = neighbors(order);
+            val = self.classNames;
         end
         
-        
-        
-        function erd(self, subset)
-            % plot the Entity Relationship Diagram of the entire schema
-            % INPUTS:
-            %    subset -- indices of tables to include in the diagram
-            %    (intended for internal use)
-            
-            if nargin==1
-                subset = 1:length(self.tableLevels);
+        function val = get.tables(self)
+            if ~self.loaded
+                self.reload
             end
-            levels = -self.tableLevels(subset);
-            C = self.dependencies(subset,subset);  % connectivity matrix
-            if sum(C)==0
-                disp 'No dependencies found. Nothing to plot'
-                return
-            end
-            
-            yi = levels;
-            xi = zeros(size(yi));
-            
-            % optimize graph appearance by minimizing disctances.^2 to connected nodes
-            % while maximizing distances to nodes on the same level.
-            fprintf 'optimizing layout...'
-            j1 = cell(1,length(xi));
-            j2 = cell(1,length(xi));
-            for i=1:length(xi)
-                j1{i} = setdiff(find(yi==yi(i)),i);
-                j2{i} = [find(C(i,:)) find(C(:,i)')];
-            end
-            niter=5e4;
-            T0=5; % initial temperature
-            cr=6/niter; % cooling rate
-            L = inf(size(xi));
-            for iter=1:niter
-                i = ceil(rand*length(xi));  % pick a random node
-                
-                % Compute the cost function Lnew of the increasing xi(i) by dx
-                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
-                xx=xi(i)+dx;
-                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
-                if ~isempty(j1{i})
-                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
-                end
-                
-                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
-                    xi(i)=xi(i)+dx;
-                    L(i) = Lnew;
-                end
-            end
-            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
-            
-            
-            % plot nodes
-            plot(xi, yi, 'ko', 'MarkerSize', 10);
-            hold on;
-            % plot edges
-            for i=1:size(C,1)
-                for j=1:size(C,2)
-                    switch C(i,j)
-                        case 1
-                            connectNodes(xi([i j]), yi([i j]), 'k-')
-                        case 2
-                            connectNodes(xi([i j]), yi([i j]), 'k--')
-                    end
-                    hold on
-                end
-            end
-            
-            % annotate nodes
-            for i=1:length(subset)
-                switch self.tables(subset(i)).tier
-                    case 'manual'
-                        c = [0 0.6 0];
-                    case 'lookup'
-                        c = [0.3 0.4 0.3];
-                    case 'imported'
-                        c = [0 0 1];
-                    case 'computed'
-                        c = [0.5 0.0 0];
-                end
-                text(xi(i), yi(i), [dj.utils.camelCase(self.tables(subset(i)).name) '  '], ...
-                    'HorizontalAlignment', 'right', ...
-                    'Color', c, 'FontSize', 12);
-                hold on;
-            end
-            
-            xlim([min(xi)-0.5 max(xi)+0.5]);
-            ylim([min(yi)-0.5 max(yi)+0.5]);
-            hold off
-            axis off
-            disp done
-            
-            
-            function connectNodes(x, y, lineStyle)
-                assert(length(x)==2 && length(y)==2)
-                plot(x, y, 'k.')
-                t = 0:0.05:1;
-                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
-                y = y(1) + (y(2)-y(1))*t;
-                plot(x, y, lineStyle)
-            end
+            val = self.tables;
         end
         
-        
-        
-        function backup(self, backupDir, tiers)
-            % dj.Schema/backup - saves tables into .mat files
-            % SYNTAX:
-            %    s.backup(folder)    -- save all lookup and manual tables
-            %    s.backup(folder, {'manual'})    -- save all manual tables
-            %    s.backup(folder, {'manual','imported'})
-            % Each table must be small enough to be loaded into memory.
-            % By default, only lookup and manual tables are saved.
-            if nargin<3
-                tiers = {'lookup','manual'};
+        function val = get.attrs(self)
+            if ~self.loaded
+                self.reload
             end
-            assert(all(ismember(tiers, dj.utils.allowedTiers)))
-            backupDir = fullfile(backupDir, self.dbname);
-            if ~exist(backupDir, 'dir')
-                assert(mkdir(backupDir), ...
-                    'Could not create directory %s', backupDir)
-            end
-            backupDir = fullfile(backupDir, datestr(now,'yyyy-mm-dd'));
-            if ~exist(backupDir,'dir')
-                assert(mkdir(backupDir), ...
-                    'Could not create directory %s', backupDir)
-            end
-            ix = find(ismember({self.tables.tier}, tiers));
-            % save in hiearchical order
-            [~,order] = sort(self.tableLevels(ix));
-            ix = ix(order);
-            for iTable = ix(:)'
-                contents = self.query(sprintf('SELECT * FROM `%s`.`%s`', ...
-                    self.dbname, self.tables(iTable).name));
-                contents = dj.utils.structure2array(contents);
-                filename = fullfile(backupDir, ...
-                    regexprep(self.classNames{iTable}, '^.*\.', ''));
-                fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
-                save(filename, 'contents')
-                fprintf 'done\n'
-            end
+            val = self.attrs;
         end
         
-        
-        
-        function delete(self)
-            % deletes the schme
-            % unfortunately mym leaves open invisible connections after
-            % clear classes.  The connections are only cleared upon exiting
-            % matlab.
-            disp 'closing DataJoint connections'
-            mym closeall
-            self.notify('ChangedDefinitions')
-            self.delete@handle
-        end
-        
-        
-        
-        function reload(self)
-            % load schema information into memory: table names and table
-            % dependencies.
-            
-            % load table information
-            fprintf('loading table definitions from %s/%s... ', self.host, self.dbname)
-            tic
-            self.tables = self.query(sprintf([...
-                'SELECT table_name AS name, table_comment AS comment ', ...
-                'FROM information_schema.tables WHERE table_schema="%s"'], ...
-                self.dbname));
-            
-            % determine table tier (see dj.Table)
-            re = [cellfun(@(x) ...
-                sprintf('^%s[a-z]\\w+$',x), dj.utils.tierPrefixes, ...
-                'UniformOutput', false) ...
-                {'.*'}];  % regular expressions to determine table tier
-            tierIdx = cellfun(@(x) ...
-                find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
-                self.tables.name);
-            self.tables.tier = dj.utils.allowedTiers(min(tierIdx,end))';
-            
-            % exclude tables that do not match the naming conventions
-            validTables = tierIdx < length(re);  % matched table name pattern
-            self.tables.comment = cellfun(@(x) strtok(x,'$'), self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
-            self.tables = dj.utils.structure2array(self.tables);
-            self.tables = self.tables(validTables);
-            self.classNames = cellfun(@(x) sprintf('%s.%s', self.package, dj.utils.camelCase(x)), {self.tables.name}, 'UniformOutput', false);
-            
-            % read field information
-            if ~isempty(self.tables)
-                fprintf('%.3g s\nloading field information... ', toc), tic
-                self.attrs = query(self, sprintf([...
-                    'SELECT table_name AS `table`, column_name as `name`,'...
-                    '(column_key="PRI") AS `iskey`,column_type as `type`,'...
-                    '(is_nullable="YES") AS isnullable, column_comment as `comment`,'...
-                    'if(is_nullable="YES","NULL",ifnull(CAST(column_default AS CHAR),"<<<none>>>"))',...
-                    ' AS `default` FROM information_schema.columns '...
-                    'WHERE table_schema="%s"'],...
-                    self.dbname));
-                self.attrs.isnullable = logical(self.attrs.isnullable);
-                self.attrs.iskey = logical(self.attrs.iskey);
-                self.attrs.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.attrs.type);
-                self.attrs.isString = ~cellfun(@(x) isempty(regexp(char(x'), '^((var)?char|enum|date|timestamp)','once')), self.attrs.type);
-                self.attrs.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), '^(tiny|medium|long)?blob', 'once')), self.attrs.type);
-                % strip field lengths off integer types
-                self.attrs.type = cellfun(@(x) regexprep(char(x'), '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
-                self.attrs = dj.utils.structure2array(self.attrs);
-                self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
-                validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];
-                if ~all(validFields)
-                    ix = find(~validFields, 1, 'first');
-                    error('unsupported field type "%s" in %s.%s', ...
-                        self.attrs(ix).type, self.attrs.table(ix), self.attrs.name(ix));
-                end
-                
-                % load table dependencies
-                fprintf('%.3g s\nloading table dependencies... ', toc), tic
-                tableList = sprintf(',"%s"',self.tables.name);
-                foreignKeys = dj.utils.structure2array(self.query(sprintf([...
-                    'SELECT table_name as `from`, referenced_table_name as `to`,'...
-                    '  min((table_schema, table_name,column_name) in'...
-                    '    (SELECT table_schema, table_name, column_name'...
-                    '    FROM information_schema.columns WHERE column_key="PRI")) as parental '...
-                    'FROM information_schema.key_column_usage '...
-                    'WHERE table_schema="%s" and referenced_table_schema="%s" '...
-                    'AND table_name in (%s) and referenced_table_name in (%s) '...
-                    'GROUP BY table_name, referenced_table_name'],...
-                    self.dbname, self.dbname, tableList(2:end), tableList(2:end))));
-                
-                ixFrom = cellfun(@(x) find(strcmp(x, {self.tables.name})), {foreignKeys.from});
-                ixTo = cellfun(@(x) find(strcmp(x, {self.tables.name})), {foreignKeys.to});
-                nTables = length(self.tables);
-                self.dependencies = sparse(ixFrom, ixTo, 2-[foreignKeys.parental], nTables, nTables);
-                
-                % determine tables' hierarchical order
-                K = self.dependencies;
-                ik = 1:length(self.tables);
-                levels = nan(size(ik));
-                level = 0;
-                while ~isempty(K)
-                    orphans = sum(K,2)==0;
-                    levels(ik(orphans)) = level;
-                    level = level + 1;
-                    ik = ik(~orphans);
-                    K = K(~orphans,~orphans);
-                end
-                
-                % lower level if possible
-                for j=1:length(self.tables)
-                    ix = find(self.dependencies(:,j));
-                    if ~isempty(ix)
-                        levels(j)=min(levels(ix)-1);
-                    end
-                end
-                fprintf('%.3g s\n', toc)
-                
-                self.tableLevels = levels;
+        function val = get.dependencies(self)
+            if ~self.loaded
+                self.reload
             end
-            self.notify('ChangedDefinitions')
+            val = self.dependencies;
         end
         
-        
-        
-        function startTransaction(self)
-            self.query('START TRANSACTION WITH CONSISTENT SNAPSHOT')
-        end
-        
-        
-        
-        function commitTransaction(self)
-            self.query('COMMIT')
-        end
-        
-        
-        
-        function cancelTransaction(self)
-            self.query('ROLLBACK')
-        end
-        
-        
-        
-        function ret = query(self, queryStr, varargin)
-            % dj.Schema/query - query(dbname, queryStr, varargin) issue an
-            % SQL query and return the result if any.
-            % Reuses the same connection, which limits connections to one
-            % database server at a time, but multiple schemas are okay.
-            %}
-            if isempty(self.connection) || 0<mym(self.connection, 'status')
-                self.connection=mym('open', self.host, self.user, self.password);
-                if ~isempty(self.initFun)
-                    self.initFun(self);
-                end
+        function val = get.tableLevels(self)
+            if ~self.loaded
+                self.reload
             end
-            if nargout>0
-                ret=mym(self.connection, queryStr, varargin{:});
-            else
-                mym(self.connection, queryStr, varargin{:});
-            end
+            val = self.tableLevels;
         end
-        
         
         
         function makeClass(self, className)
@@ -458,6 +129,7 @@ classdef Schema < handle
             % table declaration
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.re);
+                error DEBUG-THIS
                 parentIndices = self.getNeighbors([self.package '.' className],-1);
                 parentIndices(end) = [];  % remove this table
             else
@@ -520,5 +192,367 @@ classdef Schema < handle
             fclose(f);
             edit(filename)
         end
+        
+        
+        function erd(self, subset)
+            % plot the Entity Relationship Diagram of the entire schema
+            % INPUTS:
+            %    subset -- classNames to include in the diagram
+            
+            if nargin<2
+                subset = 1:length(self.tableLevels);
+            else
+                subset = cellfun(@(x) find(strcmp(self.classNames, x)), subset);
+            end
+            levels = -self.tableLevels(subset);
+            C = self.dependencies(subset,subset);  % connectivity matrix
+            if sum(C)==0
+                disp 'No dependencies found. Nothing to plot'
+                return
+            end
+            
+            yi = levels;
+            xi = zeros(size(yi));
+            
+            % optimize graph appearance by minimizing disctances.^2 to connected nodes
+            % while maximizing distances to nodes on the same level.
+            fprintf 'optimizing layout...'
+            j1 = cell(1,length(xi));
+            j2 = cell(1,length(xi));
+            for i=1:length(xi)
+                j1{i} = setdiff(find(yi==yi(i)),i);
+                j2{i} = [find(C(i,:)) find(C(:,i)')];
+            end
+            niter=5e4;
+            T0=5; % initial temperature
+            cr=6/niter; % cooling rate
+            L = inf(size(xi));
+            for iter=1:niter
+                i = ceil(rand*length(xi));  % pick a random node
+                
+                % Compute the cost function Lnew of the increasing xi(i) by dx
+                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
+                xx=xi(i)+dx;
+                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
+                if ~isempty(j1{i})
+                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
+                end
+                
+                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
+                    xi(i)=xi(i)+dx;
+                    L(i) = Lnew;
+                end
+            end
+            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
+            
+            
+            % plot nodes
+            plot(xi, yi, 'ko', 'MarkerSize', 10);
+            hold on;
+            % plot edges
+            for i=1:size(C,1)
+                for j=1:size(C,2)
+                    switch C(i,j)
+                        case 1
+                            connectNodes(xi([i j]), yi([i j]), 'k-')
+                        case 2
+                            connectNodes(xi([i j]), yi([i j]), 'k--')
+                    end
+                    hold on
+                end
+            end
+            
+            % annotate nodes
+            fontColor = struct(...
+                'external', [0.0 0.0 0.0], ...
+                'manual',   [0.0 0.6 0.0], ...
+                'lookup',   [0.3 0.4 0.3], ...
+                'imported', [0.0 0.0 1.0], ...
+                'computed', [0.5 0.0 0.0]);
+            
+            for i=1:length(subset)
+                isExternal = subset(i)>length(self.tables);
+                if isExternal
+                    c = fontColor.external;
+                else
+                    c = fontColor.(self.tables(subset(i)).tier);
+                end
+                name = self.classNames{subset(i)};
+                edgeColor = [0.3 0.3 0.3];
+                fontSize = 9;
+                if isExternal
+                    name = getPackage(self.conn, name, false);
+                else
+                    try 
+                        if isSubtable(eval(name))
+                            name = [name '*'];  %#ok:AGROW
+                        end
+                    catch %#ok 
+                    end  
+                    name = name(length(self.package)+2:end);  %remove package name
+                    edgeColor = 'none';
+                    fontSize = 11;
+                end
+                text(xi(i), yi(i), [name '  '], ...
+                    'HorizontalAlignment', 'right', 'interpreter', 'none', ...
+                    'Color', c, 'FontSize', fontSize, 'edgeColor', edgeColor);
+                hold on;
+            end
+            
+            xlim([min(xi)-0.5 max(xi)+0.5]);
+            ylim([min(yi)-0.5 max(yi)+0.5]);
+            hold off
+            axis off
+            title(sprintf('%s (%s)', self.package, self.dbname), ...
+                'Interpreter', 'none', 'fontsize', 14,'FontWeight','bold', 'FontName', 'Ariel')
+            disp done
+            
+            
+            function connectNodes(x, y, lineStyle)
+                assert(length(x)==2 && length(y)==2)
+                plot(x, y, 'k.')
+                t = 0:0.05:1;
+                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
+                y = y(1) + (y(2)-y(1))*t;
+                plot(x, y, lineStyle)
+            end
+        end
+        
+        
+        function backup(self, backupDir, tiers)
+            % dj.Schema/backup - saves tables into .mat files
+            % SYNTAX:
+            %    s.backup(folder)    -- save all lookup and manual tables
+            %    s.backup(folder, {'manual'})    -- save all manual tables
+            %    s.backup(folder, {'manual','imported'})
+            % Each table must be small enough to be loaded into memory.
+            % By default, only lookup and manual tables are saved.
+            if nargin<3
+                tiers = {'lookup','manual'};
+            end
+            assert(all(ismember(tiers, dj.common.allowedTiers)))
+            backupDir = fullfile(backupDir, self.dbname);
+            if ~exist(backupDir, 'dir')
+                assert(mkdir(backupDir), ...
+                    'Could not create directory %s', backupDir)
+            end
+            backupDir = fullfile(backupDir, datestr(now,'yyyy-mm-dd'));
+            if ~exist(backupDir,'dir')
+                assert(mkdir(backupDir), ...
+                    'Could not create directory %s', backupDir)
+            end
+            ix = find(ismember({self.tables.tier}, tiers));
+            % save in hiearchical order
+            [~,order] = sort(self.tableLevels(ix));
+            ix = ix(order);
+            for iTable = ix(:)'
+                contents = self.conn.query(sprintf('SELECT * FROM `%s`.`%s`', ...
+                    self.dbname, self.tables(iTable).name));
+                contents = dj.common.structure2array(contents);
+                filename = fullfile(backupDir, ...
+                    regexprep(self.classNames{iTable}, '^.*\.', ''));
+                fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
+                save(filename, 'contents')
+                fprintf 'done\n'
+            end
+        end
+        
+        
+        
+        
+        function reload(self, force)
+            force = nargin<2 || force;
+            if self.loaded && ~force
+                return
+            end
+            self.loaded = true;
+            
+            % reload schema information into memory: table names and table
+            % dependencies.
+            % reload table information
+            fprintf('loading table definitions from %s... ', self.dbname)
+            tic
+            self.tables = self.conn.query(sprintf([...
+                'SELECT table_name AS name, table_comment AS comment ', ...
+                'FROM information_schema.tables WHERE table_schema="%s"'], ...
+                self.dbname));
+            
+            % determine table tier (see dj.Table)
+            re = [cellfun(@(x) ...
+                sprintf('^%s[a-z]\\w+$',x), dj.common.tierPrefixes, ...
+                'UniformOutput', false) ...
+                {'.*'}];  % regular expressions to determine table tier
+            tierIdx = cellfun(@(x) ...
+                find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
+                self.tables.name);
+            self.tables.tier = dj.common.allowedTiers(min(tierIdx,end))';
+            
+            % exclude tables that do not match the naming conventions
+            validTables = tierIdx < length(re);  % matched table name pattern
+            self.tables.comment = cellfun(@(x) strtok(x,'$'), ...
+                self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
+            self.tables = dj.common.structure2array(self.tables);
+            self.tables = self.tables(validTables);
+            self.classNames = cellfun(@(x) makeClassName(self.dbname, x), ...
+                {self.tables.name}, 'UniformOutput', false);
+            
+            % read field information
+            if ~isempty(self.tables)
+                fprintf('%.3g s\nloading field information... ', toc), tic
+                self.attrs = self.conn.query(sprintf([...
+                    'SELECT table_name AS `table`, column_name as `name`,'...
+                    '(column_key="PRI") AS `iskey`,column_type as `type`,'...
+                    '(is_nullable="YES") AS isnullable, column_comment as `comment`,'...
+                    'if(is_nullable="YES","NULL",ifnull(CAST(column_default AS CHAR),"<<<none>>>"))',...
+                    ' AS `default` FROM information_schema.columns '...
+                    'WHERE table_schema="%s"'],...
+                    self.dbname));
+                self.attrs.isnullable = logical(self.attrs.isnullable);
+                self.attrs.iskey = logical(self.attrs.iskey);
+                self.attrs.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                    '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.attrs.type);
+                self.attrs.isString = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                    '^((var)?char|enum|date|time|timestamp)','once')), self.attrs.type);
+                self.attrs.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                    '^(tiny|medium|long)?blob', 'once')), self.attrs.type);
+                % strip field lengths off integer types
+                self.attrs.type = cellfun(@(x) regexprep(char(x'), ...
+                    '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
+                self.attrs = dj.common.structure2array(self.attrs);
+                self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
+                validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];
+                if ~all(validFields)
+                    ix = find(~validFields, 1, 'first');
+                    error('unsupported field type "%s" in %s.%s', ...
+                        self.attrs(ix).type, self.attrs.table(ix), self.attrs.name(ix));
+                end
+                
+                % reload table dependencies
+                fprintf('%.3g s\nloading table dependencies... ', toc), tic
+                foreignKeys = dj.common.structure2array(self.conn.query(sprintf([...
+                    'SELECT '...
+                    '  table_schema AS from_schema,'...
+                    '  table_name AS from_table,'...
+                    '  referenced_table_schema AS to_schema,'...
+                    '  referenced_table_name  AS to_table,'...
+                    '  min((table_schema, table_name, column_name) in'...
+                    '    (SELECT table_schema, table_name, column_name'...
+                    '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
+                    'FROM information_schema.key_column_usage '...
+                    'WHERE table_schema="%s" AND referenced_table_schema is not null'...
+                    '   OR referenced_table_schema="%s" '...
+                    'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
+                    self.dbname, self.dbname)));
+                toc
+                
+                % compile classNames for linked tables from outside the schema
+                toClassNames = arrayfun(@(x) makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';
+                fromClassNames = arrayfun(@(x) makeClassName(x.from_schema, x.from_table), foreignKeys, 'uni', false)';
+                self.classNames = [self.classNames, setdiff(unique([toClassNames fromClassNames]), self.classNames)];
+                
+                % create dependency matrix
+                ixFrom = cellfun(@(x) find(strcmp(x, self.classNames)), fromClassNames);
+                ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
+                nTables = length(self.classNames);
+                self.dependencies = sparse(ixFrom, ixTo, ...
+                    2-[foreignKeys.hierarchical], nTables, nTables);
+                
+                % determine tables' hierarchical level
+                K = self.dependencies;
+                ik = 1:nTables;
+                levels = nan(size(ik));
+                level = 0;
+                while ~isempty(K)
+                    orphans = sum(K,2)==0;
+                    levels(ik(orphans)) = level;
+                    level = level + 1;
+                    ik = ik(~orphans);
+                    K = K(~orphans,~orphans);
+                end
+                
+                % lower level if possible
+                for j=1:nTables
+                    ix = find(self.dependencies(:,j));
+                    if ~isempty(ix)
+                        levels(j)=min(levels(ix)-1);
+                    end
+                end
+                fprintf('%.3g s\n', toc)
+                
+                self.tableLevels = levels;
+            end
+            
+            self.notify('ChangedDefinitions')
+            
+            
+            function str = makeClassName(db,tab)
+                if strcmp(db,self.dbname)
+                    str = self.package;
+                else
+                    str = ['$' db];
+                end
+                str = sprintf('%s.%s', str, dj.common.camelCase(tab));
+            end
+        end
+        
+
+        function names = getParents(self, className, hierarchy, crossSchemas)
+            % retrieve the class names of the parents of given table classes
+            if nargin<3
+                hierarchy = [1 2];
+            end
+            crossSchemas = nargin>=4 && crossSchemas;
+            names = self.getRelatives(className, true, hierarchy, crossSchemas);
+        end
+        
+ 
+        function names = getChildren(self, className, hierarchy, crossSchemas)
+            % retrieve the class names of the parents of given table classes
+            if nargin<3
+                hierarchy = [1 2];
+            end
+            crossSchemas = nargin>=4 && crossSchemas;
+            names = self.getRelatives(className, false, hierarchy, crossSchemas);
+        end
+
+        
+        function names = getRelatives(self, className, up, hierarchy, crossSchemas)       
+            names = {};
+            if ~isempty(className)
+                if ischar(className)
+                    if crossSchemas || className(1)~='$'
+                        className = self.conn.getPackage(className);
+                        pack = strtok(className,'.');
+                        if ~strcmp(pack, self.package) && crossSchemas
+                            % parents from other packages
+                            otherSchema = eval([pack '.getSchema']);
+                            names = [names ...
+                                otherSchema.getRelatives(className, up, hierarchy, crossSchemas)];
+                        else
+                            ix = strcmp(self.classNames, className);
+                            if any(ix)
+                                if up
+                                    names = self.classNames(ismember(self.dependencies(ix,:),hierarchy));
+                                else
+                                    names = self.classNames(ismember(self.dependencies(:,ix),hierarchy));
+                                end
+                            end
+                        end
+                    end
+                elseif iscellstr(className)
+                    for i=1:length(className)
+                        newNames = self.getRelatives(className{i}, up, hierarchy, crossSchemas);
+                        if up
+                            names = [newNames names];    %#ok:AGROW
+                        else
+                            names = [names newNames];    %#ok:AGROW
+                        end
+                    end
+                end
+            end
+        end
+        
+
+
     end
 end

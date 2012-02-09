@@ -9,7 +9,7 @@
 %
 
 
-classdef Relvar < matlab.mixin.Copyable & dynamicprops
+classdef Relvar < matlab.mixin.Copyable
     
     properties(SetAccess = private)
         schema  % handle to the schema object
@@ -40,7 +40,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.tab = self.table;
                     
                 case nargin==1 && isa(copyObj, 'dj.Relvar')
-                    % (almost) copy constructor. Makes a derived relation. 
+                    % (almost) copy constructor. Makes a derived relation.
                     self.schema = copyObj.schema;
                     self.sql = copyObj.sql;
                     self.attrs = copyObj.attrs;
@@ -63,7 +63,14 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 'ChangedDefinitions', @(eventSrc,eventData) self.reset);
             
             self.reset;
-        end        
+        end                    
+        
+        
+        function yes = isSubtable(self)
+            yes = ~isempty(self.tab) && ...
+                ismember(self.tab.info.tier, {'imported','computed'}) && ...
+                ~isa(self, 'dj.AutoPopulate');            
+        end
         
         
         function names = get.primaryKey(self)
@@ -138,11 +145,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % dj.Relvar.count return the cardinality of the relation contained
             % in this relvar.
             if strcmp(self.sql.pro, '*')
-                n = self.schema.query(...
+                n = self.schema.conn.query(...
                     sprintf('SELECT count(*) as n FROM %s%s',...
                     self.sql.src, self.sql.res));
             else
-                n = self.schema.query(...
+                n = self.schema.conn.query(...
                     sprintf('SELECT count(*) as n FROM (SELECT DISTINCT %s FROM %s%s) as r', ...
                     self.sql.pro, self.sql.src, self.sql.res));
             end
@@ -211,7 +218,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         function enter(self, key)
             % dj.Relvar/enter - manually enter data into the table,
             % matching the given key.
-        
+            
             assert(~isempty(self.tab), 'Cannot enter data into a derived relation')
             assert(~any([self.attrs.isBlob]), 'Cannot mannually edith a table with blobs')
             
@@ -219,7 +226,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 key = struct;
             end
             
-            self.schema.cancelTransaction   % rollback an ongoing transcation
+            self.schema.conn.cancelTransaction   % rollback an ongoing transcation
             
             hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.8 0.4], ...
                 'MenuBar', 'none', 'Name', self.tab.className);
@@ -257,7 +264,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
                     end
                 end
-            end                       
+            end
             htab = uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.1 1.0 0.9], ...
                 'ColumnName', columnName, 'ColumnEditable', ~isfield(key,columns), ...
                 'ColumnFormat', format, 'CellEditCallback', {@cellEdit}, ...
@@ -391,7 +398,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % See also dj.Table/drop
             
             doPrompt = nargin<2 || doPrompt;
-            self.schema.cancelTransaction  % exit ongoing transaction, if any
+            self.schema.conn.cancelTransaction  % exit ongoing transaction, if any
             
             if self.count==0
                 disp 'nothing to delete'
@@ -409,21 +416,22 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     end
                 end
                 
-                % get the list of dependent tables
-                downstream = self.schema.getNeighbors(self.tab.className, 0, +1000, false);
+                % get the names of the dependent tables 
+                names = self.tab.getNeighbors(0, +1000, false);
+                names = self.schema.conn.getPackage(names);
                 
-                % construct relvars to be deleted
+                % construct relvars to delete restricted by self
                 rels = {self};
-                for iRel = downstream(2:end)
-                    rels{end+1} = dj.Relvar(self.schema.classNames{iRel}) & self; %#ok:<AGROW>
+                for i=2:length(names)
+                    rels{end+1} = dj.Relvar(names{i}) & self; %#ok:<AGROW>
                 end
+                clear names
                 
                 % exclude relvar with no matching tuples
                 counts = cellfun(@(x) count(x), rels);
                 include =  counts > 0;
                 counts = counts(include);
                 rels = rels(include);
-                downstream = downstream(include);
                 
                 % inform the  user about what's being deleted
                 if doPrompt
@@ -449,7 +457,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                         for iRel = length(rels):-1:1
                             fprintf('Deleting %d tuples from %s... ', ...
                                 counts(iRel), rels{iRel}.tab.className)
-                            self.schema.query(sprintf('DELETE FROM %s%s', ...
+                            self.schema.conn.query( sprintf('DELETE FROM %s%s', ...
                                 rels{iRel}.sql.src, rels{iRel}.sql.res))
                             fprintf 'done (not committed)\n'
                         end
@@ -469,7 +477,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
         
         function self = times(self, arg)
-            % this alias is for backward compatibility
+            % this alias remains for backward compatibility
             self = self & arg;
         end
         
@@ -544,7 +552,10 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
             %
             % See also: dj.Relvar/fetch
-            
+            persistent aliasCount
+            if isempty(aliasCount)
+                aliasCount = 0;
+            end
             self = dj.Relvar(self);  % copy into a derived relation
             
             params = varargin;
@@ -604,17 +615,18 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 
                 if isGrouped
                     keyStr = sprintf(',%s',self.primaryKey{:});
+                    aliasCount = mod(aliasCount+1,256);
                     if isempty(Q.sql.res) && strcmp(Q.sql.pro,'*')
                         self.sql.src = sprintf(...
-                            '(SELECT %s FROM %s NATURAL JOIN %s%s GROUP BY %s) as q%s', ...
+                            '(SELECT %s FROM %s NATURAL JOIN %s%s GROUP BY %s) as q%02x', ...
                             self.sql.pro, self.sql.src, ...
-                            Q.sql.src, self.sql.res, keyStr(2:end), char(rand(1,3)*26+65));
+                            Q.sql.src, self.sql.res, keyStr(2:end), aliasCount);
                     else
                         self.sql.src = sprintf(...
-                            '(SELECT %s FROM %s NATURAL JOIN (SELECT %s FROM %s%s) as q%s GROUP BY %s) as q%s', ...
+                            '(SELECT %s FROM %s NATURAL JOIN (SELECT %s FROM %s%s) as q%s GROUP BY %s) as q%02x', ...
                             self.sql.pro, self.sql.src, ...
                             Q.sql.pro, Q.sql.src, Q.sql.res, ...
-                            self.sql.res, keyStr(2:end),char(rand(1,3)*26+65));
+                            self.sql.res, keyStr(2:end), aliasCount);
                     end
                     self.sql.pro = '*';
                     self.sql.res = '';
@@ -650,6 +662,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % See also dj.Relvar/pro, dj.Relvar/fetch
             
             % check that the joined relations do not have common attrs that are blobs or opional
+            persistent aliasCount
+            if isempty(aliasCount)
+                aliasCount = 0;
+            end
+            
             commonIllegal = intersect( ...
                 {R1.attrs([R1.attrs.isnullable] | [R1.attrs.isBlob]).name},...
                 {R2.attrs([R2.attrs.isnullable] | [R2.attrs.isBlob]).name});
@@ -677,9 +694,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             if strcmp(R2.sql.pro,'*') && isempty(R2.sql.res)
                 R1.sql.src = sprintf( '%s%s', R1.sql.src, R2.sql.src);
             else
-                alias = char(97+floor(rand(1,6)*26)); % to avoid duplicates
-                R1.sql.src = sprintf( '%s (SELECT %s FROM %s%s) as `r2%s`', ...
-                    R1.sql.src, R2.sql.pro, R2.sql.src, R2.sql.res, alias);
+                aliasCount = mod(aliasCount + 1, 256);
+                R1.sql.src = sprintf( '%s (SELECT %s FROM %s%s) as r2%02x', ...
+                    R1.sql.src, R2.sql.pro, R2.sql.src, R2.sql.res, aliasCount);
             end
             
         end
@@ -824,9 +841,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             
             [limit, args] = dj.Relvar.getLimitClause(varargin{:});
             self = pro(self, args{:});
-            ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s', ...
+            ret = self.schema.conn.query( sprintf('SELECT %s FROM %s%s%s', ...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
-            ret = dj.utils.structure2array(ret);
+            ret = dj.common.structure2array(ret);
         end
         
         
@@ -847,18 +864,18 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % See also dj.Relvar.fetch, dj.Relvar/fetchn, dj.Relvar/pro
             
             % validate input
-            attrs = varargin(cellfun(@ischar, varargin));
-            assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1),...
+            specs = varargin(cellfun(@ischar, varargin));  %attribut specifiers
+            assert(nargout==length(specs) || (nargout==0 && length(specs)==1),...
                 'The number of outputs must match the number of requested attributes')
-            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetch1()')
+            assert( ~any(strcmp(specs,'*')), '''*'' is not allwed in fetch1()')
             
             s = self.fetch(varargin{:});
             assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
             
             % copy into output arguments
-            varargout = cell(length(attrs));
-            for iArg=1:length(attrs)
-                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens');
+            varargout = cell(length(specs));
+            for iArg=1:length(specs)
+                name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = s.(name{1}{1});
             end
         end
@@ -873,23 +890,23 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % See also dj.Relvar/fetch1, dj.Relvar/fetch, dj.Relvar/pro
             
             % validate input
-            attrs = varargin(cellfun(@ischar, varargin));
-            assert(nargout==length(attrs) || (nargout==0 && length(attrs)==1), ...
+            specs = varargin(cellfun(@ischar, varargin));  % attribute specifiers
+            assert(nargout==length(specs) || (nargout==0 && length(specs)==1), ...
                 'The number of outputs must match the number of requested attributes');
-            assert( ~any(strcmp(attrs,'*')), '''*'' is not allwed in fetchn()');
+            assert( ~any(strcmp(specs,'*')), '''*'' is not allwed in fetchn()');
             
             [limit, args] = dj.Relvar.getLimitClause(varargin{:});
             
             % submit query
             self = self.pro(args{:});
-            ret = self.schema.query(sprintf('SELECT %s FROM %s%s%s',...
+            ret = self.schema.conn.query( sprintf('SELECT %s FROM %s%s%s',...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
             
             % copy into output arguments
-            varargout = cell(length(attrs));
-            for iArg=1:length(attrs)
+            varargout = cell(length(specs));
+            for iArg=1:length(specs)
                 % if renamed, use the renamed attribute
-                name = regexp(attrs{iArg}, '(\w+)\s*$', 'tokens');
+                name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = ret.(name{1}{1});
             end
         end
@@ -970,7 +987,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                 end
                 
                 % issue query
-                self.schema.query(sprintf('%s `%s`.`%s` SET %s', ...
+                self.schema.conn.query( sprintf('%s `%s`.`%s` SET %s', ...
                     command, self.schema.dbname, self.tab.info.name, ...
                     queryStr(1:end-1)), blobs{:})
             end
@@ -984,9 +1001,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % discarded, for example.
             insert(self, tuples, 'INSERT IGNORE')
         end
-    
-    
-    
+        
+        
+        
         function update(self, attrname, value)
             % dj.Relvar/update - update an existing tuple
             % Updates can cause violations of referential integrity and should
@@ -995,11 +1012,11 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % Safety constraints:
             %    1. self must contain exactly one tuple
             %    2. the update attribute must not be in primary key
-            % 
+            %
             % EXAMPLES:
             %   update(v2p.Mice(key), 'mouse_dob',   '2011-01-01')
             %   update(v2p.Scan(key), 'lens', NaN)   % set numeric value to NULL
-            %   update(v2p.Stat(key), 'img', [])  % set blob value to NULL 
+            %   update(v2p.Stat(key), 'img', [])  % set blob value to NULL
             
             assert(~isempty(self.tab),  'Cannot insert into a derived relation')
             assert(count(self)==1, 'Update is only allowed on one tuple at a time for now')
@@ -1042,9 +1059,9 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             end
             queryStr = sprintf('UPDATE %s SET `%s`=%s%s', self.sql.src, ...
                 attrname, queryStr, self.sql.res);
-            self.schema.query(queryStr, value{:})
-        end        
-    end    
+            self.schema.conn.query( queryStr, value{:})
+        end
+    end
     
     
     
@@ -1055,7 +1072,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
             % initialize or reinitialize the base relvar.
             % reset is executed when at construction and then again if
             % table definitions have changed.
-            if isempty(self.attrs) || ~isempty(self.tab) 
+            if isempty(self.attrs) || ~isempty(self.tab)
                 self.schema = self.tab.schema;
                 self.attrs = self.tab.attrs;
                 self.sql.pro = '*';
@@ -1066,7 +1083,7 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     self.schema.dbname, self.tab.info.name);
             end
         end
-
+        
         
         function semijoin(R1, R2)
             % relational natural semijoin performed in place.
@@ -1175,8 +1192,8 @@ classdef Relvar < matlab.mixin.Copyable & dynamicprops
                     include = include | true;   % include all attributes
                 else
                     % process a renamed attribute
-                    toks = regexp( attrList{iAttr}, ...
-                        '^([a-z]\w*)\s*->\s*(\w+)', 'tokens' );
+                    toks = regexp(attrList{iAttr}, ...
+                        '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
                     if ~isempty(toks)
                         ix = find(strcmp(toks{1}{1},{self.attrs.name}));
                         assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});

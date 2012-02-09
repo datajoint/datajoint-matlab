@@ -92,7 +92,7 @@ classdef AutoPopulate < handle
             %   populate(OriMaps, 'mouse_id=12')    % populate OriMaps for mouse 12
             %   [failedKeys, errs] = populate(OriMaps);  % skip errors and return their list
             
-            self.schema.cancelTransaction  % rollback any unfinished transaction
+            self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             
             if nargout > 0
                 failedKeys = struct([]);
@@ -113,22 +113,22 @@ classdef AutoPopulate < handle
                 fprintf('\n** Found %d unpopulated keys\n\n', length(unpopulated))
                 for key = unpopulated'
                     if self.setJobStatus(key, 'reserved')    % this also marks previous job as completed
-                        self.schema.startTransaction
+                        self.schema.conn.startTransaction
                         % check again in case a parallel process has already populated
                         if count(self & key)
-                            self.schema.cancelTransaction
+                            self.schema.conn.cancelTransaction
                         else
                             fprintf('Populating %s for:\n', class(self))
                             disp(key)
                             try
                                 % do the work
                                 self.makeTuples(key)
-                                self.schema.commitTransaction
+                                self.schema.conn.commitTransaction
                             catch err
                                 fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
-                                fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line);                               
+                                fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line);
                                 fprintf('"%s"\n\n',err.message)
-                                self.schema.cancelTransaction
+                                self.schema.conn.cancelTransaction
                                 self.setJobStatus(key, 'error', err.message, err.stack);
                                 if nargout > 0
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>

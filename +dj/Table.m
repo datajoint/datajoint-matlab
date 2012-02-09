@@ -22,7 +22,7 @@ classdef (Sealed) Table < handle
     
     properties(SetAccess = private)
         schema   % handle to a schema object
-        className    % the name of the class that should be associated with this table
+        className    % the name of the corresponding base dj.Relvar class
     end
     
     properties(Dependent, SetAccess = private)
@@ -30,25 +30,36 @@ classdef (Sealed) Table < handle
         attrs    % structure array describing attrs
     end
     
+    properties(Constant)
+        mysql_constants = {'CURRENT_TIMESTAMP','CURRENT_TIME','CURRENT_DATE'}
+    end
+    
+    
     methods
         function self = Table(className)
             % obj = dj.Table('package.className')
             self.className = className;
             assert(nargin==1 && ischar(self.className),  ...
                 'dj.Table requres input ''package.ClassName''')
-            assert(~isempty(regexp(self.className,'\w+\.[A-Z]\w+','once')), ...
+            assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w+','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
-            schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
-            assert(~isempty(which(schemaFunction)), ['Not found: ' schemaFunction])
-            self.schema = eval(schemaFunction);
-    
-            assert(isa(self.schema, 'dj.Schema'), ...
-                [schemaFunction ' must return an instance of dj.Schema'])
         end
-
         
-        function info = get.info(self) 
+        
+        function ret = get.schema(self)
+            if isempty(self.schema)
+                schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
+                assert(~isempty(which(schemaFunction)), ['Not found: ' schemaFunction])
+                self.schema = eval(schemaFunction);
+                assert(isa(self.schema, 'dj.Schema'), ...
+                    [schemaFunction ' must return an instance of dj.Schema'])
+            end
+            ret = self.schema;
+        end
+        
+        
+        function info = get.info(self)
             ix = strcmp(self.className, self.schema.classNames);
             if ~any(ix)   % table does not exist. Create it.
                 self.create
@@ -62,16 +73,61 @@ classdef (Sealed) Table < handle
         function attrs = get.attrs(self)
             attrs = self.schema.attrs(strcmp(self.info.name, {self.schema.attrs.table}));
         end
-                        
+        
+        
+        function name = getFullTableName(self)
+            name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
+        end
         
         function display(self)
             display@handle(self)
             disp(self.re(true))
             fprintf \n
         end
-                
         
-        function erd(self, varargin)
+        
+        function neighbors = getNeighbors(self, depth1, depth2, crossSchemas)
+            % dj.Table/getNeighbors -- get the class names of tables that are
+            % directly related to the given table.
+            %
+            % depth1 and depth2 specify the connectivity radius upstream
+            % (depth<0) and downstream (depth>0) of this table.
+            % Omitting both depths defaults to (-2,2).
+            % Omitting any one of the depths sets it to zero.
+            %
+            % If interSchma is set to true, the search cascades into other
+            % schema.
+            %
+            % Examples:
+            %   table.getNeighbors(-1,0)     % get table's parents
+            %   table.getNeighbors(0,1)      % get table's children
+            %   table.getNeighbors(-2,2)     % two levels up and down
+            
+            crossSchemas = nargin>=4 && crossSchemas;
+            
+            % find tables on which self depends
+            upstream = {};
+            nodes = {self.className};
+            for j=1:depth1
+                nodes = self.schema.getParents(nodes,[1 2],crossSchemas);
+                upstream = setdiff(upstream, nodes);
+                upstream = [nodes upstream];  %#ok:<AGROW>
+            end
+            
+            % find tables dependent on self
+            downstream = {};
+            nodes = {self.className};
+            for j=1:depth2
+                nodes = self.schema.getChildren(nodes,[1 2],crossSchemas);
+                nodes = setdiff(nodes, downstream);
+                downstream = [downstream nodes];  %#ok:<AGROW>
+            end
+            
+            neighbors = [upstream {self.className} downstream];
+        end
+        
+        
+        function erd(self, depth1, depth2)
             % dj.Table/erd - plot the entity relationship diagram of tables
             % that are connected to self.
             %
@@ -90,7 +146,16 @@ classdef (Sealed) Table < handle
             %   t.erd(-1);  % plot only immediate ancestors
             %
             % See also dj.Schema/erd
-            self.schema.erd(self.schema.getNeighbors(self.className, varargin{:}))
+            switch nargin
+                case 1
+                    depth1 = -2;
+                    depth2 = +2;
+                case 2
+                    depth2 = max(0, depth1);
+                    depth1 = min(0, depth1);
+            end
+
+            self.schema.erd(self.getNeighbors(depth1, depth2))
         end
         
         
@@ -110,7 +175,7 @@ classdef (Sealed) Table < handle
             % as regular attrs.
             %
             % See also dj.Table
-                       
+            
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
             if expandForeignKeys
@@ -120,22 +185,18 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s%s (%s) # %s\n', ...
                 str, self.className, self.info.tier, self.info.comment);
-            tableIdx = find(strcmp(self.schema.classNames, self.className));
-            assert(~isempty(tableIdx), ...
+            assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
             keyFields = {self.attrs([self.attrs.iskey]).name};
             
             if ~expandForeignKeys
                 % list parent references
-                if size(self.schema.dependencies,1) >= tableIdx
-                    refIds = find(self.schema.dependencies(tableIdx,:)==1);
-                    for i=refIds
-                        str = sprintf('%s\n-> %s',str, self.schema.classNames{i});
-                        excludeFields = {self.schema.attrs([self.schema.attrs.iskey]...
-                            & strcmp({self.schema.attrs.table},self.schema.tables(i).name)).name};
-                        keyFields = keyFields(~ismember(keyFields, excludeFields));
-                    end
+                for refClassName = self.schema.getParents(self.className, 1)
+                    refObj = dj.Table(refClassName{1});
+                    str = sprintf('%s\n-> %s',str, refClassName{1});
+                    excludeFields = {refObj.attrs([refObj.attrs.iskey]).name};
+                    keyFields = keyFields(~ismember(keyFields, excludeFields));
                 end
             end
             
@@ -153,14 +214,11 @@ classdef (Sealed) Table < handle
             
             % list other references
             if ~expandForeignKeys
-                if size(self.schema.dependencies, 2) >= tableIdx
-                    refIds = find(self.schema.dependencies(tableIdx,:)==2);
-                    for i=refIds
-                        str = sprintf('%s\n-> %s',str, self.schema.classNames{i});
-                        excludeFields = {self.schema.attrs([self.schema.attrs.iskey]...
-                            & strcmp({self.schema.attrs.table},self.schema.tables(i).name)).name};
-                        dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
-                    end
+                for refClassName = self.schema.getParents(self.className, 2)
+                    refObj = dj.Table(refClassName);
+                    str = sprintf('%s\n-> %s',str, refClassName);
+                    excludeFields = {refObj.attrs([refObj.attrs.iskey]).name};
+                    dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
                 end
             end
             
@@ -170,7 +228,8 @@ classdef (Sealed) Table < handle
                     default = '=null';
                 elseif strcmp(char(self.attrs(i).default(:)'), '<<<none>>>')
                     default = '';
-                elseif self.attrs(i).isNumeric || strcmp(self.attrs(i).default,'CURRENT_TIMESTAMP')
+                elseif self.attrs(i).isNumeric || ...
+                        any(strcmp(self.attrs(i).default,self.mysql_constants))
                     default = ['=' self.attrs(i).default];
                 else
                     default = ['="' self.attrs(i).default '"'];
@@ -189,55 +248,130 @@ classdef (Sealed) Table < handle
         
         
         function optimize(self)
-            % optimizes the table if it has become fragmented after repeated inserts and deletes.  
+            % optimizes the table if it has become fragmented after repeated inserts and deletes.
             % See http://dev.mysql.com/doc/refman/5.6/en/optimize-table.html
             fprintf 'optimizing ...'
-            status = self.schema.query(sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
+            status = query(dj.conn, sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
                 self.schema.dbname, self.info.name));
             disp(status.Msg_text{end})
         end
-            
         
         
-        function alter(self)
-            % dj.Table/alter - alter the table definition
-            %
-            % Datajoint tables are defined in the first percent-brace block
-            % comment of the file <package>.<className>.m.
-            %
-            % If the new table definition matches the current definition,
-            % dj.Table/alter does nothing.
-            %
-            % If the table is empty, the table and its dependents are
-            % simply dropped.  The tables will then be recreated automatically
-            % upon next use.
-            %
-            % If the table is not empty, dj.Table/alter compares the column
-            % definitions. If a column name is not present in the new definition,
-            % dj.Table/alter will prompt the user to match it to a new column or
-            % to drop it altogether.  For new columns that are not matched to
-            % existing columns and do not have a default value, dj.Table/alter
-            % prompts the user to provide a temporary default value that is
-            % applied only once during the transition.
-            %
-            % Any alterations of the primary key are propagated to the dependent
-            % tables.  The database will reject this operation if referential
-            % constraints are caused to be violated.
-            
-            if ~count(dj.Relvar(self))
-                % if empty, simply drop the table
-                self.drop
-            else
-                keyChange = false;
-                [tableInfo parents references fieldDefs] = ...
-                    dj.Table.parseDeclaration(self.getDeclaration);
-                tableIdx = find(strcmp(self.schema.classNames, self.className), 1, 'first');
-                parentIdx = find(self.schema.dependencies(tableIdx,:)==1);
-                error 'not implemented yet'
-            end
+        
+        
+        
+        %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
+        function alterTableComment(self, newComment)
+            % dj.Table/alterTableComment - update the table comment
+            % in the table declaration
+            query(dj.conn, ...
+                sprintf('ALTER TABLE `%s`.`%s` COMMENT = "%s"', ...
+                self.schema.dbname, self.info.name, newComment));
+            disp 'table updated'
+            self.syncDef
+        end
+        
+        function addAttribute(self, definition)
+            sql = fieldToSQL(parseAttrDef(definition, false));
+            sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN %s', ...
+                self.schema.dbname, self.info.name, sql(1:end-2));
+            query(dj.conn, sql)
+            disp 'table updated'
+            self.schema.reload
+            self.syncDef
+        end
+        
+        function dropAttribute(self, attrName)
+            sql = sprintf('ALTER TABLE `%s`.`%s` DROP COLUMN %s', ...
+                self.schema.dbname, self.info.name, attrName);
+            query(dj.conn, sql)
+            disp 'table updated'
+            self.schema.reload
+            self.syncDef
+        end
+        
+        function alterAttribute(self, attrName, newDefinition)
+            sql = fieldToSQL(parseAttrDef(newDefinition, false));
+            sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN %s %s', ...
+                self.schema.dbname, self.info.name, attrName, sql(1:end-2));
+            query(dj.conn, sql)
+            disp 'table updated'
+            self.schema.reload
+            self.syncDef
         end
         
         
+        
+        function syncDef(self)
+            % dj.Table/syncDef replace the table declaration in the file
+            % <package>.<className>.m with the actual definition from the database.
+            %
+            % This method is useful if the table definition has been
+            % changed by other means than the regular datajoint definition
+            % process.
+            
+            path = which(self.className);
+            if isempty(path)
+                fprintf('File %s.m is not found\n', self.className);
+            else
+                s = input(sprintf('Update table declaration in %s? yes/no > ',path), 's');
+                if ~strcmpi(s,'yes')
+                    disp 'No? Table declaration left unpdated.'
+                else
+                    % read old file
+                    f = fopen(path, 'rt');
+                    lines = {};
+                    line = fgetl(f);
+                    while ischar(line)
+                        lines{end+1} = line;  %#ok<AGROW>
+                        line = fgetl(f);
+                    end
+                    fclose(f);
+                    
+                    % write new file
+                    f = fopen(path, 'wt');
+                    p1 = find(strcmp(strtrim(lines), '%{'), 1, 'first');
+                    p2 = find(strcmp(strtrim(lines), '%}'), 1, 'first');
+                    if isempty(p1)
+                        p1 = 1;
+                        p2 = 1;
+                    end
+                    for i=1:p1-1
+                        fprintf(f,'%s\n',lines{i});
+                    end
+                    fprintf(f,'%s', self.re);
+                    for i=p2+1:length(lines)
+                        fprintf(f,'%s\n',lines{i});
+                    end
+                    fclose(f);
+                    disp 'updated table definition'
+                end
+            end
+        end
+        %%%%%  END ALTER METHODS
+        
+        
+        
+        
+        %         function list = getAllDependents(self)
+        %             % dj.Table/getAllDependents - get all dependent tables across all schemas.
+        %             % This is used by dj.Table/drop and dj.Table/delete to properly
+        %             % their effects.
+        %
+        %             expanded = {self.schema.dbname, self.info.name};
+        %             list = {};
+        %             while ~isempty(expanded)
+        %                 list = {list; expanded}
+        %                 cond = sprintf(' OR referenced_table_schema="%s" AND referenced_table_name="%s"', expanded{:});
+        %                 foreignKeys = query(dj.conn, [...
+        %                     'SELECT table_schema as `schema`, table_name AS `table`', ...
+        %                     ' FROM information_schema.key_column_usage ', ...
+        %                     sprintf('WHERE FALSE %s',cond) ...
+        %                     ' GROUP BY table_schema, table_name']));
+        %                 expanded = [{foregnKeys.schema}, {foreignKeys.table}];
+        %             end
+        %
+        %         end
         
         
         function drop(self)
@@ -251,7 +385,7 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Table, dj.Relvar/del
             
-            self.schema.cancelTransaction   % exit ongoing transaction
+            self.schema.conn.cancelTransaction   % exit ongoing transaction
             
             % warn user if self is a subtable
             if ismember(self.info.tier, {'imported','computed'}) && ...
@@ -267,17 +401,17 @@ classdef (Sealed) Table < handle
                 end
             end
             
-            % comple the list of dependent tables
-            downstream = self.schema.getNeighbors(self.className, 0, +1000, false);
+            % compile the list of dropped tables
+            names = self.getNeighbors(0, +1000, true);
+            names = cellfun(@(x) self.schema.conn.getPackage(x), names, 'uni', false);
+            names = [{self.getFullTableName}, ...
+                cellfun(@(x) getFullTableName(dj.Table(x)), names(2:end), 'uni', false)];
             
             % inform user about what's being deleted
             fprintf 'ABOUT TO DROP TABLES: \n'
-            names = cell(size(downstream));
-            counts = zeros(size(downstream));
-            for iTable = 1:length(downstream)
-                names{iTable} = sprintf('`%s`.`%s`', ...
-                    self.schema.dbname, self.schema.tables(downstream(iTable)).name);
-                n = self.schema.query(sprintf('SELECT count(*) as n FROM %s', ...
+            counts = zeros(size(names));
+            for iTable = 1:length(names)
+                n = query(dj.conn, sprintf('SELECT count(*) as n FROM %s', ...
                     names{iTable}));
                 counts(iTable) = n.n;
                 fprintf('%s... %d tuples \n', names{iTable}, n.n)
@@ -290,58 +424,63 @@ classdef (Sealed) Table < handle
             if ~doDrop
                 disp 'User cancelled table drop'
             else
-                for iTable = length(downstream):-1:1
-                    self.schema.query(sprintf('DROP TABLE %s', names{iTable}))
-                    fprintf('Dropped table %s\n', ...
-                        self.schema.classNames{downstream(iTable)})
+                try
+                    for iTable = length(names):-1:1
+                        query(dj.conn, sprintf('DROP TABLE %s', names{iTable}))
+                        fprintf('Dropped table %s\n', names{iTable})
+                    end
+                catch err
+                    self.schema.conn.reload
+                    rethrow(err)
                 end
-                % reload the schema.  clear classes is still necessary to reset
-                % constant properties and persistent variables that use the
-                % dropped tables
-                self.schema.reload
+                % reload all schemas
+                self.schema.conn.reload
             end
             fprintf \n
-        end
+        end       
     end
     
     
     
+    
+    
     methods(Access=private)
-
-        function declaration = getDeclaration(self)          
+        
+        
+        function declaration = getDeclaration(self)
             file = which(self.className);
             assert(~isempty(file), 'DataJoint:MissingTableDefnition', ...
                 'Could not find table definition file %s', file)
-            declaration = dj.utils.readPercentBraceComment(file);
+            declaration = dj.common.readPercentBraceComment(file);
             assert(~isempty(declaration), 'DataJoint:MissingTableDefnition', ...
                 'Could not find the table declaration in %s', file)
         end
-
         
-        function create(self)     
-
+        
+        function create(self)
+            
             [tableInfo parents references fieldDefs] = ...
-                dj.Table.parseDeclaration(self.getDeclaration);
+                parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
-                'Table name %s does not match in file %s', cname, self.className)           
+                'Table name %s does not match in file %s', cname, self.className)
             
             % compile the CREATE TABLE statement
             tableName = [...
-                dj.utils.tierPrefixes{strcmp(tableInfo.tier, dj.utils.allowedTiers)}, ...
-                dj.utils.camelCase(tableInfo.className, true)];
+                dj.common.tierPrefixes{strcmp(tableInfo.tier, dj.common.allowedTiers)}, ...
+                dj.common.camelCase(tableInfo.className, true)];
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
             % add inherited primary key attrs
             primaryKeyFields = {};
             for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.table.attrs.iskey])                    
+                for iField = find([parents{iRef}.table.attrs.iskey])
                     field = parents{iRef}.table.attrs(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
                         assert(~field.isnullable, 'primary key attrs cannot be nullable')
-                        sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
+                        sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
             end
@@ -353,7 +492,7 @@ classdef (Sealed) Table < handle
                     primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
                     assert(~strcmpi(field.default,'NULL'), ...
                         'primary key attrs cannot be nullable')
-                    sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
+                    sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
             end
             
@@ -362,7 +501,7 @@ classdef (Sealed) Table < handle
                 for iField = find([references{iRef}.table.attrs.iskey])
                     field = references{iRef}.table.attrs(iField);
                     if ~ismember(field.name, primaryKeyFields)
-                        sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
+                        sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
             end
@@ -371,7 +510,7 @@ classdef (Sealed) Table < handle
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
-                    sql = sprintf('%s%s', sql, dj.Table.fieldToSQL(field));
+                    sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
             end
             
@@ -408,136 +547,151 @@ classdef (Sealed) Table < handle
             
             % execute declaration
             if nargout==0
-                self.schema.query(sql);
+                query(dj.conn, sql);
             end
             self.schema.reload
-        end       
-    end
-    
-    methods(Static, Access=private)               
-        
-        function sql = fieldToSQL(field)
-            % convert the structure field with attrs {'name' 'type' 'default' 'comment'}
-            % to the SQL column declaration
-            
-            if strcmpi(field.default, 'NULL')
-                % all nullable attrs default to null
-                field.default = 'DEFAULT NULL';
-            else
-                if strcmp(field.default,'<<<none>>>')
-                    field.default = 'NOT NULL';
-                else
-                    % enclose value in quotes (even numeric), except special SQL values
-                    if ~strcmpi(field.default, 'CURRENT_TIMESTAMP') && ...
-                            ~any(strcmp(field.default([1 end]), {'''''','""'}))
-                        field.default = ['"' field.default '"'];
-                    end
-                    field.default = sprintf('NOT NULL DEFAULT %s', field.default);
-                end
-            end
-            sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
-                field.name, field.type, field.default, field.comment);
-        end
-        
-        
-        function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)
-            parents = {};
-            references = {};
-            fieldDefs = [];
-            
-            if ischar(declaration)
-                declaration = dj.utils.str2cell(declaration);
-            end
-            assert(iscellstr(declaration), ...
-                'declaration must be a multiline string or a cellstr');
-            
-            % remove empty lines
-            declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
-            
-            % expand <<macros>>   TODO: make macro expansion recursive (if necessary)
-            for macro = fieldnames(dj.utils.macros)'
-                while true
-                    ix = find(strcmp(strtrim(declaration), ...
-                        ['<<' macro{1} '>>']),1,'first');
-                    if isempty(ix)
-                        break
-                    end
-                    declaration = [
-                        declaration(1:ix-1)
-                        dj.utils.macros.(macro{1})
-                        declaration(ix+1:end)
-                        ];
-                end
-            end
-            
-            % concatenate lines that end with a backslash to the next line
-            i = 1;
-            while i<length(declaration)
-                pos = regexp(declaration{i},  '\\\s*$', 'once');
-                if isempty(pos)
-                    i = i + 1;
-                else
-                    declaration{i} = [strtrim(declaration{i}(1:pos-1)) ' ' ...
-                        strtrim(declaration{i+1})];
-                    declaration(i+1) = [];
-                end
-            end
-            
-            % parse table schema, name, type, and comment
-            pat = {
-                '^\s*(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-                '\(\s*(?<tier>\w+)\s*\)\s*'                  % (tier)
-                '#\s*(?<comment>\S.*\S)\s*$'                 % # comment
-                };
-            tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-            assert(numel(tableInfo)==1, ...
-                'incorrect syntax is table declaration, line 1')
-            assert(ismember(tableInfo.tier, dj.utils.allowedTiers),...
-                ['Invalid tier for table ' tableInfo.className])
-            
-            if nargout > 1
-                % parse field declarations and references
-                inKey = true;
-                for iLine = 2:length(declaration)
-                    line = strtrim(declaration{iLine});
-                    switch true
-                        case strncmp(line,'---',3)
-                            inKey = false;
-                        case strncmp(line,'->',2)
-                            % foreign key
-                            p = eval(line(3:end));
-                            assert(isa(p, 'dj.Relvar'), ...
-                                'foreign keys must be base relvars')
-                            if inKey
-                                parents{end+1} = p;     %#ok:<AGROW>
-                            else
-                                references{end+1} = p;   %#ok:<AGROW>
-                            end
-                        otherwise
-                            % parse field definition
-                            pat = {
-                                '^\s*(?<name>[a-z][a-z\d_]*)\s*'  % field name
-                                '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-                                ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-                                '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
-                                };
-                            fieldInfo = regexp(line, cat(2,pat{:}), 'names');
-                            if isempty(fieldInfo)
-                                % try no default value
-                                fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-                                assert(~isempty(fieldInfo), ...
-                                    'invalid field declaration line: %s', line);
-                                fieldInfo.default = '<<<none>>>';
-                            end
-                            assert(~any(fieldInfo.comment=='"'), ...
-                                'comments must not contain double quotes')
-                            assert(numel(fieldInfo)==1, ...
-                                'Invalid field declaration "%s"', line);
-                            fieldInfo.iskey = inKey;
-                            fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
-                    end
-                end
-            end
         end
     end
+end
+
+
+
+
+
+
+
+
+%          LOCAL FUNCTIONS
+
+
+function sql = fieldToSQL(field)
+% convert the structure field with attrs {'name' 'type' 'default' 'comment'}
+% to the SQL column declaration
+
+if strcmpi(field.default, 'NULL')
+    % all nullable attrs default to null
+    field.default = 'DEFAULT NULL';
+else
+    if strcmp(field.default,'<<<none>>>')
+        field.default = 'NOT NULL';
+    else
+        % enclose value in quotes (even numeric), except special SQL values
+        if ~any(strcmpi(field.default, dj.Table.mysql_constants)) && ...
+                ~any(strcmp(field.default([1 end]), {'''''','""'}))
+            field.default = ['"' field.default '"'];
+        end
+        field.default = sprintf('NOT NULL DEFAULT %s', field.default);
+    end
+end
+sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
+    field.name, field.type, field.default, field.comment);
+end
+
+
+
+
+function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)
+parents = {};
+references = {};
+fieldDefs = [];
+
+if ischar(declaration)
+    declaration = dj.common.str2cell(declaration);
+end
+assert(iscellstr(declaration), ...
+    'declaration must be a multiline string or a cellstr');
+
+% remove empty lines
+declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
+
+% expand <<macros>>   TODO: make macro expansion recursive (if necessary)
+for macro = fieldnames(dj.common.macros)'
+    while true
+        ix = find(strcmp(strtrim(declaration), ...
+            ['<<' macro{1} '>>']),1,'first');
+        if isempty(ix)
+            break
+        end
+        declaration = [
+            declaration(1:ix-1)
+            dj.common.macros.(macro{1})
+            declaration(ix+1:end)
+            ];
+    end
+end
+
+% concatenate lines that end with a backslash to the next line
+i = 1;
+while i<length(declaration)
+    pos = regexp(declaration{i},  '\\\s*$', 'once');
+    if isempty(pos)
+        i = i + 1;
+    else
+        declaration{i} = [strtrim(declaration{i}(1:pos-1)) ' ' ...
+            strtrim(declaration{i+1})];
+        declaration(i+1) = [];
+    end
+end
+
+% parse table schema, name, type, and comment
+pat = {
+    '^\s*(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+    '\(\s*(?<tier>\w+)\s*\)\s*'                  % (tier)
+    '#\s*(?<comment>\S.*\S)\s*$'                 % # comment
+    };
+tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
+assert(numel(tableInfo)==1, ...
+    'incorrect syntax is table declaration, line 1')
+assert(ismember(tableInfo.tier, dj.common.allowedTiers),...
+    ['Invalid tier for table ' tableInfo.className])
+
+if nargout > 1
+    % parse field declarations and references
+    inKey = true;
+    for iLine = 2:length(declaration)
+        line = strtrim(declaration{iLine});
+        switch true
+            case strncmp(line,'---',3)
+                inKey = false;
+            case strncmp(line,'->',2)
+                % foreign key
+                p = eval(line(3:end));
+                assert(isa(p, 'dj.Relvar'), ...
+                    'foreign keys must be base relvars')
+                if inKey
+                    parents{end+1} = p;     %#ok:<AGROW>
+                else
+                    references{end+1} = p;   %#ok:<AGROW>
+                end
+            otherwise
+                % parse field definition
+                fieldInfo = parseAttrDef(line, inKey);
+                fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
+        end
+    end
+end
+end
+
+
+
+function fieldInfo = parseAttrDef(line, inKey)
+pat = {
+    '^\s*(?<name>[a-z][a-z\d_]*)\s*'  % field name
+    '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
+    ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
+    '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
+    };
+fieldInfo = regexp(line, cat(2,pat{:}), 'names');
+if isempty(fieldInfo)
+    % try no default value
+    fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
+    assert(~isempty(fieldInfo), ...
+        'invalid field declaration line: %s', line);
+    fieldInfo.default = '<<<none>>>';
+end
+assert(~any(fieldInfo.comment=='"'), ...
+    'comments must not contain double quotes')
+assert(numel(fieldInfo)==1, ...
+    'Invalid field declaration "%s"', line);
+fieldInfo.iskey = inKey;
 end
