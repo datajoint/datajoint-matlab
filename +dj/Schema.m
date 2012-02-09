@@ -199,11 +199,11 @@ classdef Schema < handle
             % INPUTS:
             %    subset -- classNames to include in the diagram
             
-            if nargin<2
-                subset = 1:length(self.tableLevels);
-            else
-                subset = cellfun(@(x) find(strcmp(self.classNames, x)), subset);
+            ix = find(~ismember(subset,self.classNames));
+            if ~isempty(ix)
+                error('Unknown table %d', subset(ix(1)));
             end
+            subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset); 
             levels = -self.tableLevels(subset);
             C = self.dependencies(subset,subset);  % connectivity matrix
             if sum(C)==0
@@ -327,6 +327,8 @@ classdef Schema < handle
             %    s.backup(folder, {'manual','imported'})
             % Each table must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
+            error 'dj.Schema/backup has not been tested yet after '
+            
             if nargin<3
                 tiers = {'lookup','manual'};
             end
@@ -355,9 +357,7 @@ classdef Schema < handle
                 save(filename, 'contents')
                 fprintf 'done\n'
             end
-        end
-        
-        
+        end        
         
         
         function reload(self, force)

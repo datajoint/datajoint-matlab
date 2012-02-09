@@ -108,8 +108,11 @@ classdef (Sealed) Table < handle
             % find tables on which self depends
             upstream = {};
             nodes = {self.className};
-            for j=1:depth1
+            for j=1:-depth1
                 nodes = self.schema.getParents(nodes,[1 2],crossSchemas);
+                if isempty(nodes)
+                    break
+                end
                 upstream = setdiff(upstream, nodes);
                 upstream = [nodes upstream];  %#ok:<AGROW>
             end
@@ -119,6 +122,9 @@ classdef (Sealed) Table < handle
             nodes = {self.className};
             for j=1:depth2
                 nodes = self.schema.getChildren(nodes,[1 2],crossSchemas);
+                if isempty(nodes)
+                    break;
+                end
                 nodes = setdiff(nodes, downstream);
                 downstream = [downstream nodes];  %#ok:<AGROW>
             end
