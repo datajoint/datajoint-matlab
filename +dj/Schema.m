@@ -79,6 +79,7 @@ classdef Schema < handle
             % Example:
             %    makeClass(v2p.getSchema, 'RegressionModel')
             
+            error 'dj.Schema/makeClass needs to be tested'
             if nargin<2
                 className = input('Enter class name >', 's');
             end

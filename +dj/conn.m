@@ -1,16 +1,19 @@
 function connObj = conn(host, user, pass, initQuery)
-% dj.conn - construct and return a persistent dj.Connection object.
+% dj.conn - constructs and returns a persistent dj.Connection object.
 %
-% Only one connection should be open at a time and all DataJoint classes
-% call dj.conn to get the connection object.
+% This function can be used in cases when all datajoint schemas connect to
+% the same database server with the same credentials.  If this is not so,
+% you may wish to create multiple functions patterned after dj.conn to
+% manage multiple persistent connections. 
 %
 % The first time dj.conn is called, it must establish a conection. The
-% connection parameters may be specified by input arguments. Any omitted
-% paramters are taken from the environment variables DJ_HOST, DJ_USER, DJ_PASS,
-% and DJ_INIT are used. Finally, if the required parameters are still missing,
-% the user is prompted to enter them manually.
+% connection parameters may be specified by input arguments. Any values omitted
+% from the input arguments will be taken from the environment variables 
+% DJ_HOST, DJ_USER, DJ_PASS, and DJ_INIT are used. 
+% Finally, if the required parameters are still missing, dj.conn will prompt the 
+% user to enter them manually.
 %
-% The last parameter, initQuery (or the environemnt variable) DJ_INIT specify
+% The last parameter, initQuery (or the environemnt variable DJ_INIT) specify
 % the query to be executed everytime a new connection session is established.
 %
 % Once established during the first invocation, the connection object cannot
