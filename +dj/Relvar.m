@@ -439,7 +439,7 @@ classdef Relvar < matlab.mixin.Copyable
                     for iRel = 1:length(rels)
                         fprintf('%s %s: %d', ...
                             rels{iRel}.tab.info.tier, ...
-                            self.schema.classNames{downstream(iRel)}, counts(iRel));
+                            rels{iRel}.tab.info.name, counts(iRel));
                         if ismember(rels{iRel}.tab.info.tier, {'manual','lookup'})
                             fprintf ' !!!'
                         end
@@ -452,7 +452,7 @@ classdef Relvar < matlab.mixin.Copyable
                 if doPrompt && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
                     disp 'delete canceled'
                 else
-                    self.schema.startTransaction
+                    self.schema.conn.startTransaction
                     try
                         for iRel = length(rels):-1:1
                             fprintf('Deleting %d tuples from %s... ', ...
@@ -461,11 +461,11 @@ classdef Relvar < matlab.mixin.Copyable
                                 rels{iRel}.sql.src, rels{iRel}.sql.res))
                             fprintf 'done (not committed)\n'
                         end
-                        self.schema.commitTransaction
+                        self.schema.conn.commitTransaction
                         fprintf ' ** delete committed\n'
                     catch err
                         fprintf '\n ** delete rolled back due to to error\n'
-                        self.schema.cancelTransaction
+                        self.schema.conn.cancelTransaction
                         rethrow(err)
                     end
                 end

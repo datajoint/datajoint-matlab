@@ -38,37 +38,27 @@ classdef Schema < handle
         
         
         function val = get.classNames(self)
-            if ~self.loaded
-                self.reload
-            end
+            self.reload(false)
             val = self.classNames;
         end
         
         function val = get.tables(self)
-            if ~self.loaded
-                self.reload
-            end
+            self.reload(false)
             val = self.tables;
         end
         
         function val = get.attrs(self)
-            if ~self.loaded
-                self.reload
-            end
+            self.reload(false)
             val = self.attrs;
         end
         
         function val = get.dependencies(self)
-            if ~self.loaded
-                self.reload
-            end
+            self.reload(false)
             val = self.dependencies;
         end
         
         function val = get.tableLevels(self)
-            if ~self.loaded
-                self.reload
-            end
+            self.reload(false)
             val = self.tableLevels;
         end
         

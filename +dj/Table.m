@@ -95,8 +95,7 @@ classdef (Sealed) Table < handle
             % Omitting both depths defaults to (-2,2).
             % Omitting any one of the depths sets it to zero.
             %
-            % If interSchma is set to true, the search cascades into other
-            % schema.
+            % If crossSchemas is set to true, the search cascades into other schemas.
             %
             % Examples:
             %   table.getNeighbors(-1,0)     % get table's parents
@@ -106,30 +105,27 @@ classdef (Sealed) Table < handle
             crossSchemas = nargin>=4 && crossSchemas;
             
             % find tables on which self depends
-            upstream = {};
+            neighbors = {self.className};
             nodes = {self.className};
             for j=1:-depth1
                 nodes = self.schema.getParents(nodes,[1 2],crossSchemas);
                 if isempty(nodes)
                     break
                 end
-                upstream = setdiff(upstream, nodes);
-                upstream = [nodes upstream];  %#ok:<AGROW>
+                neighbors = setdiff(neighbors, nodes);
+                neighbors = [nodes neighbors];  %#ok:<AGROW>
             end
             
             % find tables dependent on self
-            downstream = {};
             nodes = {self.className};
             for j=1:depth2
                 nodes = self.schema.getChildren(nodes,[1 2],crossSchemas);
                 if isempty(nodes)
                     break;
                 end
-                nodes = setdiff(nodes, downstream);
-                downstream = [downstream nodes];  %#ok:<AGROW>
+                nodes = setdiff(nodes, neighbors);
+                neighbors = [neighbors nodes];  %#ok:<AGROW>
             end
-            
-            neighbors = [upstream {self.className} downstream];
         end
         
         

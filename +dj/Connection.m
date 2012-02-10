@@ -69,7 +69,8 @@ classdef Connection < handle
         
         function ret = get.isConnected(self)
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
-            assert(~ret || ~self.inTransaction, ...
+            
+            assert(ret || (~ret && ~self.inTransaction), ...
                 'Database connection was terminated during an ongoing transaction. Restart the processing.')
         end
         
