@@ -30,6 +30,8 @@ classdef Schema < handle
     methods
         
         function self = Schema(conn, package, dbname)
+            assert(isa(conn, 'dj.Connection'), ...
+                'dj.Schema''s first input must be a dj.Connection')
             self.conn = conn;
             self.dbname = dbname;
             self.package = package;
@@ -40,7 +42,7 @@ classdef Schema < handle
         function val = get.classNames(self)
             self.reload(false)
             val = self.classNames;
-        end
+        end 
         
         function val = get.tables(self)
             self.reload(false)
@@ -69,13 +71,13 @@ classdef Schema < handle
             % Example:
             %    makeClass(v2p.getSchema, 'RegressionModel')
             
-            error 'dj.Schema/makeClass needs to be tested'
             if nargin<2
                 className = input('Enter class name >', 's');
             end
             className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
             assert(~isempty(className), 'invalid class name')
             
+            % get the path to the scema package
             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
             assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
             filename = fullfile(filename, [className '.m']);
@@ -186,10 +188,12 @@ classdef Schema < handle
         
         
         function erd(self, subset)
-            % plot the Entity Relationship Diagram of the entire schema
+            % ERD -- plot the Entity Relationship Diagram of the entire schema
+            %
             % INPUTS:
-            %    subset -- classNames to include in the diagram
+            %    subset -- a string array of classNames to include in the diagram
             
+            % copy relevant information 
             C = self.dependencies;
             levels = -self.tableLevels;
             names = self.classNames;
@@ -197,7 +201,7 @@ classdef Schema < handle
             tiers = [tiers repmat({'external'},1,length(names)-length(tiers))];
             
             if nargin>=2
-                % limit to the subset
+                % limit the diagram to the specified subset of tables
                 ix = find(~ismember(subset,self.classNames));
                 if ~isempty(ix)
                     error('Unknown table %d', subset(ix(1)));
@@ -326,7 +330,6 @@ classdef Schema < handle
             %    s.backup(folder, {'manual','imported'})
             % Each table must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
-            error 'dj.Schema/backup has not been tested yet after '
             
             if nargin<3
                 tiers = {'lookup','manual'};
