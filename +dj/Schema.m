@@ -331,7 +331,7 @@ classdef Schema < handle
             if nargin<3
                 tiers = {'lookup','manual'};
             end
-            assert(all(ismember(tiers, dj.common.allowedTiers)))
+            assert(all(ismember(tiers, dj.utils.allowedTiers)))
             backupDir = fullfile(backupDir, self.dbname);
             if ~exist(backupDir, 'dir')
                 assert(mkdir(backupDir), ...
@@ -349,7 +349,7 @@ classdef Schema < handle
             for iTable = ix(:)'
                 contents = self.conn.query(sprintf('SELECT * FROM `%s`.`%s`', ...
                     self.dbname, self.tables(iTable).name));
-                contents = dj.common.structure2array(contents);
+                contents = dj.utils.structure2array(contents);
                 filename = fullfile(backupDir, ...
                     regexprep(self.classNames{iTable}, '^.*\.', ''));
                 fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
@@ -378,19 +378,19 @@ classdef Schema < handle
             
             % determine table tier (see dj.Table)
             re = [cellfun(@(x) ...
-                sprintf('^%s[a-z]\\w+$',x), dj.common.tierPrefixes, ...
+                sprintf('^%s[a-z]\\w+$',x), dj.utils.tierPrefixes, ...
                 'UniformOutput', false) ...
                 {'.*'}];  % regular expressions to determine table tier
             tierIdx = cellfun(@(x) ...
                 find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
                 self.tables.name);
-            self.tables.tier = dj.common.allowedTiers(min(tierIdx,end))';
+            self.tables.tier = dj.utils.allowedTiers(min(tierIdx,end))';
             
             % exclude tables that do not match the naming conventions
             validTables = tierIdx < length(re);  % matched table name pattern
             self.tables.comment = cellfun(@(x) strtok(x,'$'), ...
                 self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
-            self.tables = dj.common.structure2array(self.tables);
+            self.tables = dj.utils.structure2array(self.tables);
             self.tables = self.tables(validTables);
             self.classNames = cellfun(@(x) makeClassName(self.dbname, x), ...
                 {self.tables.name}, 'UniformOutput', false);
@@ -417,7 +417,7 @@ classdef Schema < handle
                 % strip field lengths off integer types
                 self.attrs.type = cellfun(@(x) regexprep(char(x'), ...
                     '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
-                self.attrs = dj.common.structure2array(self.attrs);
+                self.attrs = dj.utils.structure2array(self.attrs);
                 self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
                 validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];
                 if ~all(validFields)
@@ -428,7 +428,7 @@ classdef Schema < handle
                 
                 % reload table dependencies
                 fprintf('%.3g s\nloading table dependencies... ', toc), tic
-                foreignKeys = dj.common.structure2array(self.conn.query(sprintf([...
+                foreignKeys = dj.utils.structure2array(self.conn.query(sprintf([...
                     'SELECT '...
                     '  table_schema AS from_schema,'...
                     '  table_name AS from_table,'...
@@ -490,7 +490,7 @@ classdef Schema < handle
                 else
                     str = ['$' db];
                 end
-                str = sprintf('%s.%s', str, dj.common.camelCase(tab));
+                str = sprintf('%s.%s', str, dj.utils.camelCase(tab));
             end
         end
         

@@ -843,7 +843,7 @@ classdef Relvar < matlab.mixin.Copyable
             self = pro(self, args{:});
             ret = self.schema.conn.query( sprintf('SELECT %s FROM %s%s%s', ...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
-            ret = dj.common.structure2array(ret);
+            ret = dj.utils.structure2array(ret);
         end
         
         
