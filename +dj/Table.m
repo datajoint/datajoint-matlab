@@ -453,7 +453,7 @@ classdef (Sealed) Table < handle
             file = which(self.className);
             assert(~isempty(file), 'DataJoint:MissingTableDefnition', ...
                 'Could not find table definition file %s', file)
-            declaration = dj.common.readPercentBraceComment(file);
+            declaration = dj.utils.readPercentBraceComment(file);
             assert(~isempty(declaration), 'DataJoint:MissingTableDefnition', ...
                 'Could not find the table declaration in %s', file)
         end
@@ -469,8 +469,8 @@ classdef (Sealed) Table < handle
             
             % compile the CREATE TABLE statement
             tableName = [...
-                dj.common.tierPrefixes{strcmp(tableInfo.tier, dj.common.allowedTiers)}, ...
-                dj.common.camelCase(tableInfo.className, true)];
+                dj.utils.tierPrefixes{strcmp(tableInfo.tier, dj.utils.allowedTiers)}, ...
+                dj.utils.camelCase(tableInfo.className, true)];
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
@@ -598,7 +598,7 @@ references = {};
 fieldDefs = [];
 
 if ischar(declaration)
-    declaration = dj.common.str2cell(declaration);
+    declaration = dj.utils.str2cell(declaration);
 end
 assert(iscellstr(declaration), ...
     'declaration must be a multiline string or a cellstr');
@@ -607,7 +607,7 @@ assert(iscellstr(declaration), ...
 declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
 
 % expand <<macros>>   TODO: make macro expansion recursive (if necessary)
-for macro = fieldnames(dj.common.macros)'
+for macro = fieldnames(dj.utils.macros)'
     while true
         ix = find(strcmp(strtrim(declaration), ...
             ['<<' macro{1} '>>']),1,'first');
@@ -616,7 +616,7 @@ for macro = fieldnames(dj.common.macros)'
         end
         declaration = [
             declaration(1:ix-1)
-            dj.common.macros.(macro{1})
+            dj.utils.macros.(macro{1})
             declaration(ix+1:end)
             ];
     end
@@ -644,7 +644,7 @@ pat = {
 tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
 assert(numel(tableInfo)==1, ...
     'incorrect syntax is table declaration, line 1')
-assert(ismember(tableInfo.tier, dj.common.allowedTiers),...
+assert(ismember(tableInfo.tier, dj.utils.allowedTiers),...
     ['Invalid tier for table ' tableInfo.className])
 
 if nargout > 1

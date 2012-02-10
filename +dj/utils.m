@@ -1,4 +1,4 @@
-classdef(Sealed) common
+classdef(Sealed) utils
     
     properties(Constant)
         % Table naming convention
