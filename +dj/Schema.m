@@ -122,12 +122,9 @@ classdef Schema < handle
             % table declaration
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.re);
-                error DEBUG-THIS
-                parentIndices = self.getNeighbors([self.package '.' className],-1);
+                parentIndices = self.getParents([self.package '.' className]);
                 parentIndices(end) = [];  % remove this table
             else
-                fprintf(f, '%% %s.%s - my newest table\n', self.package, className);
-                fprintf(f, '%% I will explain what my table does here \n\n');
                 fprintf(f, '%%{\n');
                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
                 if ~isempty(self.classNames)

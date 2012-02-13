@@ -220,7 +220,7 @@ classdef Relvar < matlab.mixin.Copyable
             % matching the given key.
             
             assert(~isempty(self.tab), 'Cannot enter data into a derived relation')
-            assert(~any([self.attrs.isBlob]), 'Cannot mannually edith a table with blobs')
+            assert(~any([self.attrs.isBlob]), 'Cannot mannually edith a table with blobs')            
             
             if nargin<2
                 key = struct;
@@ -234,8 +234,6 @@ classdef Relvar < matlab.mixin.Copyable
             % buttons
             uicontrol('Parent', hfig, 'String', '+','Style', 'pushbutton', ...
                 'Position', [15 15 15 18], 'Callback', {@newTuple});
-            uicontrol('Parent', hfig','String','commit','Style','pushbutton', ...
-                'Position', [50 15 80 18], 'Callback', {@commit});
             uicontrol('Parent', hfig, 'String', 'refresh','Style', 'pushbutton',...
                 'Position', [140 15 80 18], 'Callback', {@refresh});
             hstat = uicontrol('Parent', hfig, 'Style','text',...
@@ -319,9 +317,13 @@ classdef Relvar < matlab.mixin.Copyable
                         set(hstat,'String','status: you have uncommitted tuples');
                     end
                 else
-                    data{idx(1),idx(2)} = change.NewData;
-                    data{idx(1),1}= false;
-                    set(hstat,'String','status: you have uncommitted tuples');
+                    if idx(2)==1
+                        commit
+                    else
+                        data{idx(1),idx(2)} = change.NewData;
+                        data{idx(1),1}= false;
+                        set(hstat,'String','status: you have uncommitted tuples');
+                    end
                 end
                 set(htab, 'Data', data);
             end
