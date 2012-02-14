@@ -843,9 +843,9 @@ classdef Relvar < matlab.mixin.Copyable
             
             [limit, args] = dj.Relvar.getLimitClause(varargin{:});
             self = pro(self, args{:});
-            ret = self.schema.conn.query( sprintf('SELECT %s FROM %s%s%s', ...
+            ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s%s', ...
                 self.sql.pro, self.sql.src, self.sql.res, limit));
-            ret = dj.utils.structure2array(ret);
+            ret = dj.struct.fromFields(ret);
         end
         
         

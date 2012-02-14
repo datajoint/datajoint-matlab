@@ -36,6 +36,7 @@ classdef Connection < handle
         function addPackage(self, dbname, package)
             self.packageDict.(dbname) = package;
         end
+
         
         
         function reload(self)
@@ -67,12 +68,14 @@ classdef Connection < handle
         end
                 
         
+        
         function ret = get.isConnected(self)
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             assert(ret || ~self.inTransaction, ...
                 'Database connection was terminated during an ongoing transaction. Restart the processing.')
         end
+        
         
         
         function ret = query(self, queryStr, varargin)

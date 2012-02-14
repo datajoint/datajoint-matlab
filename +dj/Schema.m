@@ -35,7 +35,7 @@ classdef Schema < handle
             self.conn = conn;
             self.dbname = dbname;
             self.package = package;
-            addPackage(self.conn, dbname, package);
+            addPackage(self.conn, dbname, package)
         end
         
         
@@ -349,7 +349,7 @@ classdef Schema < handle
             for iTable = ix(:)'
                 contents = self.conn.query(sprintf('SELECT * FROM `%s`.`%s`', ...
                     self.dbname, self.tables(iTable).name));
-                contents = dj.utils.structure2array(contents);
+                contents = dj.struct.fromFields(contents);
                 filename = fullfile(backupDir, ...
                     regexprep(self.classNames{iTable}, '^.*\.', ''));
                 fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
@@ -390,7 +390,7 @@ classdef Schema < handle
             validTables = tierIdx < length(re);  % matched table name pattern
             self.tables.comment = cellfun(@(x) strtok(x,'$'), ...
                 self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
-            self.tables = dj.utils.structure2array(self.tables);
+            self.tables = dj.struct.fromFields(self.tables);
             self.tables = self.tables(validTables);
             self.classNames = cellfun(@(x) makeClassName(self.dbname, x), ...
                 {self.tables.name}, 'UniformOutput', false);
@@ -417,7 +417,7 @@ classdef Schema < handle
                 % strip field lengths off integer types
                 self.attrs.type = cellfun(@(x) regexprep(char(x'), ...
                     '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
-                self.attrs = dj.utils.structure2array(self.attrs);
+                self.attrs = dj.struct.fromFields(self.attrs);
                 self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
                 validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];
                 if ~all(validFields)
@@ -428,7 +428,7 @@ classdef Schema < handle
                 
                 % reload table dependencies
                 fprintf('%.3g s\nloading table dependencies... ', toc), tic
-                foreignKeys = dj.utils.structure2array(self.conn.query(sprintf([...
+                foreignKeys = dj.struct.fromFields(self.conn.query(sprintf([...
                     'SELECT '...
                     '  table_schema AS from_schema,'...
                     '  table_name AS from_table,'...
@@ -442,7 +442,6 @@ classdef Schema < handle
                     '   OR referenced_table_schema="%s" '...
                     'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
                     self.dbname, self.dbname)));
-                toc
                 
                 % compile classNames for linked tables from outside the schema
                 toClassNames = arrayfun(@(x) makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';

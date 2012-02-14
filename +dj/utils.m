@@ -49,19 +49,11 @@ classdef(Sealed) utils
         end
         
         
-        function ret = str2cell(str, delims)
-            % converts string into cell array of strings
-            
-            if nargin<=2
-                delims = char([10,13]); % new line characters
-            end
-            str = [delims(1) str delims(1)];
-            pos = find(ismember(str,delims));
-            ret = arrayfun(@(i) str(pos(i-1):pos(i)), ...
-                2:length(pos),'UniformOutput', false);
-            ret = ret(~cellfun(@isempty, ret));
-            ret = ret(:);  % convert to column
-        end    
+        function ret = str2cell(str)
+            % DJ.UTILS.STR2CELL - convert a multi-line string into a cell array of one-line strings.           
+            ret = regexp(str,'\n','split')';
+            ret = ret(~cellfun(@isempty, ret));  % remove empty strings
+        end
         
         
         function str = camelCase(str, reverse)
@@ -105,84 +97,27 @@ classdef(Sealed) utils
         end
         
         
+        
+        % DEPRECATED FUNCTIONS        
         function s = structure2array(s)
-            % structure2array(s) converts structure s whose fields are Nx1 matrices into
-            % an Nx1 matrix of structures.
-            % :: Dimitri Yatsenko :: Created 2010-10-07 :: Modified 2010-10-31
-            
-            lst = {};
-            for fname = fieldnames(s)'
-                lst{end+1} = fname{1};  %#ok<AGROW>
-                v = s.(fname{1});
-                if isempty(v)
-                    lst{end+1}={};   %#ok<AGROW>
-                else
-                    if isnumeric(v) || islogical(v)
-                        lst{end+1} = num2cell(s.(fname{1}));  %#ok<AGROW>
-                    else
-                        lst{end+1} = s.(fname{1});  %#ok<AGROW>
-                    end
-                end
-            end
-            
-            % convert into struct array
-            s = struct(lst{:});
+            warning('DataJoint:deprecated',...
+                'dj.utils.structure2array will be removed in an upcoming revision. Use dj.struct.fromFields instead')
+            s = dj.struct.fromFields(s);
         end
-        
-        
         function ret = structJoin(s1, s2)
-            % the relational join of structure arrays s1 and s2
-            
-            assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
-            ret = struct([]);
-            commonFields = intersect(fieldnames(s1),fieldnames(s2));
-            s2only = setdiff(fieldnames(s2),fieldnames(s1));
-            for p2 = s2'
-                for p1 = s1'
-                    if isequal(...
-                            dj.utils.structPro(p1,commonFields), ...
-                            dj.utils.structPro(p2,commonFields))
-                        for f = s2only'
-                            p1.(f{1}) = p2.(f{1});
-                        end
-                        ret = [ret; p1];   %#ok<AGROW>
-                    end
-                end
-            end
-            
+            warning('DataJoint:deprecated',...
+                'dj.utils.structJoin will be removed in an upcoming revision. Use dj.struct.join instead' )
+            ret = dj.struct.join(s1,s2);
         end
-        
-        
         function s = structPro(s,fields)
-            % the relational projection of structure array onto fields
-            % Duplicates are not removed.
-            for ff=fieldnames(s)'
-                if ~ismember(ff{1}, fields)
-                    s = rmfield(s, ff{1});
-                end
-            end
+            warning('DataJoint:deprecated',...
+                'dj.utils.structPro will be removed in an upcoming revision. Use dj.struct.pro instead' )
+            s = dj.struct.pro(s,fields);
         end
-        
-        
         function sorted = structSort(s, fieldNames)
-            % sort structure array s alphanumerically in order of fieldNames
-            % Example:
-            % >> s = struct('a', {1,1,2}, 'b', {'one' 'two' 'two'}, 'c', {1 2 1})'
-            % >> s = structSort(s, 'c');
-            % >> s = structSort(s, {'b','a'})
-            
-            assert(isstruct(s) && ndims(s)==2 && size(s,2)==1, ...
-                'first input must be a column array of structures.')
-            if ischar(fieldNames)
-                fieldNames = {fieldNames};
-            end
-            assert(iscellstr(fieldNames) && all(isfield(s, fieldNames)), ...
-                'second input must be an array of fieldnames');
-            f = fieldnames(s);
-            c = struct2cell(s)';
-            [~,i] = ismember(fieldNames,f);
-            [~,i] = sortrows(c(:,i));
-            sorted = s(i);
+            warning('DataJoint:deprecated',...
+                'dj.utils.structSort will be removed in an upcoming revision. Use dj.struct.sort instead' )
+            sorted = dj.struct.sort(s, fieldNames);
         end
     end
 end
