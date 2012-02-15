@@ -52,8 +52,8 @@ classdef struct
             % DJ.STRUCT.PRO - the relational projection operator
             % of structure array onto fields
             % Duplicates are not removed.
-            for ff=fields(:)'
-                if isfield(s,ff{1})
+            for ff=fieldnames(s)'
+                if ~ismember(ff{1}, fields)
                     s = rmfield(s, ff{1});
                 end
             end
