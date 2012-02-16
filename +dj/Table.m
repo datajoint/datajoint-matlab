@@ -108,22 +108,22 @@ classdef (Sealed) Table < handle
             neighbors = {self.className};
             nodes = {self.className};
             for j=1:-depth1
-                nodes = self.schema.getParents(nodes,[1 2],crossSchemas);
+                nodes = unique(self.schema.getParents(nodes,[1 2],crossSchemas));
                 if isempty(nodes)
                     break
                 end
-                neighbors = setdiff(neighbors, nodes);
+                neighbors(ismember(neighbors,nodes))=[];
                 neighbors = [nodes neighbors];  %#ok:<AGROW>
             end
             
             % find tables dependent on self
             nodes = {self.className};
             for j=1:depth2
-                nodes = self.schema.getChildren(nodes,[1 2],crossSchemas);
+                nodes = unique(self.schema.getChildren(nodes,[1 2],crossSchemas));
                 if isempty(nodes)
                     break;
                 end
-                nodes = setdiff(nodes, neighbors);
+                neighbors(ismember(neighbors,nodes))=[];
                 neighbors = [neighbors nodes];  %#ok:<AGROW>
             end
         end

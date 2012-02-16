@@ -35,8 +35,8 @@ classdef struct
             for p2 = s2'
                 for p1 = s1'
                     if isequal(...
-                            dj.struct.pro(p1,commonFields), ...
-                            dj.struct.pro(p2,commonFields))
+                            dj.struct.pro(p1,commonFields{:}), ...
+                            dj.struct.pro(p2,commonFields{:}))
                         for f = s2only'
                             p1.(f{1}) = p2.(f{1});
                         end
@@ -48,12 +48,12 @@ classdef struct
         end
         
         
-        function s = pro(s,fields)
+        function s = pro(s,varargin)
             % DJ.STRUCT.PRO - the relational projection operator
             % of structure array onto fields
             % Duplicates are not removed.
             for ff=fieldnames(s)'
-                if ~ismember(ff{1}, fields)
+                if ~ismember(ff{1}, varargin)
                     s = rmfield(s, ff{1});
                 end
             end

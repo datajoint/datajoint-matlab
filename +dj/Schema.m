@@ -469,10 +469,12 @@ classdef Schema < handle
                 end
                 
                 % lower level if possible
-                for j=1:nTables
-                    ix = find(self.dependencies(:,j));
-                    if ~isempty(ix)
-                        levels(j)=min(levels(ix)-1);
+                for ii=1:3
+                    for j=1:nTables
+                        ix = find(self.dependencies(:,j));
+                        if ~isempty(ix)
+                            levels(j)=min(levels(ix)-1);
+                        end
                     end
                 end
                 fprintf('%.3g s\n', toc)
