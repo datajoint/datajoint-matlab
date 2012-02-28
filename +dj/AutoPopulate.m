@@ -92,6 +92,8 @@ classdef AutoPopulate < handle
             %   populate(OriMaps, 'mouse_id=12')    % populate OriMaps for mouse 12
             %   [failedKeys, errs] = populate(OriMaps);  % skip errors and return their list
             
+            assert(~self.isRestricted, ...
+                'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)')
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             
             if nargout > 0
@@ -105,7 +107,9 @@ classdef AutoPopulate < handle
             end
             assert(isa(unpopulated, 'dj.Relvar'), 'property popRel must be a dj.Relvar')
             unpopulated = fetch((unpopulated & varargin) - self);
-            if ~isempty(unpopulated)
+            if isempty(unpopulated)
+                disp 'Nothing to populate'
+            else
                 if numel(self.jobRel)
                     jobFields = self.jobRel.primaryKey(1:end-1);
                     unpopulated = dj.utils.structSort(unpopulated, jobFields);

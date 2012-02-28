@@ -156,7 +156,7 @@ classdef (Sealed) Table < handle
                     depth2 = max(0, depth1);
                     depth1 = min(0, depth1);
             end
-
+            
             self.schema.erd(self.getNeighbors(depth1, depth2))
         end
         
@@ -217,7 +217,7 @@ classdef (Sealed) Table < handle
             % list other references
             if ~expandForeignKeys
                 for refClassName = self.schema.getParents(self.className, 2)
-                    refObj = dj.Table(refClassName);
+                    refObj = dj.Table(refClassName{1});
                     str = sprintf('%s\n-> %s',str, refClassName);
                     excludeFields = {refObj.attrs([refObj.attrs.iskey]).name};
                     dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
@@ -354,28 +354,6 @@ classdef (Sealed) Table < handle
         
         
         
-        
-        %         function list = getAllDependents(self)
-        %             % dj.Table/getAllDependents - get all dependent tables across all schemas.
-        %             % This is used by dj.Table/drop and dj.Table/delete to properly
-        %             % their effects.
-        %
-        %             expanded = {self.schema.dbname, self.info.name};
-        %             list = {};
-        %             while ~isempty(expanded)
-        %                 list = {list; expanded}
-        %                 cond = sprintf(' OR referenced_table_schema="%s" AND referenced_table_name="%s"', expanded{:});
-        %                 foreignKeys = query(dj.conn, [...
-        %                     'SELECT table_schema as `schema`, table_name AS `table`', ...
-        %                     ' FROM information_schema.key_column_usage ', ...
-        %                     sprintf('WHERE FALSE %s',cond) ...
-        %                     ' GROUP BY table_schema, table_name']));
-        %                 expanded = [{foregnKeys.schema}, {foreignKeys.table}];
-        %             end
-        %
-        %         end
-        
-        
         function drop(self)
             % dj.Table/drop - drop the table and all its dependents.
             % Confirmation is requested if the dropped tables contain data.
@@ -439,7 +417,7 @@ classdef (Sealed) Table < handle
                 self.schema.conn.reload
             end
             fprintf \n
-        end       
+        end
     end
     
     

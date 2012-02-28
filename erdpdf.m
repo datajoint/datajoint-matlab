@@ -5,5 +5,11 @@ erd(entity)
 
 set(gcf,'PaperUnits','inches','PaperPosition',[0 0 11 8],'PaperSize',[11 8])
 print('-dpdf', './temp_erd')
-system('open ./temp_erd.pdf; rm ./temp_erd.pdf');
+
+if ~strncmpi(computer, 'MAC', 3)
+    disp 'Saved temp erd'
+else
+    % on a mac, open the PDF and erase the file
+    system('open ./temp_erd.pdf; rm ./temp_erd.pdf');
+end
 close(gcf)

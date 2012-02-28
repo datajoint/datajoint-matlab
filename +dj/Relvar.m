@@ -73,6 +73,11 @@ classdef Relvar < matlab.mixin.Copyable
         end
         
         
+        function yes = isRestricted(self)
+            yes = ~isempty(self.sql.res);
+        end
+        
+        
         function names = get.primaryKey(self)
             if isempty(self.attrs)
                 names = {};
