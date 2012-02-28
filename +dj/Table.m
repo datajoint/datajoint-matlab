@@ -218,7 +218,7 @@ classdef (Sealed) Table < handle
             if ~expandForeignKeys
                 for refClassName = self.schema.getParents(self.className, 2)
                     refObj = dj.Table(refClassName{1});
-                    str = sprintf('%s\n-> %s',str, refClassName);
+                    str = sprintf('%s\n-> %s',str, refClassName{1});
                     excludeFields = {refObj.attrs([refObj.attrs.iskey]).name};
                     dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
                 end
