@@ -174,9 +174,9 @@ classdef AutoPopulate < handle
                         % the final "completed" is being submitted.
                         if ~isempty(self.jobKey)
                             % assert that the completed job matches the reservation
-                            assert(~isempty(dj.utils.structJoin(key, self.jobKey)),...
+                            assert(~isempty(dj.struct.join(key, self.jobKey)),...
                                 'job key mismatch ')
-                            key = dj.utils.structPro(key, self.jobRel.primaryKey);
+                            key = dj.struct.pro(key, self.jobRel.primaryKey{:});
                             key.job_status = status;
                             if strcmp(status, 'error')
                                 key.error_message = errMsg;
@@ -190,7 +190,7 @@ classdef AutoPopulate < handle
                     case 'reserved'
                         % check if the job is already ours
                         success = ~isempty(self.jobKey) && ...
-                            ~isempty(dj.utils.structJoin(key, self.jobKey));
+                            ~isempty(dj.struct.join(key, self.jobKey));
                         
                         if ~success
                             % mark previous job completed
@@ -200,7 +200,7 @@ classdef AutoPopulate < handle
                             end
                             
                             % create the new job key
-                            self.jobKey = dj.utils.structPro(key, self.jobRel.primaryKey);
+                            self.jobKey = dj.struct.pro(key, self.jobRel.primaryKey{:});
                             
                             % check if the job is available
                             try
