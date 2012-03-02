@@ -112,7 +112,7 @@ classdef AutoPopulate < handle
             else
                 if numel(self.jobRel)
                     jobFields = self.jobRel.primaryKey(1:end-1);
-                    unpopulated = dj.utils.structSort(unpopulated, jobFields);
+                    unpopulated = dj.struct.sort(unpopulated, jobFields);
                 end
                 fprintf('\n** Found %d unpopulated keys\n\n', length(unpopulated))
                 for key = unpopulated'
