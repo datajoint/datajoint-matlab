@@ -26,8 +26,7 @@ classdef struct
         
         
         function ret = join(s1, s2)
-            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2
-            
+            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2            
             assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
             ret = struct([]);
             commonFields = intersect(fieldnames(s1),fieldnames(s2));
@@ -50,8 +49,13 @@ classdef struct
         
         function s = pro(s,varargin)
             % DJ.STRUCT.PRO - the relational projection operator
-            % of structure array onto fields
-            % Duplicates are not removed.
+            % of structure array onto the specified fields.
+            % The result may contain duplicate tuples.
+            %
+            % SYNTAX:
+            %    s = dj.struct.pro(s, 'field1', 'field2')
+            %    This removes all fields from s except field1 and field2
+            
             for ff=fieldnames(s)'
                 if ~ismember(ff{1}, varargin)
                     s = rmfield(s, ff{1});
