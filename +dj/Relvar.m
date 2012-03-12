@@ -682,7 +682,7 @@ classdef Relvar < matlab.mixin.Copyable
                     commonIllegal{1})
             end
             
-            R1 = dj.Relvar(R1);
+            R1 = dj.Relvar(R1);   % copy
             
             % merge field lists
             [~, ix] = setdiff({R2.attrs.name},{R1.attrs.name});
