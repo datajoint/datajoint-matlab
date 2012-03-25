@@ -99,8 +99,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                         for iRel = length(rels):-1:1
                             fprintf('Deleting %d tuples from %s... ', ...
                                 counts(iRel), rels{iRel}.tab.className)
-                            self.schema.conn.query( sprintf('DELETE FROM %s%s', ...
-                                rels{iRel}.sql.src, rels{iRel}.sql.res))
+                            self.schema.conn.query(sprintf('DELETE FROM `%s`.`%s`%s', ...
+                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, self.whereClause))    
                             fprintf 'done (not committed)\n'
                         end
                         self.schema.conn.commitTransaction
@@ -187,7 +187,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                 
                 % issue query
                 self.schema.conn.query( sprintf('%s `%s`.`%s` SET %s', ...
-                    command, self.schema.dbname, self.operand{1}.info.name, ...
+                    command, self.schema.dbname, self.tab.info.name, ...
                     queryStr(1:end-1)), blobs{:})
             end
         end
@@ -256,10 +256,9 @@ classdef BaseRelvar < dj.GeneralRelvar
                 otherwise
                     error 'Invalid condition: report to DataJoint developers'
             end            
-            whereClause = self.sql;
-            pos = strfind(whereClause, 'WHERE');
+            
             queryStr = sprintf('UPDATE `%s`.`%s` SET `%s`=%s %s', ...
-                self.schema.dbname, self.tab.info.name, attrname, queryStr, whereClause(pos:end));
+                self.schema.dbname, self.tab.info.name, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
         end
     end

@@ -39,8 +39,7 @@ classdef GeneralRelvar < handle
         end
         
         function schema = get.schema(self)
-            leaf = self.getLeaf();
-            schema = leaf.schema;
+            schema = self.getSchema();
         end
                 
         function names = get.primaryKey(self)
@@ -58,6 +57,10 @@ classdef GeneralRelvar < handle
             else
                 names = {self.attrs(~[self.attrs.iskey]).name};
             end
+        end
+        
+        function clause = whereClause(self)
+            clause = makeWhereClause(self.attrs, self.restrictions);
         end
         
         function display(self, justify)
@@ -108,6 +111,45 @@ classdef GeneralRelvar < handle
             fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
         end
         
+        function view(self)
+            % dj.Relvar/view - view the data in speadsheet form
+            
+            if ~count(self)
+                disp('empty relation')
+            else
+                columns = {self.attrs.name};
+                
+                assert(~any([self.attrs.isBlob]), 'cannot view blobs')
+                
+                % specify table header
+                columnName = columns;
+                for iCol = 1:length(columns)
+                    
+                    if self.attrs(iCol).iskey
+                        columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
+                    else
+                        columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
+                    end
+                end
+                format = cell(1,length(columns));
+                format([self.attrs.isString]) = {'char'};
+                format([self.attrs.isNumeric]) = {'numeric'};
+                for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
+                    enumValues = textscan(self.attrs(iCol).type(6:end-1),'%s','Delimiter',',');
+                    enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
+                    format(iCol) = {enumValues'};
+                end
+                
+                % display table
+                data = fetch(self, columns{:});
+                hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
+                    'MenuBar', 'none');
+                uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
+                    'ColumnName', columnName, 'ColumnEditable', false(1,length(columns)), ...
+                    'ColumnFormat', format, 'Data', struct2cell(data)');
+            end
+        end
+        
         
         %%%%%%%%%%%%%%%%%% FETCHING DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
@@ -115,7 +157,7 @@ classdef GeneralRelvar < handle
             % GeneralRelvar/count - the number of tuples in the relation.
             n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s',self.sql));
             n=n.n;
-        end
+        end       
         
         
         function ret = fetch(self, varargin)
@@ -158,7 +200,7 @@ classdef GeneralRelvar < handle
             ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s', ...
                 makeAttrList(attrs), sql, limit));
             ret = dj.struct.fromFields(ret);
-        end
+        end 
         
         
         function varargout = fetch1(self, varargin)
@@ -404,23 +446,25 @@ classdef GeneralRelvar < handle
     end
     
     
-    %%%%%%%%%%%%%%% IPRIVATE HELPER FUNCTIONS %%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%% PRIVATE HELPER FUNCTIONS %%%%%%%%%%%%%%%%%%%%%
     
     
     methods(Access = private)
-        function leaf = getLeaf(self)
-            leaf = self.operands{1};
-            if ~strcmp(self.operator, 'table')
-                leaf = leaf.getLeaf();
+        function schema = getSchema(self)
+            schema = self.operands{1};
+            if strcmp(self.operator, 'table')
+                schema = schema.schema;
+            else
+                schema = schema.getSchema();
             end
         end
             
             
         function [attrs, sql] = compile(self)
-            % compile the expression tree into an SQL expression
+            % compile the query tree into an SQL expression
             % OUTPUTS:
             %   sql =   "... [WHERE ...] [GROUP BY (...)]'
-            %   attrs = array of attribute structures
+            %   attrs = structure array with attribute properties
             
             persistent aliasCount
             
@@ -491,7 +535,7 @@ classdef GeneralRelvar < handle
                     [attrStr, attrs] = makeAttrList(attrs);
                     sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
                 end                
-                sql = sprintf('%s%s', sql, whereClause(attrs, self.restrictions));
+                sql = sprintf('%s%s', sql, makeWhereClause(attrs, self.restrictions));
             end      
         end
     end
@@ -500,7 +544,7 @@ end
 
 
 
-function clause = whereClause(selfAttrs, restrictions)
+function clause = makeWhereClause(selfAttrs, restrictions)
 % make the where clause from self.restrictions
 persistent aliasCount
 if isempty(aliasCount) 
@@ -535,7 +579,7 @@ for arg = restrictions
             
         case isa(cond, 'dj.GeneralRelvar')
             % semijoin or antijoin
-            [condSQL, condAttrs] = cond.compile;
+            [condAttrs, condSQL] = cond.compile;
             
             % isolate previous projection (if not already)
             if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions)
@@ -565,9 +609,10 @@ for arg = restrictions
                 end
             else
                 % make semijoin or antijoin clause
-                commonAttrs = sprintf( ',`%s`', commonAttrs{:});                
-                clause = sprintf('%s %s ((%s) %sIN (SELECT %s FROM %s%s) as `$w%x`)',...
-                    clause, word, commonAttrs(2:end), not, commonAttrs, condSQL, aliasCount);
+                commonAttrs = sprintf( ',`%s`', commonAttrs{:});     
+                commonAttrs = commonAttrs(2:end);
+                clause = sprintf('%s %s ((%s) %sIN (SELECT %s FROM %s))',...
+                    clause, word, commonAttrs, not, commonAttrs, condSQL);
             end
     end
     not = '';

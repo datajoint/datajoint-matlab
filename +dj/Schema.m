@@ -21,11 +21,6 @@ classdef Schema < handle
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
-    events
-        % lets relvar objects know that table definitions may have changed
-        ChangedDefinitions
-    end
-    
     
     methods
         
@@ -38,7 +33,7 @@ classdef Schema < handle
             addPackage(self.conn, dbname, package)
         end
         
-        
+            
         function val = get.classNames(self)
             self.reload(false)
             val = self.classNames;
@@ -63,6 +58,7 @@ classdef Schema < handle
             self.reload(false)
             val = self.tableLevels;
         end        
+        
         
         function makeClass(self, className)
             % create a base relvar class for the new className in schema directory.
@@ -481,9 +477,7 @@ classdef Schema < handle
                 
                 self.tableLevels = levels;
             end
-            
-            self.notify('ChangedDefinitions')
-            
+                        
             
             function str = makeClassName(db,tab)
                 if strcmp(db,self.dbname)
