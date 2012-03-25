@@ -1,6 +1,6 @@
 % manages information about database tables and their dependencies
 % Complete documentation is available at <a href=http://code.google.com/p/datajoint/wiki/TableOfContents>Datajoint wiki</a>
-% See also dj.Table, dj.Relvar
+% See also dj.Table, dj.BaseRelvar, dj.GeneralRelvar
 
 classdef Schema < handle
     
@@ -62,8 +62,7 @@ classdef Schema < handle
         function val = get.tableLevels(self)
             self.reload(false)
             val = self.tableLevels;
-        end
-        
+        end        
         
         function makeClass(self, className)
             % create a base relvar class for the new className in schema directory.
@@ -417,6 +416,7 @@ classdef Schema < handle
                 % strip field lengths off integer types
                 self.attrs.type = cellfun(@(x) regexprep(char(x'), ...
                     '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
+                self.attrs.alias = repmat({''}, length(self.attrs.name),1);
                 self.attrs = dj.struct.fromFields(self.attrs);
                 self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
                 validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];

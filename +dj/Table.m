@@ -363,7 +363,7 @@ classdef (Sealed) Table < handle
             % properties and persistent variables that refer to the dropped
             % table.
             %
-            % See also dj.Table, dj.Relvar/del
+            % See also dj.Table, dj.BaseRelvar/del
             
             self.schema.conn.cancelTransaction   % exit ongoing transaction
             
