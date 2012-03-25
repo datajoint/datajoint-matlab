@@ -136,37 +136,38 @@ classdef BaseRelvar < dj.GeneralRelvar
             end
             assert(any(strcmpi(command,{'INSERT', 'INSERT IGNORE', 'REPLACE'})), ...
                 'invalid insert command')
+            attrs = self.attrs;
             
             % validate attrs
             fnames = fieldnames(tuples);
-            found = ismember(fnames,{self.attrs.name});
+            found = ismember(fnames,{attrs.name});
             if ~all(found)
                 error('Field %s is not found in the table %s', ...
                     fnames{find(~found,1,'first')}, class(self));
             end
             
             % form query
-            ix = ismember({self.attrs.name}, fnames);
+            ix = ismember({attrs.name}, fnames);
             for tuple=tuples(:)'
                 queryStr = '';
                 blobs = {};
                 for i = find(ix)
-                    v = tuple.(self.attrs(i).name);
-                    if self.attrs(i).isString
+                    v = tuple.(attrs(i).name);
+                    if attrs(i).isString
                         assert(ischar(v), ...
                             'The field %s must be a character string', ...
-                            self.attrs(i).name)
+                            attrs(i).name)
                         if isempty(v)
                             queryStr = sprintf('%s`%s`="",', ...
-                                queryStr, self.attrs(i).name);
+                                queryStr, attrs(i).name);
                         else
                             queryStr = sprintf('%s`%s`="{S}",', ...
-                                queryStr,self.attrs(i).name);
+                                queryStr,attrs(i).name);
                             blobs{end+1} = v;  %#ok<AGROW>
                         end
-                    elseif self.attrs(i).isBlob
+                    elseif attrs(i).isBlob
                         queryStr = sprintf('%s`%s`="{M}",', ...
-                            queryStr,self.attrs(i).name);
+                            queryStr,attrs(i).name);
                         if islogical(v) % mym doesn't accept logicals - save as uint8 instead
                             v = uint8(v);
                         end
@@ -177,10 +178,10 @@ classdef BaseRelvar < dj.GeneralRelvar
                         end
                         assert(isscalar(v) && isnumeric(v),...
                             'The field %s must be a numeric scalar value', ...
-                            self.attrs(i).name)
+                            attrs(i).name)
                         if ~isnan(v)  % nans are not passed: assumed missing.
                             queryStr = sprintf('%s`%s`=%1.16g,',...
-                                queryStr, self.attrs(i).name, v);
+                                queryStr, attrs(i).name, v);
                         end
                     end
                 end
@@ -217,19 +218,25 @@ classdef BaseRelvar < dj.GeneralRelvar
             % EXAMPLES:
             %   update(v2p.Mice(key), 'mouse_dob',   '2011-01-01')
             %   update(v2p.Scan(key), 'lens')   % set the value to NULL
-            
-            assert(count(self)==1, 'Update is only allowed on one tuple at a time for now')
-            ix = find(strcmp(attrname,{self.attrs.name}));
+           
+            assert(count(self)==1, 'Update is only allowed on one tuple at a time')
+            isNull = nargin<3;
+            attrs = self.attrs;
+            ix = find(strcmp(attrname,{attrs.name}));
             assert(numel(ix)==1, 'invalid attribute name')
-            assert(~self.attrs(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
+            assert(~attrs(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
             
             switch true
-                case self.attrs(ix).isString
+                case isNull
+                    queryStr = 'NULL';
+                    value = {};
+                    
+                case attrs(ix).isString
                     assert(ischar(value), 'Value must be a string')
                     queryStr = '"{S}"';
                     value = {value};
-                case self.attrs(ix).isBlob
-                    if isempty(value) && self.attrs(ix).isnullable
+                case attrs(ix).isBlob
+                    if isempty(value) && attrs(ix).isnullable
                         queryStr = NULL;
                         value = {};
                     else
@@ -239,13 +246,13 @@ classdef BaseRelvar < dj.GeneralRelvar
                         end
                         value = {value};
                     end
-                case self.attrs(ix).isNumeric
+                case attrs(ix).isNumeric
                     if islogical(value)
                         value = uint8(valuealue);
                     end
                     assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
                     if isnan(value)
-                        assert(self.attrs(ix).isnullable, ...
+                        assert(attrs(ix).isnullable, ...
                             'attribute `%s` is not nullable. NaNs not allowed', attrname)
                         queryStr = 'NULL';
                         value = {};
@@ -254,8 +261,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                         value = {};
                     end
                 otherwise
-                    error 'Invalid condition: report to DataJoint developers'
-            end            
+                    error 'Invalid condition: please report to DataJoint developers'
+            end
             
             queryStr = sprintf('UPDATE `%s`.`%s` SET `%s`=%s %s', ...
                 self.schema.dbname, self.tab.info.name, attrname, queryStr, self.whereClause);
