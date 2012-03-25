@@ -1,19 +1,14 @@
-% BaseRelvar: a relational variable linked to a table in the database
-% before other relational operators have been applied.
-%
-% BaseRelvar provides data manipulation operators del and insert.
-%
-% SYNTAX:
-%    obj = dj.BaseRelvar(table)  % table must be of class dj.Table
-
-
 classdef BaseRelvar < dj.GeneralRelvar
+    % BaseRelvar: a relational variable linked to a table in the database.
+    % BaseRelvar provides data manipulation operators del and insert.
+    %
+    % SYNTAX:
+    %    obj = dj.BaseRelvar(table)  % table must be of class dj.Table
     
     properties(Dependent,Access=private)
         tab     % associated table
     end
-
-
+    
     methods
         function self = init(self, table)
             assert(isa(table, 'dj.Table'))
@@ -24,7 +19,7 @@ classdef BaseRelvar < dj.GeneralRelvar
         function info = get.tab(self)
             info = self.operands{1};
         end
-       
+        
         
         function del(self, doPrompt)
             % dj.BaseRelvar/del - remove all tuples of relation self from its table
@@ -46,7 +41,7 @@ classdef BaseRelvar < dj.GeneralRelvar
             
             if self.count==0
                 disp 'nothing to delete'
-            else                
+            else
                 % warn the user if deleting from a subtable
                 if ismember(self.tab.info.tier, {'imported','computed'}) ...
                         && ~isa(self, 'dj.AutoPopulate')
@@ -100,7 +95,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                             fprintf('Deleting %d tuples from %s... ', ...
                                 counts(iRel), rels{iRel}.tab.className)
                             self.schema.conn.query(sprintf('DELETE FROM `%s`.`%s`%s', ...
-                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, self.whereClause))    
+                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, self.whereClause))
                             fprintf 'done (not committed)\n'
                         end
                         self.schema.conn.commitTransaction
@@ -192,7 +187,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                     queryStr(1:end-1)), blobs{:})
             end
         end
-             
+        
         
         function inserti(self, tuples)
             % insert tuples but ignore errors. This is useful for rare
@@ -200,13 +195,13 @@ classdef BaseRelvar < dj.GeneralRelvar
             % discarded, for example.
             self.insert(tuples, 'INSERT IGNORE')
         end
-                
+        
         
         function update(self, attrname, value)
             % dj.BaseRelvar/update - update a field in an existing tuple
             %
-            % Relational database maintain referential integrity on the level 
-            % of a tuple. Therefore, the UPDATE operator can violate referential 
+            % Relational database maintain referential integrity on the level
+            % of a tuple. Therefore, the UPDATE operator can violate referential
             % integrity and should not be used routinely.  The proper way
             % to update information is to delete the entire tuple and
             % insert the entire update tuple.
@@ -218,7 +213,7 @@ classdef BaseRelvar < dj.GeneralRelvar
             % EXAMPLES:
             %   update(v2p.Mice(key), 'mouse_dob',   '2011-01-01')
             %   update(v2p.Scan(key), 'lens')   % set the value to NULL
-           
+            
             assert(count(self)==1, 'Update is only allowed on one tuple at a time')
             isNull = nargin<3;
             attrs = self.attrs;

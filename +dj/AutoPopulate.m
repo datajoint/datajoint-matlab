@@ -21,30 +21,15 @@ classdef AutoPopulate < handle
         jobRel   % the job reservation table (if any)
     end
     
-    methods
-        
-        function self = AutoPopulate
-            try
-                assert(isa(self, 'dj.Relvar'))
-                assert(isa(self.table, 'dj.Table'))
-                assert(isa(self.popRel, 'dj.Relvar') || isa(self.popRel,'function_handle'))
-            catch  %#ok
-                error(['an AutoPopulate class must be derived from dj.Relvar ' ...
-                    'and define properties ''table'' and ''popRel'''])
-            end
-            assert(ismember(self.table.info.tier, {'imported','computed'}), ...
-                'AutoPopulate tables can only be "imported" or "computed"')
-        end
-        
+    properties(Abstract)
+        popRel  % specify the relation providing tuples for which makeTuples is called.
     end
     
-    methods(Abstract)
-        
+    methods(Abstract)        
         makeTuples(self, key)
         % makeTuples(self, key) must be defined by each automatically
         % populated relvar. makeTuples copies key as tuple, adds computed
         % fields to tuple and inserts tuple as self.insert(tuple)
-        
     end
     
     methods
@@ -53,8 +38,10 @@ classdef AutoPopulate < handle
             % dj.AutoPopulate/parPopulate - same as populate but with job
             % reservation for distributed processing.
             
-            assert(isa(jobRel,'dj.Relvar'), ...
-                'The second input must be a job reservation relvar');
+            if ~isa(jobRel,'dj.Relvar')
+                throwAsCaller(MException('DataJoint:invalidInput',...
+                    'The second input must be a job reservation relvar'));
+            end
             assert(all(ismember(jobRel.primaryKey, [self.primaryKey,{'table_name'}])), ...
                 'The job table''s primary key fields must be a subset of populated table fields');
             
@@ -91,9 +78,10 @@ classdef AutoPopulate < handle
             %   populate(OriMaps)   % populate all OriMaps
             %   populate(OriMaps, 'mouse_id=12')    % populate OriMaps for mouse 12
             %   [failedKeys, errs] = populate(OriMaps);  % skip errors and return their list
-            
-            assert(~self.isRestricted, ...
-                'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)')
+            if ~isempty(self.restrictions)
+                throwAsCaller(MException('DataJoint:invalidInput', ...
+                    'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)'))
+            end
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             
             if nargout > 0
@@ -105,7 +93,7 @@ classdef AutoPopulate < handle
             if isa(unpopulated, 'function_handle')
                 unpopulated = unpopulated();
             end
-            assert(isa(unpopulated, 'dj.Relvar'), 'property popRel must be a dj.Relvar')
+            assert(isa(unpopulated, 'dj.GeneralRelvar'), 'property popRel must be a subclass of dj.GeneralRelvar')
             unpopulated = fetch((unpopulated & varargin) - self);
             if isempty(unpopulated)
                 disp 'Nothing to populate'
