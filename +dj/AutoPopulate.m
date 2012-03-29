@@ -21,7 +21,7 @@ classdef AutoPopulate < handle
         jobRel   % the job reservation table (if any)
     end
     
-    properties(Abstract)
+    properties(Constant,Abstract)
         popRel  % specify the relation providing tuples for which makeTuples is called.
     end
     
@@ -90,10 +90,8 @@ classdef AutoPopulate < handle
             end
             
             unpopulated = self.popRel;
-            if isa(unpopulated, 'function_handle')
-                unpopulated = unpopulated();
-            end
-            assert(isa(unpopulated, 'dj.GeneralRelvar'), 'property popRel must be a subclass of dj.GeneralRelvar')
+            assert(isa(unpopulated, 'dj.GeneralRelvar'), ...
+                'property popRel must be a subclass of dj.GeneralRelvar')
             unpopulated = fetch((unpopulated & varargin) - self);
             if isempty(unpopulated)
                 disp 'Nothing to populate'

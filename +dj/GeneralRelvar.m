@@ -5,18 +5,20 @@ classdef GeneralRelvar < handle
     
     
     properties(Dependent, SetAccess = private)
-        attrs        % computed attributes and their properties
-        sql          % computed sql expression
         schema       % schema object
+        header       % attributes and their properties
+        sql          % sql expression
         primaryKey   % primary key attribute names
         nonKeyFields % non-key attribute names
     end
     
-    
-    properties(SetAccess = private, GetAccess = protected)
-        operator          % node type: table, join, or pro
-        operands = {}     % list of operands (other relvars)
+    properties(SetAccess=private, GetAccess=public)
         restrictions = {} % list of restrictions applied to operator output
+    end
+    
+    properties(SetAccess=private, GetAccess=protected)
+        operator          % node type: table, join, or pro
+        operands = {}     % list of operands
     end
     
     methods
@@ -30,8 +32,8 @@ classdef GeneralRelvar < handle
             end
         end
         
-        function attrs = get.attrs(self)
-            attrs = self.compile();
+        function header = get.header(self)
+            header = self.compile();
         end
                 
         function s = get.sql(self)
@@ -43,50 +45,50 @@ classdef GeneralRelvar < handle
         end
                 
         function names = get.primaryKey(self)
-            if isempty(self.attrs)
+            if isempty(self.header)
                 warning('DataJoint:emptyPrimaryKey', 'empty primary key?')
                 names = {};
             else
-                names = {self.attrs([self.attrs.iskey]).name};
+                names = {self.header([self.header.iskey]).name};
             end
         end
         
         function names = get.nonKeyFields(self)
-            if isempty(self.attrs)
+            if isempty(self.header)
                 names = {};
             else
-                names = {self.attrs(~[self.attrs.iskey]).name};
+                names = {self.header(~[self.header.iskey]).name};
             end
         end
         
         function clause = whereClause(self)
-            clause = makeWhereClause(self.attrs, self.restrictions);
+            clause = makeWhereClause(self.header, self.restrictions);
         end
         
         function display(self, justify)
             % dj.GeneralRelvar/display - display the contents of the relation.
-            % Only non-blob attrs of the first several tuples are shown.
+            % Only non-blob header of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             tic
             justify = nargin==1 || justify;
             display@handle(self)
             nTuples = self.count;
             
-            attrs = self.attrs;
+            header = self.header;
             
             if nTuples>0
                 % print header
-                ix = find( ~[attrs.isBlob] );  % attrs to display
+                ix = find( ~[header.isBlob] );  % header to display
                 fprintf \n
-                fprintf('  %12.12s', attrs(ix).name)
+                fprintf('  %12.12s', header(ix).name)
                 fprintf \n
                 maxRows = 12;
-                tuples = self.fetch(attrs(ix).name,maxRows+1);
+                tuples = self.fetch(header(ix).name,maxRows+1);
                 
                 % print rows
                 for s = tuples(1:min(end,maxRows))'
                     for iField = ix
-                        v = s.(attrs(iField).name);
+                        v = s.(header(iField).name);
                         if isnumeric(v)
                             fprintf('  %12g',v)
                         else
@@ -117,25 +119,25 @@ classdef GeneralRelvar < handle
             if ~count(self)
                 disp('empty relation')
             else
-                columns = {self.attrs.name};
+                columns = {self.header.name};
                 
-                assert(~any([self.attrs.isBlob]), 'cannot view blobs')
+                assert(~any([self.header.isBlob]), 'cannot view blobs')
                 
                 % specify table header
                 columnName = columns;
                 for iCol = 1:length(columns)
                     
-                    if self.attrs(iCol).iskey
+                    if self.header(iCol).iskey
                         columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
                     else
                         columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
                     end
                 end
                 format = cell(1,length(columns));
-                format([self.attrs.isString]) = {'char'};
-                format([self.attrs.isNumeric]) = {'numeric'};
-                for iCol = find(strncmpi('ENUM', {self.attrs.type}, 4))
-                    enumValues = textscan(self.attrs(iCol).type(6:end-1),'%s','Delimiter',',');
+                format([self.header.isString]) = {'char'};
+                format([self.header.isNumeric]) = {'numeric'};
+                for iCol = find(strncmpi('ENUM', {self.header.type}, 4))
+                    enumValues = textscan(self.header(iCol).type(6:end-1),'%s','Delimiter',',');
                     enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
                     format(iCol) = {enumValues'};
                 end
@@ -172,7 +174,7 @@ classdef GeneralRelvar < handle
             % conventions as in dj.GeneralRelvar.pro, including renamed
             % attributed, and computed arguments.  In particular, if the second
             % input argument is another relvar, the computed arguments can
-            % include summary operations on the attrs of the second relvar.
+            % include summary operations on the header of the second relvar.
             %
             % For example:
             %   s = R.fetch(Q, 'count(*)->n');
@@ -196,9 +198,9 @@ classdef GeneralRelvar < handle
             
             [limit, args] = makeLimitClause(varargin{:});
             self = self.pro(args{:});
-            [attrs, sql] = self.compile;
+            [header, sql] = self.compile;
             ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s', ...
-                makeAttrList(attrs), sql, limit));
+                makeAttrList(header), sql, limit));
             ret = dj.struct.fromFields(ret);
         end 
         
@@ -273,9 +275,9 @@ classdef GeneralRelvar < handle
             
             % submit query
             self = self.pro(args{:});
-            [attrs, sql] = self.compile;
+            [header, sql] = self.compile;
             ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s%s',...
-                makeAttrList(attrs), sql, limit));
+                makeAttrList(header), sql, limit));
             
             % copy into output arguments
             varargout = cell(length(specs));
@@ -323,12 +325,19 @@ classdef GeneralRelvar < handle
             %   Scans & struct('mouse_id',3, 'scannum', 4);
             %   Scans & 'lens=10'
             %   Mice & (Scans & 'lens=10')
+            if ~iscell(arg)
+                arg = {arg};
+            end
             ret = init(dj.GeneralRelvar, self.operator, self.operands, ...
-                [self.restrictions {arg}]);
+                [self.restrictions arg]);
         end
         
         
         function ret = minus(self, arg)
+            if iscell(arg)
+                throwAsCaller(MException('DataJoint:invalidOperator',...
+                    'Antijoin only accepts single restrictions'))
+            end
             ret = init(dj.GeneralRelvar, self.operator, self.operands, ...
                 [self.restrictions {'not' arg}]);
         end
@@ -348,7 +357,7 @@ classdef GeneralRelvar < handle
             %
             % The result will return another relation with the same number of tuples
             % with modified attributes. Primary key attributes are included implicitly
-            % and cannot be excluded. Thus pro(rel) simply strips all non-key attrs.
+            % and cannot be excluded. Thus pro(rel) simply strips all non-key header.
             %
             % Project: To include an attribute, add its name to the attribute list.
             %
@@ -395,14 +404,9 @@ classdef GeneralRelvar < handle
                 params = varargin;
             end
             
-            % always include primary key in projection
-            pk = self.primaryKey;
-            params(ismember(params,pk))=[];
-            params = [pk params];
-            
-            if isempty(params) || ~iscellstr(params)
+            if ~iscellstr(params)
                 throwAsCaller(MException('DataJoint:invalidOperotor', ...
-                    'dj.GeneralRelvar/pro requires a list of strings as attribute specs'))
+                    'pro() requires a list of strings as attribute specs'))
             end
             
             ret = init(dj.GeneralRelvar, op, [{self} arg params]);
@@ -419,7 +423,7 @@ classdef GeneralRelvar < handle
             % in R1 and tuples in R2. Two tuples make a matching
             % combination if their commonly named attributes contain the
             % same values.
-            % Blobs and nullable attrs should not be joined on.
+            % Blobs and nullable header should not be joined on.
             % To prevent an attribute from being joined on, rename it using
             % dj.GeneralRelvar/pro's rename syntax.
             %
@@ -432,17 +436,30 @@ classdef GeneralRelvar < handle
         end
         
         
+        % prohibit obsolote operators 
         function ret = times(self, arg)
-            % alias for backward compatibility
-            ret = self & arg;
+            throwAsCaller(MException('DataJoint:invalidOperator',....
+                'dj.GeneralRelvar/times is no longer defined. For the relational semijoin, use the "&" operator'))
         end
         
         
         function ret = rdivide(self, arg)
-            %alias for backward compatibility
-            ret = self - arg;
+            throwAsCaller(MException('DataJoint:invalidOperator',....
+                'dj.GeneralRelvar/rdivide is no longer defined. For the relational antijoin, use the "-" operator'))
         end
-
+        
+        function length(self)
+            % prohibit the use of length() to avoid ambiguity 
+            throwAsCaller(MException('DataJoint:invalidOperator',....
+                'dj.GeneralRelvar/length is not defined Use count()'))
+        end
+        
+        function isempty(self)
+            % prohibit the use of isempty() tp avoid ambiguity 
+            throwAsCaller(MException('DataJoint:invalidOperator',....
+                'dj.GeneralRelvar/isempty is not defined. Use count()'))
+        end
+                
     end
     
     
@@ -450,6 +467,7 @@ classdef GeneralRelvar < handle
     
     
     methods(Access = private)
+        
         function schema = getSchema(self)
             schema = self.operands{1};
             if strcmp(self.operator, 'table')
@@ -460,18 +478,18 @@ classdef GeneralRelvar < handle
         end
             
             
-        function [attrs, sql] = compile(self)
+        function [header, sql] = compile(self)
             % compile the query tree into an SQL expression
             % OUTPUTS:
             %   sql =   "... [WHERE ...] [GROUP BY (...)]'
-            %   attrs = structure array with attribute properties
+            %   header = structure array with attribute properties
             
             persistent aliasCount
             
             if strcmp(self.operator, 'table')
                 % terminal node
                 r = self.operands{1};
-                attrs = r.attrs;
+                header = r.header;
                 sql = sprintf('`%s`.`%s`', r.schema.dbname, r.info.name);
             else               
                 if isempty(aliasCount)
@@ -482,21 +500,21 @@ classdef GeneralRelvar < handle
                 
                 % first operand
                 r = self.operands{1};
-                [attrs, sql] = r.compile;
+                [header, sql] = r.compile;
                 
                 % isolate previous projection (if not already)
                 if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions)
-                    [attrStr, attrs] = makeAttrList(attrs);
+                    [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
                 end
                 
                 % second operand (if dj.GeneralRelvar)
-                if isa(self.operands{2}, 'dj.GeneralRelvar')
+                if length(self.operands)>1 && isa(self.operands{2}, 'dj.GeneralRelvar')
                     r2 = self.operands{2};
-                    [attrs2, sql2] = r2.compile;
+                    [header2, sql2] = r2.compile;
                     % isolate previous projection (if not already)
                     if ismember(r2.operator, {'pro','aggregate'}) && isempty(r2.restrictions)
-                        [attrStr2, attrs2] = makeAttrList(attrs2);
+                        [attrStr2, header2] = makeAttrList(header2);
                         sql2 = sprintf('(SELECT %s FROM %s) AS `$b%x`', attrStr2, sql2, aliasCount);
                     end
                 end
@@ -504,23 +522,23 @@ classdef GeneralRelvar < handle
                 % apply relational operator
                 switch self.operator                    
                     case 'pro'
-                        attrs = compileAttrs(attrs, self.operands(2:end));
+                        header = projectHeader(header, self.operands(2:end));
                         
                     case 'aggregate'
-                        commonAttrs = intersect({attrs.name}, {attrs2.name});
+                        commonAttrs = intersect({header.name}, {header2.name});
                         commonAttrs = sprintf(',`%s`', commonAttrs{:});
                         sql = sprintf(...
                             '%s as `$r%x` NATURAL JOIN %s as `$q%x` GROUP BY (%s)', ...
                             sql, aliasCount, sql2, aliasCount, commonAttrs(2:end));
-                        attrs = compileAttrs(attrs, self.operands(3:end));
+                        header = projectHeader(header, self.operands(3:end));
                         
-                        if all(arrayfun(@(x) isempty(x.alias), attrs))
+                        if all(arrayfun(@(x) isempty(x.alias), header))
                             throw(MException('DataJoint:invalidRelation', ...
                                 'Aggregate opeators must define at least one computation'))
                         end
                         
                     case 'join'                       
-                        attrs = [attrs; attrs2(~ismember({attrs2.name}, {attrs.name}))];
+                        header = [header; header2(~ismember({header2.name}, {header.name}))];
                         sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
                         
                     otherwise
@@ -531,11 +549,11 @@ classdef GeneralRelvar < handle
             % apply restrictions
             if ~isempty(self.restrictions)
                 % clear aliases
-                if ~all(arrayfun(@(x) isempty(x.alias), attrs))
-                    [attrStr, attrs] = makeAttrList(attrs);
+                if ~all(arrayfun(@(x) isempty(x.alias), header))
+                    [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
                 end                
-                sql = sprintf('%s%s', sql, makeWhereClause(attrs, self.restrictions));
+                sql = sprintf('%s%s', sql, makeWhereClause(header, self.restrictions));
             end      
         end
     end
@@ -622,7 +640,7 @@ end
 
 
 
-function cond = struct2cond(keys, attrs)
+function cond = struct2cond(keys, header)
 % convert the structure array keys into an SQL condition
 if length(keys)>512
     warning('DataJoint:longCondition', ...
@@ -632,16 +650,16 @@ conds = cell(1,length(keys));
 for iKey= 1:length(keys)
     key = keys(iKey);
     keyFields = fieldnames(key)';
-    foundAttributes = ismember(keyFields, {attrs.name});
+    foundAttributes = ismember(keyFields, {header.name});
     word = '';
     cond = '';
     for field = keyFields(foundAttributes)
         value = key.(field{1});
         if ~isempty(value)
-            iField = find(strcmp(field{1}, {attrs.name}));
-            assert(~attrs(iField).isBlob,...
-                'The key must not include blob attrs.');
-            if attrs(iField).isString
+            iField = find(strcmp(field{1}, {header.name}));
+            assert(~header(iField).isBlob,...
+                'The key must not include blob header.');
+            if header(iField).isString
                 assert( ischar(value), ...
                     'Value for key.%s must be a string', field{1})
                 value=sprintf('"%s"',value);
@@ -651,7 +669,7 @@ for iKey= 1:length(keys)
                 value=sprintf('%1.16g',value);
             end
             cond = sprintf('%s%s`%s`=%s', ...
-                cond, word, attrs(iField).name, value);
+                cond, word, header(iField).name, value);
             word = ' AND';
         end
     end
@@ -682,11 +700,11 @@ end
 
 
 
-function attrs = compileAttrs(attrs, params)
+function header = projectHeader(header, params)
 % This is a helper function for dj.Revlar.pro.
-% Parse and validate the list of relation attributes in params.
+% Update the header based on a list of attributes
 
-include = false(length(attrs),1);  
+include = [header.iskey];  % always include the primary key  
 for iAttr=1:length(params)
     if strcmp('*',params{iAttr})
         include = include | true;   % include all attributes
@@ -695,22 +713,22 @@ for iAttr=1:length(params)
         toks = regexp(params{iAttr}, ...
             '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
         if ~isempty(toks)
-            ix = find(strcmp(toks{1}{1},{attrs.name}));
+            ix = find(strcmp(toks{1}{1},{header.name}));
             assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
-            if ismember(toks{1}{2},union({attrs.alias},{attrs.name}))
+            if ismember(toks{1}{2},union({header.alias},{header.name}))
                 throw(MException('DataJoint:invalidOperator',  ...
                     sprintf('Duplicate attribute alias `%s`',toks{1}{2})))
             end
-            attrs(ix).name = toks{1}{2};
-            attrs(ix).alias = toks{1}{1};
+            header(ix).name = toks{1}{2};
+            header(ix).alias = toks{1}{1};
         else
             % process a computed attribute
             toks = regexp(params{iAttr}, ...
                 '(.*\S)\s*->\s*(\w+)', 'tokens');
             if ~isempty(toks)
                 %add computed attribute
-                ix = length(attrs)+1;
-                attrs(ix) = struct(...
+                ix = length(header)+1;
+                header(ix) = struct(...
                     'table','', ...
                     'name', toks{1}{2}, ...
                     'iskey', false, ...
@@ -724,7 +742,7 @@ for iAttr=1:length(params)
                     'alias', toks{1}{1});
             else
                 % process a regular attribute
-                ix = find(strcmp(params{iAttr},{attrs.name}));
+                ix = find(strcmp(params{iAttr},{header.name}));
                 if isempty(ix)
                     throw(MException('DataJoint:invalidOperator', ...
                         sprintf('Attribute `%s` does not exist', params{iAttr})));
@@ -734,22 +752,22 @@ for iAttr=1:length(params)
         include(ix)=true;
     end
 end
-attrs = attrs(include);
+header = header(include);
 end
 
 
 
-function [str, attrs] = makeAttrList(attrs)
-    % make an SQL list of attributes for attrs, expanding aliases and strip
-    % aliases from attrs
+function [str, header] = makeAttrList(header)
+    % make an SQL list of attributes for header, expanding aliases and strip
+    % aliases from header
     str = '';
-    if ~isempty(attrs)
-        for i = 1:length(attrs)
-            if isempty(attrs(i).alias)
-                str = sprintf('%s,`%s`', str, attrs(i).name);
+    if ~isempty(header)
+        for i = 1:length(header)
+            if isempty(header(i).alias)
+                str = sprintf('%s,`%s`', str, header(i).name);
             else
-                str = sprintf('%s,(%s) AS `%s`', str, attrs(i).alias, attrs(i).name);
-                attrs(i).alias = '';
+                str = sprintf('%s,(%s) AS `%s`', str, header(i).alias, header(i).name);
+                header(i).alias = '';
             end
         end
         str = str(2:end);

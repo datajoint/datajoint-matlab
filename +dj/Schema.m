@@ -13,14 +13,13 @@ classdef Schema < handle
         loaded = false
         classNames    % classes corresponding to self.tables plus all referenced tables from other schemas.
         tables        % full list of tables
-        attrs         % full list of all table attrs
+        header        % full list of all table header
         tableLevels   % levels in dependency hiararchy
     end
     
     properties(Access=private)
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
-    
     
     methods
         
@@ -44,9 +43,9 @@ classdef Schema < handle
             val = self.tables;
         end
         
-        function val = get.attrs(self)
+        function val = get.header(self)
             self.reload(false)
-            val = self.attrs;
+            val = self.header;
         end
         
         function val = get.dependencies(self)
@@ -143,9 +142,7 @@ classdef Schema < handle
             % properties
             fprintf(f, '\n\n\tproperties(Constant)\n');
             fprintf(f, '\t\ttable = dj.Table(''%s.%s'')\n', self.package, className);
-            fprintf(f, '\tend\n');
             if isAuto && ~isSubtable
-                fprintf(f, '\tproperties\n');
                 fprintf(f, '\t\tpopRel');
                 for i = 1:length(parentIndices)
                     if i>1
@@ -156,8 +153,8 @@ classdef Schema < handle
                     fprintf(f, '%s', self.classNames{parentIndices(i)});
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
-                fprintf(f, '\tend\n');
             end
+            fprintf(f, '\tend\n');
             
             % constructor
             fprintf(f, '\n\tmethods\n');
@@ -393,7 +390,7 @@ classdef Schema < handle
             % read field information
             if ~isempty(self.tables)
                 fprintf('%.3g s\nloading field information... ', toc), tic
-                self.attrs = self.conn.query(sprintf([...
+                self.header = self.conn.query(sprintf([...
                     'SELECT table_name AS `table`, column_name as `name`,'...
                     '(column_key="PRI") AS `iskey`,column_type as `type`,'...
                     '(is_nullable="YES") AS isnullable, column_comment as `comment`,'...
@@ -401,25 +398,25 @@ classdef Schema < handle
                     ' AS `default` FROM information_schema.columns '...
                     'WHERE table_schema="%s"'],...
                     self.dbname));
-                self.attrs.isnullable = logical(self.attrs.isnullable);
-                self.attrs.iskey = logical(self.attrs.iskey);
-                self.attrs.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), ...
-                    '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.attrs.type);
-                self.attrs.isString = ~cellfun(@(x) isempty(regexp(char(x'), ...
-                    '^((var)?char|enum|date|time|timestamp)','once')), self.attrs.type);
-                self.attrs.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), ...
-                    '^(tiny|medium|long)?blob', 'once')), self.attrs.type);
+                self.header.isnullable = logical(self.header.isnullable);
+                self.header.iskey = logical(self.header.iskey);
+                self.header.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                    '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.header.type);
+                self.header.isString = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                    '^((var)?char|enum|date|time|timestamp)','once')), self.header.type);
+                self.header.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                    '^(tiny|medium|long)?blob', 'once')), self.header.type);
                 % strip field lengths off integer types
-                self.attrs.type = cellfun(@(x) regexprep(char(x'), ...
-                    '((tiny|long|small|)int)\(\d+\)','$1'), self.attrs.type, 'UniformOutput', false);
-                self.attrs.alias = repmat({''}, length(self.attrs.name),1);
-                self.attrs = dj.struct.fromFields(self.attrs);
-                self.attrs = self.attrs(ismember({self.attrs.table}, {self.tables.name}));
-                validFields = [self.attrs.isNumeric] | [self.attrs.isString] | [self.attrs.isBlob];
+                self.header.type = cellfun(@(x) regexprep(char(x'), ...
+                    '((tiny|long|small|)int)\(\d+\)','$1'), self.header.type, 'UniformOutput', false);
+                self.header.alias = repmat({''}, length(self.header.name),1);
+                self.header = dj.struct.fromFields(self.header);
+                self.header = self.header(ismember({self.header.table}, {self.tables.name}));
+                validFields = [self.header.isNumeric] | [self.header.isString] | [self.header.isBlob];
                 if ~all(validFields)
                     ix = find(~validFields, 1, 'first');
                     error('unsupported field type "%s" in %s.%s', ...
-                        self.attrs(ix).type, self.attrs.table(ix), self.attrs.name(ix));
+                        self.header(ix).type, self.header.table(ix), self.header.name(ix));
                 end
                 
                 % reload table dependencies

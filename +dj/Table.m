@@ -27,7 +27,7 @@ classdef (Sealed) Table < handle
     
     properties(Dependent, SetAccess = private)
         info     % name, tier, comment.  See self.Schema
-        attrs    % structure array describing attrs
+        header    % structure array describing header
     end
     
     properties(Constant)
@@ -70,8 +70,8 @@ classdef (Sealed) Table < handle
         end
         
         
-        function attrs = get.attrs(self)
-            attrs = self.schema.attrs(strcmp(self.info.name, {self.schema.attrs.table}));
+        function header = get.header(self)
+            header = self.schema.header(strcmp(self.info.name, {self.schema.header.table}));
         end
         
         
@@ -173,8 +173,8 @@ classdef (Sealed) Table < handle
             % to create the table using dj.Table.
             %
             % When the second input expandForeignKeys is true, then references
-            % to other tables are not displayed and foreign key attrs are shown
-            % as regular attrs.
+            % to other tables are not displayed and foreign key header are shown
+            % as regular header.
             %
             % See also dj.Table
             
@@ -190,55 +190,55 @@ classdef (Sealed) Table < handle
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
-            keyFields = {self.attrs([self.attrs.iskey]).name};
+            keyFields = {self.header([self.header.iskey]).name};
             
             if ~expandForeignKeys
                 % list parent references
                 for refClassName = self.schema.getParents(self.className, 1)
                     refObj = dj.Table(refClassName{1});
                     str = sprintf('%s\n-> %s',str, refClassName{1});
-                    excludeFields = {refObj.attrs([refObj.attrs.iskey]).name};
+                    excludeFields = {refObj.header([refObj.header.iskey]).name};
                     keyFields = keyFields(~ismember(keyFields, excludeFields));
                 end
             end
             
-            for i=find(ismember({self.attrs.name}, keyFields))
-                comment = self.attrs(i).comment;
+            for i=find(ismember({self.header.name}, keyFields))
+                comment = self.header(i).comment;
                 str = sprintf('%s\n%-40s# %s', str, ...
-                    sprintf('%-16s: %s', self.attrs(i).name, self.attrs(i).type), ...
+                    sprintf('%-16s: %s', self.header(i).name, self.header(i).type), ...
                     comment);
             end
             
             % dividing line
             str = sprintf('%s\n---', str);
             
-            dependentFields = {self.attrs(~[self.attrs.iskey]).name};
+            dependentFields = {self.header(~[self.header.iskey]).name};
             
             % list other references
             if ~expandForeignKeys
                 for refClassName = self.schema.getParents(self.className, 2)
                     refObj = dj.Table(refClassName{1});
                     str = sprintf('%s\n-> %s',str, refClassName{1});
-                    excludeFields = {refObj.attrs([refObj.attrs.iskey]).name};
+                    excludeFields = {refObj.header([refObj.header.iskey]).name};
                     dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
                 end
             end
             
-            % list remaining attrs
-            for i=find(ismember({self.attrs.name}, dependentFields))
-                if self.attrs(i).isnullable
+            % list remaining header
+            for i=find(ismember({self.header.name}, dependentFields))
+                if self.header(i).isnullable
                     default = '=null';
-                elseif strcmp(char(self.attrs(i).default(:)'), '<<<none>>>')
+                elseif strcmp(char(self.header(i).default(:)'), '<<<none>>>')
                     default = '';
-                elseif self.attrs(i).isNumeric || ...
-                        any(strcmp(self.attrs(i).default,self.mysql_constants))
-                    default = ['=' self.attrs(i).default];
+                elseif self.header(i).isNumeric || ...
+                        any(strcmp(self.header(i).default,self.mysql_constants))
+                    default = ['=' self.header(i).default];
                 else
-                    default = ['="' self.attrs(i).default '"'];
+                    default = ['="' self.header(i).default '"'];
                 end
-                comment = self.attrs(i).comment;
+                comment = self.header(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
-                    sprintf('%-28s: %s', [self.attrs(i).name default], self.attrs(i).type), ...
+                    sprintf('%-28s: %s', [self.header(i).name default], self.header(i).type), ...
                     comment);
             end
             str = sprintf('%s\n', str);
@@ -267,9 +267,10 @@ classdef (Sealed) Table < handle
             % dj.Table/alterTableComment - update the table comment
             % in the table declaration
             query(dj.conn, ...
-                sprintf('ALTER TABLE `%s`.`%s` COMMENT = "%s"', ...
+                sprintf('ALTER TABLE `%s`.`%s` COMMENT="%s"', ...
                 self.schema.dbname, self.info.name, newComment));
             disp 'table updated'
+            self.schema.reload
             self.syncDef
         end
         
@@ -452,41 +453,41 @@ classdef (Sealed) Table < handle
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
-            % add inherited primary key attrs
+            % add inherited primary key header
             primaryKeyFields = {};
             for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.table.attrs.iskey])
-                    field = parents{iRef}.table.attrs(iField);
+                for iField = find([parents{iRef}.table.header.iskey])
+                    field = parents{iRef}.table.header(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        assert(~field.isnullable, 'primary key attrs cannot be nullable')
+                        assert(~field.isnullable, 'primary key header cannot be nullable')
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
             end
             
-            % add the new primary key attrs
+            % add the new primary key header
             if ~isempty(fieldDefs)
                 for iField = find([fieldDefs.iskey])
                     field = fieldDefs(iField);
                     primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
                     assert(~strcmpi(field.default,'NULL'), ...
-                        'primary key attrs cannot be nullable')
+                        'primary key header cannot be nullable')
                     sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
             end
             
-            % add secondary foreign key attrs
+            % add secondary foreign key header
             for iRef = 1:length(references)
-                for iField = find([references{iRef}.table.attrs.iskey])
-                    field = references{iRef}.table.attrs(iField);
+                for iField = find([references{iRef}.table.header.iskey])
+                    field = references{iRef}.table.header(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
             end
             
-            % add dependent attrs
+            % add dependent header
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
@@ -545,11 +546,11 @@ end
 
 
 function sql = fieldToSQL(field)
-% convert the structure field with attrs {'name' 'type' 'default' 'comment'}
+% convert the structure field with header {'name' 'type' 'default' 'comment'}
 % to the SQL column declaration
 
 if strcmpi(field.default, 'NULL')
-    % all nullable attrs default to null
+    % all nullable header default to null
     field.default = 'DEFAULT NULL';
 else
     if strcmp(field.default,'<<<none>>>')
