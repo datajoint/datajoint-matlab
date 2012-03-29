@@ -25,7 +25,7 @@ classdef AutoPopulate < handle
         popRel  % specify the relation providing tuples for which makeTuples is called.
     end
     
-    methods(Abstract)        
+    methods(Abstract,Access=protected)        
         makeTuples(self, key)
         % makeTuples(self, key) must be defined by each automatically
         % populated relvar. makeTuples copies key as tuple, adds computed
