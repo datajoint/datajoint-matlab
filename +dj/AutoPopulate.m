@@ -125,7 +125,7 @@ classdef AutoPopulate < handle
                                     errors = [errors; err];         %#ok<AGROW>
                                 elseif ~numel(self.jobRel)
                                     % rethrow error only if it's not already returned or logged.
-                                    throwAsCaller(err)
+                                    rethrow(err)
                                 end
                             end
                         end

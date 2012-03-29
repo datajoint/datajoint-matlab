@@ -2,8 +2,11 @@
 % General relvars do not have a table associated with them. They
 % represent a relational expression based on other relvars.
 
-% pre-R2011: classdef GeneralRelvar < handle 
-classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
+% To make the code R2009 compatible, uncomment all lines commented as %pre-R2011
+% and comment off all lines that 
+
+% classdef GeneralRelvar < handle   %pre-R2011
+classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
 
     properties(Dependent, SetAccess = private)
         schema       % schema object
@@ -328,9 +331,19 @@ classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
             if ~iscell(arg)
                 arg = {arg};
             end
-            %pre-R2011: ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions arg])
+            % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions arg]) %pre-R2011
             ret = self.copy;  %post-R2011
             ret.restrictions = [ret.restrictions arg];  %post-R2011
+        end
+        
+        function ret = times(self, arg)
+            % alias for backward compatibility
+            ret = self & arg;
+        end
+        
+        function ret = rdivide(self, arg)
+            % alias for backward compatibility
+            ret = self - arg;
         end
         
         
@@ -339,7 +352,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
             end
-            %pre-R2011:  ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]);
+            % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]); %pre-R2011
             ret = self.copy;  %post-R2011
             self.restrictions = [self.restrictions {'not' arg}];  %post-R2011
         end
@@ -437,18 +450,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
             ret = init(dj.GeneralRelvar, 'join', {self arg});
         end
         
-        
-        % prohibit obsolote operators 
-        function ret = times(self, arg)
-            throwAsCaller(MException('DataJoint:invalidOperator',....
-                'dj.GeneralRelvar/times is no longer defined. For the relational semijoin, use the "&" operator'))
-        end
-        
-        
-        function ret = rdivide(self, arg)
-            throwAsCaller(MException('DataJoint:invalidOperator',....
-                'dj.GeneralRelvar/rdivide is no longer defined. For the relational antijoin, use the "-" operator'))
-        end
         
         function length(self)
             % prohibit the use of length() to avoid ambiguity 
