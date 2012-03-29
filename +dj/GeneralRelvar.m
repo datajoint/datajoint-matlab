@@ -1,9 +1,10 @@
-classdef GeneralRelvar < handle
-    % GeneralRelvar: a relational variable supporting relational operators.
-    % General relvars do not have a table associated with them. They
-    % represent a relational expression based on other relvars.
-    
-    
+% GeneralRelvar: a relational variable supporting relational operators.
+% General relvars do not have a table associated with them. They
+% represent a relational expression based on other relvars.
+
+% pre-R2011: classdef GeneralRelvar < handle 
+classdef GeneralRelvar < handle & matlab.mixin.Copyable  % post-R2011
+
     properties(Dependent, SetAccess = private)
         schema       % schema object
         header       % attributes and their properties
@@ -290,7 +291,6 @@ classdef GeneralRelvar < handle
         
    
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
-        
         function restrict(self, varargin)
             % dj.GeneralRelvar/restrict - relational restriction in place
             % Restrictions may be provided as separate arguments or a
@@ -328,7 +328,9 @@ classdef GeneralRelvar < handle
             if ~iscell(arg)
                 arg = {arg};
             end
-            ret = init(dj.GeneralRelvar, self.operator, self.operands, ...
+            %pre-R2011: obj = dj.GeneralRelvar
+            obj = self.copy;  %post-R2011
+            ret = init(obj, self.operator, self.operands, ...
                 [self.restrictions arg]);
         end
         
@@ -338,7 +340,9 @@ classdef GeneralRelvar < handle
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
             end
-            ret = init(dj.GeneralRelvar, self.operator, self.operands, ...
+            %pre-R2011: obj = dj.GeneralRelvar
+            obj = self.copy;  %post-R2011
+            ret = init(obj, self.operator, self.operands, ...
                 [self.restrictions {'not' arg}]);
         end
         

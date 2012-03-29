@@ -18,6 +18,7 @@ classdef Connection < handle
     end
     
     methods
+        
         function self=Connection(host, username, password, initQuery)
             % specify the connection to the database.
             % initQuery is the SQL query to be executed at the start
@@ -39,16 +40,6 @@ classdef Connection < handle
 
         
         
-        function reload(self)
-            % reload all schemas
-            schemaNames = struct2cell(self.packageDict);
-            for i=1:length(schemaNames)
-                reload(eval([schemaNames{i} '.getSchema']))
-            end
-        end
-        
-        
-        
         function name = getPackage(self, name, strict)
             % replaces the schema name with its package name iff necessary
             strict = nargin<3 || strict;
@@ -66,14 +57,29 @@ classdef Connection < handle
                 end
             end
         end
-                
+
         
+        
+        function reload(self)
+            % reload all schemas
+            schemaNames = struct2cell(self.packageDict);
+            for i=1:length(schemaNames)
+                reload(eval([schemaNames{i} '.getSchema']))
+            end
+        end
+        
+                
         
         function ret = get.isConnected(self)
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
-            assert(ret || ~self.inTransaction, ...
-                'Database connection was terminated during an ongoing transaction. Restart the processing.')
+            if ~ret && self.inTransaction
+                disp 'Database connection was terminated during an ongoing transaction.'
+                disp 'The first part of the transaction has been rolled back.'
+                disp 'Enter dbcont to continue with the rest of the rest of the transaction.'
+                disp 'Otherwise, enter dbquit and restart the processing.'
+                keyboard
+            end
         end
         
         
@@ -115,18 +121,19 @@ classdef Connection < handle
         
         
         function cancelTransaction(self)
-            self.query('ROLLBACK')
             self.inTransaction = false;
+            self.query('ROLLBACK')
         end
         
-        
+ 
         
         function close(self)
             if self.isConnected
                 fprintf('closing DataJoint connection #%d\n', self.connId)
                 mym(self.connId, 'close')
             end
-        end
+            self.inTransaction = false;
+        end        
         
     end
 end
