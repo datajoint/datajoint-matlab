@@ -3,7 +3,7 @@
 % represent a relational expression based on other relvars.
 
 % pre-R2011: classdef GeneralRelvar < handle 
-classdef GeneralRelvar < handle & matlab.mixin.Copyable  % post-R2011
+classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
 
     properties(Dependent, SetAccess = private)
         schema       % schema object
@@ -328,10 +328,9 @@ classdef GeneralRelvar < handle & matlab.mixin.Copyable  % post-R2011
             if ~iscell(arg)
                 arg = {arg};
             end
-            %pre-R2011: obj = dj.GeneralRelvar
-            obj = self.copy;  %post-R2011
-            ret = init(obj, self.operator, self.operands, ...
-                [self.restrictions arg]);
+            %pre-R2011: ret = init(dj.Relvar, self.operator, self.operands,[self.restrictions arg])
+            ret = self.copy;  %post-R2011
+            ret.restrictions = [ret.restrictions arg];  %post-R2011
         end
         
         
@@ -340,10 +339,9 @@ classdef GeneralRelvar < handle & matlab.mixin.Copyable  % post-R2011
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
             end
-            %pre-R2011: obj = dj.GeneralRelvar
-            obj = self.copy;  %post-R2011
-            ret = init(obj, self.operator, self.operands, ...
-                [self.restrictions {'not' arg}]);
+            %pre-R2011:  ret = init( dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]);
+            ret = self.copy;  %post-R2011
+            self.restrictions = [self.restrictions {'not' arg}];  %post-R2011
         end
         
         
