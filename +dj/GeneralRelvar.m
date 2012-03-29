@@ -68,7 +68,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
         
         function display(self, justify)
             % dj.GeneralRelvar/display - display the contents of the relation.
-            % Only non-blob header of the first several tuples are shown.
+            % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             tic
             justify = nargin==1 || justify;
@@ -328,7 +328,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
             if ~iscell(arg)
                 arg = {arg};
             end
-            %pre-R2011: ret = init(dj.Relvar, self.operator, self.operands,[self.restrictions arg])
+            %pre-R2011: ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions arg])
             ret = self.copy;  %post-R2011
             ret.restrictions = [ret.restrictions arg];  %post-R2011
         end
@@ -339,7 +339,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  % post-R2011
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
             end
-            %pre-R2011:  ret = init( dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]);
+            %pre-R2011:  ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]);
             ret = self.copy;  %post-R2011
             self.restrictions = [self.restrictions {'not' arg}];  %post-R2011
         end
