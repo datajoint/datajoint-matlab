@@ -334,6 +334,16 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions arg]) %pre-R2011
             ret = self.copy;  %post-R2011
             ret.restrictions = [ret.restrictions arg];  %post-R2011
+        end        
+        
+        function ret = minus(self, arg)
+            if iscell(arg)
+                throwAsCaller(MException('DataJoint:invalidOperator',...
+                    'Antijoin only accepts single restrictions'))
+            end
+            % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]); %pre-R2011
+            ret = self.copy;  %post-R2011
+            ret.restrictions = [ret.restrictions {'not' arg}];  %post-R2011
         end
         
         function ret = times(self, arg)
@@ -345,18 +355,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % alias for backward compatibility
             ret = self - arg;
         end
-        
-        
-        function ret = minus(self, arg)
-            if iscell(arg)
-                throwAsCaller(MException('DataJoint:invalidOperator',...
-                    'Antijoin only accepts single restrictions'))
-            end
-            % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]); %pre-R2011
-            ret = self.copy;  %post-R2011
-            self.restrictions = [self.restrictions {'not' arg}];  %post-R2011
-        end
-        
         
         function ret = pro(self, varargin)
             % dj.GeneralRelvar/pro - relational operators that modify the relvar's header:
