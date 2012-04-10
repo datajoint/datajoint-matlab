@@ -6,7 +6,12 @@ classdef Connection < handle
         initQuery    % initializing function or query executed for each new session
         inTransaction = false
         connId        % connection handle
-        packageDict = struct  % maps database schemas to matlab packages 
+        packageDict = struct  % maps database schemas to matlab packages
+    end
+    
+    properties(Access = public)
+        reconnectTransaction = true   % if true, reconnect to the server even within a transaction. 
+                                      % set false to guarantee transaction automicity
     end
     
     properties(Access = private)
@@ -32,12 +37,12 @@ classdef Connection < handle
             end
         end
         
-  
+        
         
         function addPackage(self, dbname, package)
             self.packageDict.(dbname) = package;
         end
-
+        
         
         
         function name = getPackage(self, name, strict)
@@ -57,7 +62,7 @@ classdef Connection < handle
                 end
             end
         end
-
+        
         
         
         function reload(self)
@@ -68,17 +73,17 @@ classdef Connection < handle
             end
         end
         
-                
+        
         
         function ret = get.isConnected(self)
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             if ~ret && self.inTransaction
-                disp 'Database connection was terminated during an ongoing transaction.'
-                disp 'The first part of the transaction has been rolled back.'
-                disp 'Enter dbcont to continue with the rest of the rest of the transaction.'
-                disp 'Otherwise, enter dbquit and restart the processing.'
-                keyboard
+                if self.reconnectTransaction
+                    warning('DataJoint:TransactionReconnect', 'reconnecting after server disconnected during a transaction')
+                else
+                    throwAsCaller(MException('DataJoint:TransactionReconnect', 'server disconnected during a transaction'))
+                end
             end
         end
         
@@ -125,7 +130,7 @@ classdef Connection < handle
             self.query('ROLLBACK')
         end
         
- 
+        
         
         function close(self)
             if self.isConnected
@@ -133,7 +138,7 @@ classdef Connection < handle
                 mym(self.connId, 'close')
             end
             self.inTransaction = false;
-        end        
+        end
         
     end
 end

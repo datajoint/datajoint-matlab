@@ -504,7 +504,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 [header, sql] = r.compile;
                 
                 % isolate previous projection (if not already)
-                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions)
+                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions) 
                     [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
                 end
@@ -549,8 +549,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             
             % apply restrictions
             if ~isempty(self.restrictions)
-                % clear aliases
-                if ~all(arrayfun(@(x) isempty(x.alias), header))
+                % clear aliases and enclose 
+                if ~all(arrayfun(@(x) isempty(x.alias), header)) || strcmp(self.operator, 'join')
                     [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
                 end                
@@ -591,7 +591,7 @@ for arg = restrictions
             % SQL condition
             clause = sprintf('%s %s %s(%s)', clause, word, not, cond);
             
-        case isstruct(cond)
+        case isstruct(cond) 
             % struct array
             clause = sprintf('%s %s %s(%s)', clause, word, not, ...
                 struct2cond(cond, selfAttrs));
