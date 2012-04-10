@@ -3,11 +3,11 @@
 % represent a relational expression based on other relvars.
 
 % To make the code R2009 compatible, uncomment all lines commented as %pre-R2011
-% and comment off all lines that 
+% and comment off all lines that
 
 % classdef GeneralRelvar < handle   %pre-R2011
 classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
-
+    
     properties(Dependent, SetAccess = private)
         schema       % schema object
         header       % attributes and their properties
@@ -39,7 +39,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         function header = get.header(self)
             header = self.compile();
         end
-                
+        
         function s = get.sql(self)
             [~, s] = self.compile();
         end
@@ -47,7 +47,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         function schema = get.schema(self)
             schema = self.getSchema();
         end
-                
+        
         function names = get.primaryKey(self)
             if isempty(self.header)
                 warning('DataJoint:emptyPrimaryKey', 'empty primary key?')
@@ -163,7 +163,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % GeneralRelvar/count - the number of tuples in the relation.
             n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s',self.sql));
             n=n.n;
-        end       
+        end
         
         
         function ret = fetch(self, varargin)
@@ -206,7 +206,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s', ...
                 makeAttrList(header), sql, limit));
             ret = dj.struct.fromFields(ret);
-        end 
+        end
         
         
         function varargout = fetch1(self, varargin)
@@ -252,7 +252,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = s.(name{1}{1});
             end
-        end        
+        end
         
         
         function varargout = fetchn(self, varargin)
@@ -292,7 +292,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
         end
         
-   
+        
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
         function restrict(self, varargin)
             % dj.GeneralRelvar/restrict - relational restriction in place
@@ -334,7 +334,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions arg]) %pre-R2011
             ret = self.copy;  %post-R2011
             ret.restrictions = [ret.restrictions arg];  %post-R2011
-        end        
+        end
         
         function ret = minus(self, arg)
             if iscell(arg)
@@ -450,17 +450,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         
         
         function length(self)
-            % prohibit the use of length() to avoid ambiguity 
+            % prohibit the use of length() to avoid ambiguity
             throwAsCaller(MException('DataJoint:invalidOperator',....
                 'dj.GeneralRelvar/length is not defined Use count()'))
         end
         
         function isempty(self)
-            % prohibit the use of isempty() tp avoid ambiguity 
+            % prohibit the use of isempty() tp avoid ambiguity
             throwAsCaller(MException('DataJoint:invalidOperator',....
                 'dj.GeneralRelvar/isempty is not defined. Use count()'))
         end
-                
+        
     end
     
     
@@ -477,8 +477,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 schema = schema.getSchema();
             end
         end
-            
-            
+        
+        
         function [header, sql] = compile(self)
             % compile the query tree into an SQL expression
             % OUTPUTS:
@@ -492,7 +492,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 r = self.operands{1};
                 header = r.header;
                 sql = sprintf('`%s`.`%s`', r.schema.dbname, r.info.name);
-            else               
+            else
                 if isempty(aliasCount)
                     aliasCount = 0;
                 else
@@ -504,7 +504,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 [header, sql] = r.compile;
                 
                 % isolate previous projection (if not already)
-                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions) 
+                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions) || ...
+                        ismember(self.operator, {'join'}) && ~isempty(r.restrictions)
                     [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
                 end
@@ -514,14 +515,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     r2 = self.operands{2};
                     [header2, sql2] = r2.compile;
                     % isolate previous projection (if not already)
-                    if ismember(r2.operator, {'pro','aggregate'}) && isempty(r2.restrictions)
+                    if ismember(r2.operator, {'pro','aggregate'}) && isempty(r2.restrictions) || ...
+                            ismember(self.operator, {'join'}) && ~isempty(r2.restrictions)
                         [attrStr2, header2] = makeAttrList(header2);
                         sql2 = sprintf('(SELECT %s FROM %s) AS `$b%x`', attrStr2, sql2, aliasCount);
                     end
                 end
                 
                 % apply relational operator
-                switch self.operator                    
+                switch self.operator
                     case 'pro'
                         header = projectHeader(header, self.operands(2:end));
                         
@@ -538,7 +540,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                                 'Aggregate opeators must define at least one computation'))
                         end
                         
-                    case 'join'                       
+                    case 'join'
                         header = [header; header2(~ismember({header2.name}, {header.name}))];
                         sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
                         
@@ -549,13 +551,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             
             % apply restrictions
             if ~isempty(self.restrictions)
-                % clear aliases and enclose 
-                if ~all(arrayfun(@(x) isempty(x.alias), header)) || strcmp(self.operator, 'join')
+                % clear aliases and enclose
+                if ~all(arrayfun(@(x) isempty(x.alias), header))
                     [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
-                end                
+                end
                 sql = sprintf('%s%s', sql, makeWhereClause(header, self.restrictions));
-            end      
+            end
         end
     end
 end
@@ -566,7 +568,7 @@ end
 function clause = makeWhereClause(selfAttrs, restrictions)
 % make the where clause from self.restrictions
 persistent aliasCount
-if isempty(aliasCount) 
+if isempty(aliasCount)
     aliasCount = 0;
 else
     aliasCount = aliasCount + 1;
@@ -591,7 +593,7 @@ for arg = restrictions
             % SQL condition
             clause = sprintf('%s %s %s(%s)', clause, word, not, cond);
             
-        case isstruct(cond) 
+        case isstruct(cond)
             % struct array
             clause = sprintf('%s %s %s(%s)', clause, word, not, ...
                 struct2cond(cond, selfAttrs));
@@ -628,7 +630,7 @@ for arg = restrictions
                 end
             else
                 % make semijoin or antijoin clause
-                commonAttrs = sprintf( ',`%s`', commonAttrs{:});     
+                commonAttrs = sprintf( ',`%s`', commonAttrs{:});
                 commonAttrs = commonAttrs(2:end);
                 clause = sprintf('%s %s ((%s) %sIN (SELECT %s FROM %s))',...
                     clause, word, commonAttrs, not, commonAttrs, condSQL);
@@ -705,7 +707,7 @@ function header = projectHeader(header, params)
 % This is a helper function for dj.Revlar.pro.
 % Update the header based on a list of attributes
 
-include = [header.iskey];  % always include the primary key  
+include = [header.iskey];  % always include the primary key
 for iAttr=1:length(params)
     if strcmp('*',params{iAttr})
         include = include | true;   % include all attributes
@@ -759,19 +761,19 @@ end
 
 
 function [str, header] = makeAttrList(header)
-    % make an SQL list of attributes for header, expanding aliases and strip
-    % aliases from header
-    str = '';
-    if ~isempty(header)
-        for i = 1:length(header)
-            if isempty(header(i).alias)
-                str = sprintf('%s,`%s`', str, header(i).name);
-            else
-                str = sprintf('%s,(%s) AS `%s`', str, header(i).alias, header(i).name);
-                header(i).alias = '';
-            end
+% make an SQL list of attributes for header, expanding aliases and strip
+% aliases from header
+str = '';
+if ~isempty(header)
+    for i = 1:length(header)
+        if isempty(header(i).alias)
+            str = sprintf('%s,`%s`', str, header(i).name);
+        else
+            str = sprintf('%s,(%s) AS `%s`', str, header(i).alias, header(i).name);
+            header(i).alias = '';
         end
-        str = str(2:end);
     end
+    str = str(2:end);
+end
 end
 
