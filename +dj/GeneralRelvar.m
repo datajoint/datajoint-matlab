@@ -2,8 +2,8 @@
 % General relvars do not have a table associated with them. They
 % represent a relational expression based on other relvars.
 
-% To make the code R2009 compatible, uncomment all lines commented as %pre-R2011
-% and comment off all lines that
+% To make the code R2009 compatible, uncomment all lines commented %pre-R2011
+% and comment off all lines commented %post-R2011
 
 % classdef GeneralRelvar < handle   %pre-R2011
 classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
