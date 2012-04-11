@@ -499,27 +499,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     aliasCount = aliasCount + 1;
                 end
                 
-                % first operand
-                r = self.operands{1};
-                [header, sql] = r.compile;
+                % recurse into first operand
+                [header, sql] = recurse(self.operands{1});
                 
-                % isolate previous projection (if not already)
-                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions) || ...
-                        ismember(self.operator, {'join'}) && ~isempty(r.restrictions)
-                    [attrStr, header] = makeAttrList(header);
-                    sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
-                end
-                
-                % second operand (if dj.GeneralRelvar)
                 if length(self.operands)>1 && isa(self.operands{2}, 'dj.GeneralRelvar')
-                    r2 = self.operands{2};
-                    [header2, sql2] = r2.compile;
-                    % isolate previous projection (if not already)
-                    if ismember(r2.operator, {'pro','aggregate'}) && isempty(r2.restrictions) || ...
-                            ismember(self.operator, {'join'}) && ~isempty(r2.restrictions)
-                        [attrStr2, header2] = makeAttrList(header2);
-                        sql2 = sprintf('(SELECT %s FROM %s) AS `$b%x`', attrStr2, sql2, aliasCount);
-                    end
+                    % recurse into second operand
+                    aliasCount = aliasCount + 1;
+                    [header2, sql2] = recurse(self.operands{2});
                 end
                 
                 % apply relational operator
@@ -558,6 +544,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 end
                 sql = sprintf('%s%s', sql, makeWhereClause(header, self.restrictions));
             end
+            
+            function [header, sql] = recurse(r)
+                [header, sql] = r.compile;
+                % isolate previous projection (if not already)
+                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions) || ...
+                        ismember(self.operator, {'join'}) && ~isempty(r.restrictions)
+                    [attrStr, header] = makeAttrList(header);
+                    sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
+                end
+            end
+            
         end
     end
 end

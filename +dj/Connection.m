@@ -9,7 +9,7 @@ classdef Connection < handle
         packageDict = struct  % maps database schemas to matlab packages
     end
     
-    properties(Access = public)
+    properties
         reconnectTransaction = true   % if true, reconnect to the server even within a transaction. 
                                       % set false to guarantee transaction automicity
     end
