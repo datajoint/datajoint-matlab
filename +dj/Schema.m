@@ -13,7 +13,7 @@ classdef Schema < handle
         loaded = false
         classNames    % classes corresponding to self.tables plus all referenced tables from other schemas.
         tables        % full list of tables
-        header        % full list of all table header
+        header        % full list of all table attributes
         tableLevels   % levels in dependency hiararchy
     end
     
@@ -32,11 +32,11 @@ classdef Schema < handle
             addPackage(self.conn, dbname, package)
         end
         
-            
+        
         function val = get.classNames(self)
             self.reload(false)
             val = self.classNames;
-        end 
+        end
         
         function val = get.tables(self)
             self.reload(false)
@@ -56,7 +56,7 @@ classdef Schema < handle
         function val = get.tableLevels(self)
             self.reload(false)
             val = self.tableLevels;
-        end        
+        end
         
         
         function makeClass(self, className)
@@ -164,6 +164,10 @@ classdef Schema < handle
             
             % metod makeTuples
             if isAuto
+                if ~isSubtable
+                    fprintf(f, '\tend\n');
+                    fprintf(f, '\n\tmethods(Access=protected)\n');
+                end
                 fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
@@ -182,7 +186,7 @@ classdef Schema < handle
             % INPUTS:
             %    subset -- a string array of classNames to include in the diagram
             
-            % copy relevant information 
+            % copy relevant information
             C = self.dependencies;
             levels = -self.tableLevels;
             names = self.classNames;
@@ -269,18 +273,18 @@ classdef Schema < handle
             for i=1:length(levels)
                 name = names{i};
                 isExternal = ~strncmp(name, self.package, length(self.package));
-
+                
                 edgeColor = [0.3 0.3 0.3];
                 fontSize = 9;
                 if isExternal
                     name = getPackage(self.conn, name, false);
                 else
-                    try 
+                    try
                         if isSubtable(eval(name))
                             name = [name '*'];  %#ok:AGROW
                         end
-                    catch %#ok 
-                    end  
+                    catch %#ok
+                    end
                     name = name(length(self.package)+2:end);  %remove package name
                     edgeColor = 'none';
                     fontSize = 11;
@@ -348,7 +352,7 @@ classdef Schema < handle
                 save(filename, 'contents')
                 fprintf 'done\n'
             end
-        end        
+        end
         
         
         function reload(self, force)
@@ -364,26 +368,22 @@ classdef Schema < handle
             fprintf('loading table definitions from %s... ', self.dbname)
             tic
             self.tables = self.conn.query(sprintf([...
-                'SELECT table_name AS name, table_comment AS comment ', ...
-                'FROM information_schema.tables WHERE table_schema="%s"'], ...
+                'SELECT table_name AS name, table_comment AS comment ' ...
+                'FROM information_schema.tables ' ...
+                'WHERE table_schema="%s" AND table_name REGEXP "^(__|_|#)?[a-z][a-z0-9_]*$"'], ...
                 self.dbname));
             
             % determine table tier (see dj.Table)
-            re = [cellfun(@(x) ...
-                sprintf('^%s[a-z]\\w+$',x), dj.utils.tierPrefixes, ...
-                'UniformOutput', false) ...
-                {'.*'}];  % regular expressions to determine table tier
+            re = cellfun(@(x) sprintf('^%s[a-z][a-z0-9_]*$',x), ...
+                dj.utils.tierPrefixes, 'UniformOutput', false); % regular expressions to determine table tier
             tierIdx = cellfun(@(x) ...
                 find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
                 self.tables.name);
-            self.tables.tier = dj.utils.allowedTiers(min(tierIdx,end))';
+            self.tables.tier = dj.utils.allowedTiers(tierIdx)';
             
-            % exclude tables that do not match the naming conventions
-            validTables = tierIdx < length(re);  % matched table name pattern
             self.tables.comment = cellfun(@(x) strtok(x,'$'), ...
                 self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
             self.tables = dj.struct.fromFields(self.tables);
-            self.tables = self.tables(validTables);
             self.classNames = cellfun(@(x) makeClassName(self.dbname, x), ...
                 {self.tables.name}, 'UniformOutput', false);
             
@@ -422,17 +422,19 @@ classdef Schema < handle
                 % reload table dependencies
                 fprintf('%.3g s\nloading table dependencies... ', toc), tic
                 foreignKeys = dj.struct.fromFields(self.conn.query(sprintf([...
-                    'SELECT '...
+                    'SELECT'...
                     '  table_schema AS from_schema,'...
                     '  table_name AS from_table,'...
                     '  referenced_table_schema AS to_schema,'...
-                    '  referenced_table_name  AS to_table,'...
+                    '  referenced_table_name  AS to_table, '...
                     '  min((table_schema, table_name, column_name) in'...
                     '    (SELECT table_schema, table_name, column_name'...
                     '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
                     'FROM information_schema.key_column_usage '...
-                    'WHERE table_schema="%s" AND referenced_table_schema is not null'...
-                    '   OR referenced_table_schema="%s" '...
+                    'WHERE (table_schema="%s" AND referenced_table_schema is not null'...
+                    '   OR referenced_table_schema="%s") '...
+                    '  AND table_name REGEXP "^(__|_|#)?[a-z][a-z0-9_]*$"'...
+                    '  AND referenced_table_name REGEXP "^(__|_|#)?[a-z][a-z0-9_]*$" '...
                     'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
                     self.dbname, self.dbname)));
                 
@@ -445,8 +447,8 @@ classdef Schema < handle
                 ixFrom = cellfun(@(x) find(strcmp(x, self.classNames)), fromClassNames);
                 ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
                 nTables = length(self.classNames);
-                self.dependencies = sparse(ixFrom, ixTo, ...
-                    2-[foreignKeys.hierarchical], nTables, nTables);
+                
+                self.dependencies = sparse(ixFrom, ixTo, 2-[foreignKeys.hierarchical], nTables, nTables);
                 
                 % determine tables' hierarchical level
                 K = self.dependencies;
@@ -474,7 +476,7 @@ classdef Schema < handle
                 
                 self.tableLevels = levels;
             end
-                        
+            
             
             function str = makeClassName(db,tab)
                 if strcmp(db,self.dbname)
@@ -486,7 +488,7 @@ classdef Schema < handle
             end
         end
         
-
+        
         function names = getParents(self, className, hierarchy, crossSchemas)
             % retrieve the class names of the parents of given table classes
             if nargin<3
@@ -496,7 +498,7 @@ classdef Schema < handle
             names = self.getRelatives(className, true, hierarchy, crossSchemas);
         end
         
- 
+        
         function names = getChildren(self, className, hierarchy, crossSchemas)
             % retrieve the class names of the parents of given table classes
             if nargin<3
@@ -505,9 +507,9 @@ classdef Schema < handle
             crossSchemas = nargin>=4 && crossSchemas;
             names = self.getRelatives(className, false, hierarchy, crossSchemas);
         end
-
         
-        function names = getRelatives(self, className, up, hierarchy, crossSchemas)       
+        
+        function names = getRelatives(self, className, up, hierarchy, crossSchemas)
             names = {};
             if ~isempty(className)
                 if ischar(className)
@@ -542,8 +544,5 @@ classdef Schema < handle
                 end
             end
         end
-        
-
-
     end
 end

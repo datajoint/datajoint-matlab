@@ -26,7 +26,7 @@ classdef (Sealed) Table < handle
     end
     
     properties(Dependent, SetAccess = private)
-        info     % name, tier, comment.  See self.Schema
+        info     % name, tier, comment.  See dj.Schema
         header    % structure array describing header
     end
     
@@ -253,7 +253,7 @@ classdef (Sealed) Table < handle
             % optimizes the table if it has become fragmented after repeated inserts and deletes.
             % See http://dev.mysql.com/doc/refman/5.6/en/optimize-table.html
             fprintf 'optimizing ...'
-            status = query(dj.conn, sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
+            status = self.schema.conn.query(sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
                 self.schema.dbname, self.info.name));
             disp(status.Msg_text{end})
         end
@@ -266,7 +266,7 @@ classdef (Sealed) Table < handle
         function alterTableComment(self, newComment)
             % dj.Table/alterTableComment - update the table comment
             % in the table declaration
-            query(dj.conn, ...
+            self.schema.conn.query(...
                 sprintf('ALTER TABLE `%s`.`%s` COMMENT="%s"', ...
                 self.schema.dbname, self.info.name, newComment));
             disp 'table updated'
@@ -278,7 +278,7 @@ classdef (Sealed) Table < handle
             sql = fieldToSQL(parseAttrDef(definition, false));
             sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN %s', ...
                 self.schema.dbname, self.info.name, sql(1:end-2));
-            query(dj.conn, sql)
+            self.schema.conn.query(sql)
             disp 'table updated'
             self.schema.reload
             self.syncDef
@@ -287,7 +287,7 @@ classdef (Sealed) Table < handle
         function dropAttribute(self, attrName)
             sql = sprintf('ALTER TABLE `%s`.`%s` DROP COLUMN %s', ...
                 self.schema.dbname, self.info.name, attrName);
-            query(dj.conn, sql)
+            self.schema.conn.query(sql)
             disp 'table updated'
             self.schema.reload
             self.syncDef
@@ -297,7 +297,7 @@ classdef (Sealed) Table < handle
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
             sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN %s %s', ...
                 self.schema.dbname, self.info.name, attrName, sql(1:end-2));
-            query(dj.conn, sql)
+            self.schema.conn.query(sql)
             disp 'table updated'
             self.schema.reload
             self.syncDef
@@ -392,7 +392,7 @@ classdef (Sealed) Table < handle
             fprintf 'ABOUT TO DROP TABLES: \n'
             counts = zeros(size(names));
             for iTable = 1:length(names)
-                n = query(dj.conn, sprintf('SELECT count(*) as n FROM %s', ...
+                n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', ...
                     names{iTable}));
                 counts(iTable) = n.n;
                 fprintf('%s... %d tuples \n', names{iTable}, n.n)
@@ -407,7 +407,7 @@ classdef (Sealed) Table < handle
             else
                 try
                     for iTable = length(names):-1:1
-                        query(dj.conn, sprintf('DROP TABLE %s', names{iTable}))
+                        self.schema.conn.query(sprintf('DROP TABLE %s', names{iTable}))
                         fprintf('Dropped table %s\n', names{iTable})
                     end
                 catch err
@@ -528,7 +528,7 @@ classdef (Sealed) Table < handle
             
             % execute declaration
             if nargout==0
-                query(dj.conn, sql);
+                self.schema.conn.query(sql);
             end
             self.schema.reload
         end

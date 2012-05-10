@@ -11,8 +11,14 @@ classdef BaseRelvar < dj.GeneralRelvar
     
     methods
         function self = init(self, table)
-            assert(isa(table, 'dj.Table'))
-            init@dj.GeneralRelvar(self, 'table', {table});
+            switch true
+                case isa(table, 'dj.Table')
+                    init@dj.GeneralRelvar(self, 'table', {table});
+                case isa(table, 'dj.BaseRelvar')
+                    init@dj.GeneralRelvar(self, 'table', {table.tab}, table.restrictions);
+                otherwise
+                    throwAsCaller(MException('BaseRelvar requires a dj.Table object'))
+            end
         end
         
         

@@ -2,10 +2,8 @@
 % General relvars do not have a table associated with them. They
 % represent a relational expression based on other relvars.
 
-% To make the code R2009 compatible, uncomment all lines commented %pre-R2011
-% and comment off all lines commented %post-R2011
-
-% classdef GeneralRelvar < handle   %pre-R2011
+% To make the code R2009 compatible, toggle comments on the following two lines  
+%classdef GeneralRelvar < dj.R2009CopyableRelvarMixin  % pre-R2011
 classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
     
     properties(Dependent, SetAccess = private)
@@ -120,8 +118,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         function view(self)
             % dj.Relvar/view - view the data in speadsheet form
             
-            if ~count(self)
-                disp('empty relation')
+            if ~self.count
+                disp 'empty relation'
             else
                 columns = {self.header.name};
                 
@@ -161,7 +159,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         
         function n = count(self)
             % GeneralRelvar/count - the number of tuples in the relation.
-            n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s',self.sql));
+            [~, sql] = self.compile(3);
+            n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
             n=n.n;
         end
         
@@ -331,9 +330,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             if ~iscell(arg)
                 arg = {arg};
             end
-            % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions arg]) %pre-R2011
-            ret = self.copy;  %post-R2011
-            ret.restrictions = [ret.restrictions arg];  %post-R2011
+            ret = self.copy; 
+            ret.restrictions = [ret.restrictions arg];  
         end
         
         function ret = minus(self, arg)
@@ -341,9 +339,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
             end
-            % ret = init(dj.GeneralRelvar, self.operator, self.operands, [self.restrictions {'not' arg}]); %pre-R2011
-            ret = self.copy;  %post-R2011
-            ret.restrictions = [ret.restrictions {'not' arg}];  %post-R2011
+            ret = self.copy;  
+            ret.restrictions = [ret.restrictions {'not' arg}]; 
         end
         
         function ret = times(self, arg)
@@ -423,8 +420,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
             
             ret = init(dj.GeneralRelvar, op, [{self} arg params]);
-        end
-        
+        end        
         
         function ret = mtimes(self, arg)
             % dj.GeneralRelvar/mtimes - relational natural join.
@@ -447,7 +443,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
             ret = init(dj.GeneralRelvar, 'join', {self arg});
         end
-        
         
         function length(self)
             % prohibit the use of length() to avoid ambiguity
@@ -479,86 +474,98 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         end
         
         
-        function [header, sql] = compile(self)
+        function [header, sql] = compile(self, enclose)
             % compile the query tree into an SQL expression
             % OUTPUTS:
             %   sql =   "... [WHERE ...] [GROUP BY (...)]'
             %   header = structure array with attribute properties
+            %
+            % The input argument enclose controls whether the statement
+            % must be enclosed in parentheses: 
+            %   0 - don't enclose
+            %   1 - enclose only if some attributes are aliased
+            %   2 - enclose if anything but a simple table
+            %   3 - enclose if is an aggregate (has a GROUP BY clause)
+            % Of course, we could simply always inclose subexpressions in
+            % parentheses, but we try to keep SQL expressions as simple as
+            % possible.
             
             persistent aliasCount
-            
-            if strcmp(self.operator, 'table')
-                % terminal node
-                r = self.operands{1};
-                header = r.header;
-                sql = sprintf('`%s`.`%s`', r.schema.dbname, r.info.name);
-            else
-                if isempty(aliasCount)
-                    aliasCount = 0;
-                else
-                    aliasCount = aliasCount + 1;
-                end
-                
-                % recurse into first operand
-                [header, sql] = recurse(self.operands{1});
-                
-                if length(self.operands)>1 && isa(self.operands{2}, 'dj.GeneralRelvar')
-                    % recurse into second operand
-                    aliasCount = aliasCount + 1;
-                    [header2, sql2] = recurse(self.operands{2});
-                end
-                
-                % apply relational operator
-                switch self.operator
-                    case 'pro'
-                        header = projectHeader(header, self.operands(2:end));
-                        
-                    case 'aggregate'
-                        commonAttrs = intersect({header.name}, {header2.name});
-                        commonAttrs = sprintf(',`%s`', commonAttrs{:});
-                        sql = sprintf(...
-                            '%s as `$r%x` NATURAL JOIN %s as `$q%x` GROUP BY (%s)', ...
-                            sql, aliasCount, sql2, aliasCount, commonAttrs(2:end));
-                        header = projectHeader(header, self.operands(3:end));
-                        
-                        if all(arrayfun(@(x) isempty(x.alias), header))
-                            throw(MException('DataJoint:invalidRelation', ...
-                                'Aggregate opeators must define at least one computation'))
-                        end
-                        
-                    case 'join'
-                        header = [header; header2(~ismember({header2.name}, {header.name}))];
-                        sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
-                        
-                    otherwise
-                        error 'unknown operator'
-                end
+            if isempty(aliasCount)
+                aliasCount = 0;
             end
+            aliasCount = aliasCount + 1;
+            if nargin<2
+                enclose = 0;
+            end
+                        
+            % apply relational operators recursively
+            switch self.operator
+                case 'table'  % terminal node
+                    r = self.operands{1};
+                    header = r.header;
+                    sql = sprintf('`%s`.`%s`', r.schema.dbname, r.info.name);
+                    
+                case 'pro'
+                    [header, sql] = compile(self.operands{1},1);
+                    header = projectHeader(header, self.operands(2:end));
+                    
+                case 'aggregate'
+                    [header, sql] = compile(self.operands{1},2);
+                    [header2, sql2] = compile(self.operands{2},2);
+                    commonIllegal = intersect(...
+                        {header([header.isBlob]).name}, ...
+                        {header2([header2.isBlob]).name});
+                    if ~isempty(commonIllegal)
+                        throwAsCaller(MException('DataJoint:illegalOperator', ...
+                            'join cannot be done on blob attributes'))
+                    end
+                    commonAttrs = intersect({header.name}, {header2.name});
+                    commonAttrs = sprintf(',`%s`', commonAttrs{:});
+                    sql = sprintf(...
+                        '%s NATURAL JOIN %s GROUP BY %s', ...
+                        sql, sql2, commonAttrs(2:end));
+                    header = projectHeader(header, self.operands(3:end));
+                    
+                    if all(arrayfun(@(x) isempty(x.alias), header))
+                        throw(MException('DataJoint:invalidRelation', ...
+                            'Aggregate opeators must define at least one computation'))
+                    end
+                    
+                case 'join'
+                    [header, sql] = compile(self.operands{1},2);
+                    [header2, sql2] = compile(self.operands{2},2);
+                    header = [header; header2(~ismember({header2.name}, {header.name}))];
+                    sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
+                    
+                otherwise
+                    error 'unknown operator'
+            end 
+            
+            haveAliasedAttrs = ~all(arrayfun(@(x) isempty(x.alias), header));
             
             % apply restrictions
             if ~isempty(self.restrictions)
-                % clear aliases and enclose
-                if ~all(arrayfun(@(x) isempty(x.alias), header))
+                % clear aliases and enclose 
+                if haveAliasedAttrs
                     [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
+                    haveAliasedAttrs = false;
                 end
+                % add WHERE clause
                 sql = sprintf('%s%s', sql, makeWhereClause(header, self.restrictions));
             end
             
-            function [header, sql] = recurse(r)
-                [header, sql] = r.compile;
-                % isolate previous projection (if not already)
-                if ismember(r.operator, {'pro','aggregate'}) && isempty(r.restrictions) || ...
-                        ismember(self.operator, {'join'}) && ~isempty(r.restrictions)
-                    [attrStr, header] = makeAttrList(header);
-                    sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
-                end
-            end
-            
+            % enclose in parentheses if necessary
+            if enclose==1 && haveAliasedAttrs ...
+                    || enclose==2 && (~strcmp(self.operator,'table') || ~isempty(self.restrictions)) ...
+                    || enclose==3 && strcmp(self.operator, 'aggregate')  
+                [attrStr, header] = makeAttrList(header);
+                sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
+            end                 
         end
     end
 end
-
 
 
 
@@ -604,18 +611,11 @@ for arg = restrictions
                 [attrStr, condAttrs] = makeAttrList(condAttrs);
                 condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', attrStr, condSQL, aliasCount);
             end
-            
-            commonIllegal = intersect( ...
-                {selfAttrs([selfAttrs.isnullable] | [selfAttrs.isBlob]).name},...
-                {condAttrs([condAttrs.isnullable] | [condAttrs.isBlob]).name});
-            
-            if ~isempty(commonIllegal)
-                throw(MException('DataJoint:illegalOperator', ...
-                    sprintf('cannot join on blob or nullable field `%s`', ...
-                    commonIllegal{1})))
-            end
-            
-            commonAttrs = intersect({selfAttrs.name}, {condAttrs.name});
+                        
+            % common attributes for matching. Blobs are not included 
+            commonAttrs = intersect(...
+                {selfAttrs(~[selfAttrs.isBlob]).name}, ...
+                {condAttrs(~[condAttrs.isBlob]).name});
             if isempty(commonAttrs)
                 if ~isempty(not)
                     warning('DataJoint:suspiciousRelation', ...

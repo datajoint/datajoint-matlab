@@ -98,7 +98,7 @@ classdef(Sealed) utils
         
         
         
-        % DEPRECATED FUNCTIONS        
+        % DEPRECATED FUNCTIONS - may still be used by legacy code    
         function s = structure2array(s)
             warning('DataJoint:deprecated',...
                 'dj.utils.structure2array will be removed in an upcoming revision. Use dj.struct.fromFields instead')
