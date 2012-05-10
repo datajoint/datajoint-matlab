@@ -121,13 +121,18 @@ classdef Schema < handle
             else
                 fprintf(f, '%%{\n');
                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
-                if ~isempty(self.classNames)
-                    [sortedClassNames, order] = sort(self.classNames);
+                schemaList = struct2cell(self.conn.packageDict);
+                parentSelection = {};
+                for iSchema=1:length(schemaList)
+                    schema = eval([schemaList{iSchema} '.getSchema']);
+                    parentSelection = [parentSelection schema.classNames(~strncmp(schema.classNames,'$',1))]; %#ok<AGROW>
+                end
+                if ~isempty(parentSelection)
+                    parentSelection = sort(parentSelection);
                     disp 'Selecting parent table(s)'
-                    parentIndices = order(...
-                        listdlg('ListString',sortedClassNames,'PromptString','Select parent table(s)'));
-                    for i = parentIndices
-                        fprintf(f, '-> %s\n', self.classNames{i});
+                    parentIndices = listdlg('ListString',parentSelection,'PromptString','Select parent table(s)');
+                    if ~isempty(parentIndices)
+                        fprintf(f, '-> %s\n', parentSelection{parentIndices});
                     end
                 end
                 fprintf(f, '\n-----\n\n');
