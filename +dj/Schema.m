@@ -155,7 +155,7 @@ classdef Schema < handle
                     else
                         fprintf(f, ' = ');
                     end
-                    fprintf(f, '%s', self.classNames{parentIndices(i)});
+                    fprintf(f, '%s', parentSelection{parentIndices(i)});
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
             end
