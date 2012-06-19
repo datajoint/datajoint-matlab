@@ -195,8 +195,8 @@ classdef (Sealed) Table < handle
             if ~expandForeignKeys
                 % list parent references
                 for refClassName = self.schema.getParents(self.className, 1)
-                    refObj = dj.Table(refClassName{1});
-                    str = sprintf('%s\n-> %s',str, refClassName{1});
+                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                    str = sprintf('%s\n-> %s',str, refObj.className);
                     excludeFields = {refObj.header([refObj.header.iskey]).name};
                     keyFields = keyFields(~ismember(keyFields, excludeFields));
                 end
@@ -217,8 +217,8 @@ classdef (Sealed) Table < handle
             % list other references
             if ~expandForeignKeys
                 for refClassName = self.schema.getParents(self.className, 2)
-                    refObj = dj.Table(refClassName{1});
-                    str = sprintf('%s\n-> %s',str, refClassName{1});
+                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                    str = sprintf('%s\n-> %s',str, refObj.className);
                     excludeFields = {refObj.header([refObj.header.iskey]).name};
                     dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
                 end

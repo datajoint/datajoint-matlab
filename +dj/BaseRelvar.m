@@ -101,7 +101,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                             fprintf('Deleting %d tuples from %s... ', ...
                                 counts(iRel), rels{iRel}.tab.className)
                             self.schema.conn.query(sprintf('DELETE FROM `%s`.`%s`%s', ...
-                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, self.whereClause))
+                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, rels{iRel}.whereClause))
                             fprintf 'done (not committed)\n'
                         end
                         self.schema.conn.commitTransaction
