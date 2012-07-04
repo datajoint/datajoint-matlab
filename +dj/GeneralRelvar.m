@@ -343,6 +343,36 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             ret.restrictions = [ret.restrictions {'not' arg}]; 
         end
         
+        function ret = plus(self, arg)
+            % the relational union operator. 
+            % 
+            % arg can be another relvar, a string condition, or a structure array of tuples.
+            %
+            % The result will be a special kind of relvar that can only be used 
+            % as an argument in another restriction operator. It cannot be 
+            % queried on its own. 
+            %
+            % For example:
+            %   B + C   cannot be used on its own, but:
+            %   A & (B + C) returns all tuples in A that have matching tuples in B or C.
+            %   A - (B + C) returns all tuples in A that have no matching tuples in B or C.
+            
+            if ~strcmp(self.operator, 'union')
+                operandList = {self};
+            else
+                operandList = self.operands;
+            end
+            
+            % expand recursive unions
+            if ~isa(arg, 'dj.GeneralRelvar') || ~strcmp(arg.operator, 'union')
+                operandList = [operandList {arg}];
+            else
+                operandList = [operandList arg.operands];
+            end
+            ret = init(dj.GeneralRelvar, 'union', operandList);
+        end
+                
+        
         function ret = times(self, arg)
             % alias for backward compatibility
             ret = self & arg;
@@ -437,7 +467,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % dj.GeneralRelvar/pro's rename syntax.
             %
             % See also dj.GeneralRelvar/pro, dj.GeneralRelvar/fetch
-            if nargin<=1 || ~isa(arg, 'dj.GeneralRelvar')
+            if ~isa(arg, 'dj.GeneralRelvar')
                 throwAsCaller(MException('DataJoint:invalidOperotor', ...
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
             end
@@ -501,6 +531,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                         
             % apply relational operators recursively
             switch self.operator
+                case 'union'
+                    throwAsCaller(MException('DataJoint:invalidOperator', ...
+                    'The union operator must be used in a restriction'))
+                
                 case 'table'  % terminal node
                     r = self.operands{1};
                     header = r.header;
@@ -517,7 +551,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                         {header([header.isBlob]).name}, ...
                         {header2([header2.isBlob]).name});
                     if ~isempty(commonIllegal)
-                        throwAsCaller(MException('DataJoint:illegalOperator', ...
+                        throwAsCaller(MException('DataJoint:invalidOperator', ...
                             'join cannot be done on blob attributes'))
                     end
                     commonAttrs = intersect({header.name}, {header2.name});
@@ -539,7 +573,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
                     
                 otherwise
-                    error 'unknown operator'
+                    error 'unknown relational operator'
             end 
             
             haveAliasedAttrs = ~all(arrayfun(@(x) isempty(x.alias), header));
@@ -582,12 +616,21 @@ assert(all(arrayfun(@(x) isempty(x.alias), selfAttrs)), ...
     'aliases must be resolved before restriction')
 
 clause = '';
-word = ' WHERE';
+word = 'WHERE';
 not = '';
+
+stripWhere = @(s) s(7:end);
 
 for arg = restrictions
     cond = arg{1};
     switch true
+        case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
+            % union
+            s = cellfun(@(x) stripWhere(makeWhereClause(selfAttrs, {x})), cond.operands, 'UniformOutput', false);  
+            assert(~isempty(s));
+            s = sprintf('(%s) OR ', s{:});
+            clause = sprintf('%s %s %s(%s)', clause, word, not, s(1:end-4));
+        
         case ischar(cond) && strcmpi(cond,'NOT')
             % negation of the next condition
             not = 'NOT ';
