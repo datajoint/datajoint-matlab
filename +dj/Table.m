@@ -79,6 +79,7 @@ classdef (Sealed) Table < handle
             name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
         end
         
+        
         function display(self)
             display@handle(self)
             disp(self.re(true))

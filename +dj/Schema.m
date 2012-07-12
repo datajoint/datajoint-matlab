@@ -350,12 +350,54 @@ classdef Schema < handle
             for iTable = ix(:)'
                 contents = self.conn.query(sprintf('SELECT * FROM `%s`.`%s`', ...
                     self.dbname, self.tables(iTable).name));
-                contents = dj.struct.fromFields(contents);
+                contents = dj.struct.fromFields(contents); %#ok<NASGU>
                 filename = fullfile(backupDir, ...
                     regexprep(self.classNames{iTable}, '^.*\.', ''));
                 fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
                 save(filename, 'contents')
                 fprintf 'done\n'
+            end
+        end
+        
+        
+        function restore(self, backupDir)
+            % insert all missing tuples from tables saved in <ClassName>.MAT files in backupDir
+            d = dir(fullfile(backupDir,'*.mat'));
+            
+            % instantiate all classes
+            classes = cell(length(d),1);
+            objects = cell(length(d),1);
+            for i=1:length(d)
+                try
+                    classes{i} = [self.package '.' regexprep(d(i).name, '\.mat$', '')];
+                    objects{i} = eval(classes{i});
+                    objects{i}.header;  % this will trigger the creation of a table if missing.
+                catch err
+                    warning('DataJoint:invalidClass', err.message)
+                    continue
+                end
+            end
+            ix = ~cellfun(@isempty, classes);
+            classes = classes(ix);
+            objects = objects(ix);
+            d = d(ix);
+            
+            % sort objects by hiararchical level
+            levels = cellfun(@(x) self.tableLevels(strcmp(x, self.classNames)), classes);
+            [~, ix] = sort(levels);
+            classes = classes(ix);
+            objects = objects(ix);
+            d = d(ix);
+            
+            % insert tuples
+            for i=1:length(classes)
+                s = load(fullfile(backupDir, d(i).name));
+                try
+                    fprintf('inserting %d tuples into %s\n', length(s.contents), classes{i})
+                    objects{i}.insert(s.contents, 'INSERT IGNORE');
+                catch err
+                    warning('DataJoint:TableDeclarationMismatch', err.message)
+                end                    
             end
         end
         

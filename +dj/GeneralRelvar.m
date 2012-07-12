@@ -642,8 +642,12 @@ for arg = restrictions
             
         case isstruct(cond)
             % struct array
-            clause = sprintf('%s %s %s(%s)', clause, word, not, ...
-                struct2cond(cond, selfAttrs));
+            c = struct2cond(cond, selfAttrs);
+            if isempty(c)
+                continue
+            else
+                clause = sprintf('%s %s %s(%s)', clause, word, not, c);
+            end
             
         case isa(cond, 'dj.GeneralRelvar')
             % semijoin or antijoin
@@ -690,36 +694,40 @@ if length(keys)>512
         'consider replacing the long array of keys with a more succinct condition')
 end
 conds = cell(1,length(keys));
-for iKey= 1:length(keys)
-    key = keys(iKey);
-    keyFields = fieldnames(key)';
-    foundAttributes = ismember(keyFields, {header.name});
-    word = '';
+keyFields = fieldnames(keys)';
+foundAttributes = ismember(keyFields, {header.name});
+if ~any(foundAttributes)
     cond = '';
-    for field = keyFields(foundAttributes)
-        value = key.(field{1});
-        if ~isempty(value)
-            iField = find(strcmp(field{1}, {header.name}));
-            assert(~header(iField).isBlob,...
-                'The key must not include blob header.');
-            if header(iField).isString
-                assert( ischar(value), ...
-                    'Value for key.%s must be a string', field{1})
-                value=sprintf('"%s"',value);
-            else
-                assert(isnumeric(value), ...
-                    'Value for key.%s must be numeric', field{1});
-                value=sprintf('%1.16g',value);
+else
+    for iKey= 1:length(keys)
+        key = keys(iKey);
+        word = '';
+        cond = '';
+        for field = keyFields(foundAttributes)
+            value = key.(field{1});
+            if ~isempty(value)
+                iField = find(strcmp(field{1}, {header.name}));
+                assert(~header(iField).isBlob,...
+                    'The key must not include blob header.');
+                if header(iField).isString
+                    assert( ischar(value), ...
+                        'Value for key.%s must be a string', field{1})
+                    value=sprintf('"%s"',value);
+                else
+                    assert(isnumeric(value), ...
+                        'Value for key.%s must be numeric', field{1});
+                    value=sprintf('%1.16g',value);
+                end
+                cond = sprintf('%s%s`%s`=%s', ...
+                    cond, word, header(iField).name, value);
+                word = ' AND';
             end
-            cond = sprintf('%s%s`%s`=%s', ...
-                cond, word, header(iField).name, value);
-            word = ' AND';
         end
+        conds{iKey} = cond;
     end
-    conds{iKey} = cond;
+    cond = sprintf('OR (%s)', conds{:});
+    cond = cond(4:end);
 end
-cond = sprintf('OR (%s)', conds{:});
-cond = cond(4:end);
 end
 
 
