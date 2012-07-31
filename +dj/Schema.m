@@ -198,18 +198,21 @@ classdef Schema < handle
             tiers = {self.tables.tier};
             tiers = [tiers repmat({'external'},1,length(names)-length(tiers))];
             
-            if nargin>=2
+            if nargin<2
+                % by default show all but the job tables
+                subset = self.classNames(~strcmp(tiers,'job'));
+            else                
                 % limit the diagram to the specified subset of tables
                 ix = find(~ismember(subset,self.classNames));
                 if ~isempty(ix)
                     error('Unknown table %d', subset(ix(1)));
                 end
-                subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
-                levels = levels(subset);
-                C = C(subset,subset);  % connectivity matrix
-                names = self.classNames(subset);
-                tiers = tiers(subset);
             end
+            subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
+            levels = levels(subset);
+            C = C(subset,subset);  % connectivity matrix
+            names = names(subset);
+            tiers = tiers(subset);
             
             if sum(C)==0
                 disp 'No dependencies found. Nothing to plot'

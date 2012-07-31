@@ -139,13 +139,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 disp 'empty relation'
             else
                 columns = {self.header.name};
-                
-                assert(~any([self.header.isBlob]), 'cannot view blobs')
+                sel = 1:length(columns);
+                if any([self.header.isBlob])
+                    warning('DataJoint:viewblobs', 'excluding blobs from the view');
+                    columns = columns(~[self.header.isBlob]);
+                end
                 
                 % specify table header
                 columnName = columns;
-                for iCol = 1:length(columns)
-                    
+                for iCol = 1:length(columns)                    
                     if self.header(iCol).iskey
                         columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
                     else
@@ -153,13 +155,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     end
                 end
                 format = cell(1,length(columns));
-                format([self.header.isString]) = {'char'};
-                format([self.header.isNumeric]) = {'numeric'};
-                for iCol = find(strncmpi('ENUM', {self.header.type}, 4))
-                    enumValues = textscan(self.header(iCol).type(6:end-1),'%s','Delimiter',',');
-                    enumValues = cellfun(@(x) x(2:end-1), enumValues{1}, 'Uni', false);  % strip quotes
-                    format(iCol) = {enumValues'};
-                end
+                format([self.header(sel).isString]) = {'char'};
+                format([self.header(sel).isNumeric]) = {'numeric'};
                 
                 % display table
                 data = fetch(self, columns{:});
