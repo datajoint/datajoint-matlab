@@ -259,10 +259,19 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % values from multiple tuples.  Unlike fetch1, string and
             % blob values are retrieved as matlab cells.
             %
+            % SYNTAX:
+            % [f1, ..., fn] = rel.fetchn('field1',...,'fieldn')
+            %
+            % You may also obtain the primary key values (as a structure
+            % array) that match the retrieved field values.
+            %
+            % [f1, ..., fn, keys] = rel.fetchn('field1',...,'fieldn')  
+            %
             % See also dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetch, dj.GeneralRelvar/pro
             
             specs = varargin(cellfun(@ischar, varargin));  % attribute specifiers
-            if nargout~=length(specs) && (nargout~=0 || length(specs)~=1), ...
+            returnKey = nargout==length(specs)+1;
+            if ~returnKey && nargout~=length(specs) && (nargout~=0 || length(specs)~=1), ...
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                     'The number of fetchn() outputs must match the number of requested attributes'))
             end
@@ -277,7 +286,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             [limit, args] = makeLimitClause(varargin{:});
             
             % submit query
-            self = self.pro(args{:});
+            self = self.pro(args{:});  % this copies the object, so now it's a different self
             [header, sql] = self.compile;
             ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s%s',...
                 makeAttrList(header), sql, limit));
@@ -288,6 +297,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 % if renamed, use the renamed attribute
                 name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = ret.(name{1}{1});
+            end
+            
+            if returnKey
+                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.pro(ret, self.primaryKey{:}));
             end
         end
         
@@ -342,8 +355,12 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             ret = self.copy;  
             ret.restrictions = [ret.restrictions {'not' arg}]; 
         end
-        
+
         function ret = plus(self, arg)
+            ret = self.or(self,arg);
+        end
+        
+        function ret = or(self, arg)
             % the relational union operator. 
             % 
             % arg can be another relvar, a string condition, or a structure array of tuples.
