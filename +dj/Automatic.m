@@ -14,7 +14,7 @@
 % Once self.makeTuples and self.popRel are defined, the user may
 % invoke self.populate to automatically populate the table.
 %
-% The method parPopulate works similarly to populate but it also maintains
+% The method parpopulate works similarly to populate but it also maintains
 % a job reservation table thereby enabling multiple processes to populate 
 % the table without conflicts.
 %
@@ -48,13 +48,13 @@ classdef Automatic < handle
     
     methods
         
-        function varargout = parPopulate(self, varargin)
-            % dj.Automatic/parPopulate works identically to dj.Automatic/populate.
+        function varargout = parpopulate(self, varargin)
+            % dj.Automatic/parpopulate works identically to dj.Automatic/populate.
             % The only differences is that papPopulate uses a job reservation 
             % mechanism to enable multiple processes to work in parallel without 
             % collision.
             % 
-            % Upon the first invokation of obj.parPopulate, it creates the
+            % Upon the first invokation of obj.parpopulate, it creates the
             % job reservation table that is specific to obj's table. 
             % The job reservation table has the same name as the obj's
             % table prefixed with '~jobs_rsrv_'.
@@ -62,7 +62,7 @@ classdef Automatic < handle
             % A job is considered to available when the job reservation
             % table contains no matching entry. 
             % 
-            % For each unpopulated key in popRel, parPopulate first inserts a tuple
+            % For each unpopulated key in popRel, parpopulate first inserts a tuple
             % with the job_status set to 'reserved'. Upon completion, the  status 
             % is changed to 'completed'. If the job resulted in error, the status 
             % is changed to 'error' and the error messaage is saved into the jobs table.
