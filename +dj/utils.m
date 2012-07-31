@@ -6,8 +6,8 @@ classdef(Sealed) utils
         %   manual:   tableName starts with a letter
         %   imported: tableName with a '_'
         %   computed: tableName with '__'
-        allowedTiers = {'lookup' 'manual' 'imported' 'computed'}
-        tierPrefixes = {'#', '', '_', '__'}
+        allowedTiers = {'lookup' 'manual' 'imported' 'computed','job'}
+        tierPrefixes = {'#', '', '_', '__','~'}
         macros = struct(...
             'JobFields', {{
             'table_name: varchar(255)  # schema.table name for which the job is reserved'
@@ -18,7 +18,6 @@ classdef(Sealed) utils
             'job_timestamp=CURRENT_TIMESTAMP: timestamp # automatic timestamp'
             }})
     end
-    
     
     methods(Static)
         function str = readPercentBraceComment(filename)
@@ -50,7 +49,7 @@ classdef(Sealed) utils
         
         
         function ret = str2cell(str)
-            % DJ.UTILS.STR2CELL - convert a multi-line string into a cell array of one-line strings.           
+            % DJ.UTILS.STR2CELL - convert a multi-line string into a cell array of one-line strings.
             ret = regexp(str,'\n','split')';
             ret = ret(~cellfun(@isempty, ret));  % remove empty strings
         end
@@ -98,7 +97,7 @@ classdef(Sealed) utils
         
         
         
-        % DEPRECATED FUNCTIONS - may still be used by legacy code    
+        % DEPRECATED FUNCTIONS - may still be used by legacy code
         function s = structure2array(s)
             warning('DataJoint:deprecated',...
                 'dj.utils.structure2array will be removed in an upcoming revision. Use dj.struct.fromFields instead')

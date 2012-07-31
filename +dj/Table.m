@@ -34,16 +34,23 @@ classdef (Sealed) Table < handle
         mysql_constants = {'CURRENT_TIMESTAMP','CURRENT_TIME','CURRENT_DATE'}
     end
     
+    properties(Access=private)
+        declaration 
+    end
+    
     
     methods
-        function self = Table(className)
+        function self = Table(className, declaration)
             % obj = dj.Table('package.className')
             self.className = className;
-            assert(nargin==1 && ischar(self.className),  ...
+            assert(ischar(self.className),  ...
                 'dj.Table requres input ''package.ClassName''')
             assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w+','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
+            if nargin>=2
+                self.declaration = declaration;
+            end
         end
         
         
@@ -277,7 +284,7 @@ classdef (Sealed) Table < handle
         
         function addAttribute(self, definition)
             sql = fieldToSQL(parseAttrDef(definition, false));
-            sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN %s', ...
+            sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN `%s`', ...
                 self.schema.dbname, self.info.name, sql(1:end-2));
             self.schema.conn.query(sql)
             disp 'table updated'
@@ -286,7 +293,7 @@ classdef (Sealed) Table < handle
         end
         
         function dropAttribute(self, attrName)
-            sql = sprintf('ALTER TABLE `%s`.`%s` DROP COLUMN %s', ...
+            sql = sprintf('ALTER TABLE `%s`.`%s` DROP COLUMN `%s`', ...
                 self.schema.dbname, self.info.name, attrName);
             self.schema.conn.query(sql)
             disp 'table updated'
@@ -430,12 +437,18 @@ classdef (Sealed) Table < handle
         
         
         function declaration = getDeclaration(self)
-            file = which(self.className);
-            assert(~isempty(file), 'DataJoint:MissingTableDefnition', ...
-                'Could not find table definition file %s', file)
-            declaration = dj.utils.readPercentBraceComment(file);
-            assert(~isempty(declaration), 'DataJoint:MissingTableDefnition', ...
-                'Could not find the table declaration in %s', file)
+            % extract the table declaration with the first percent-brace comment
+            % block of the matching .m file. 
+            if ~isempty(self.declaration)
+                declaration = self.declaration;
+            else
+                file = which(self.className);
+                assert(~isempty(file), 'DataJoint:MissingTableDefnition', ...
+                    'Could not find table definition file %s', file)
+                declaration = dj.utils.readPercentBraceComment(file);
+                assert(~isempty(declaration), 'DataJoint:MissingTableDefnition', ...
+                    'Could not find the table declaration in %s', file)
+            end
         end
         
         

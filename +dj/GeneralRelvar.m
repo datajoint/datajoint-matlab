@@ -42,6 +42,23 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             [~, s] = self.compile();
         end
         
+        function list = getBaseRelvars(self)
+            % get the base relvars from which the relation primarily
+            % derives. Restrictions are not counted amongst the base
+            % relvars.
+            
+            switch self.operator
+                case 'table'
+                    list = {self.operands{1}.className};
+                case {'pro','aggregate'}
+                    list = getBaseRelvars(self.operands{1});
+                case 'join'
+                    list = [getBaseRelvars(self.operands{1}) getBaseRelvars(self.operands{2})];
+                otherwise
+                    list = {};
+            end
+        end
+        
         function schema = get.schema(self)
             schema = self.getSchema();
         end
