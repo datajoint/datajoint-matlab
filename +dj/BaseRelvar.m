@@ -28,10 +28,9 @@ classdef BaseRelvar < dj.GeneralRelvar
         
         
         function delQuick(self)
-            % dj.BaseRelvar/delQuick - remove all tuples of relation self from
-            % its table. Unlike dj.BaseRelvar/del, del1 does not prompt about
-            % the tuples to be deleted. Also it does not attempt to cascade the
-            % delete through the dependent tables.
+            % dj.BaseRelvar/delQuick - remove all tuples of relation self from its table. 
+            % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
+            % confirmation, nor does it attempt to cascade down to the dependent tables.
             
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end

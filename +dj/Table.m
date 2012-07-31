@@ -264,8 +264,8 @@ classdef (Sealed) Table < handle
         
         
         %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
-        function alterTableComment(self, newComment)
-            % dj.Table/alterTableComment - update the table comment
+        function setTableComment(self, newComment)
+            % dj.Table/setTableComment - update the table comment
             % in the table declaration
             self.schema.conn.query(...
                 sprintf('ALTER TABLE `%s`.`%s` COMMENT="%s"', ...
@@ -296,7 +296,7 @@ classdef (Sealed) Table < handle
         
         function alterAttribute(self, attrName, newDefinition)
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
-            sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN %s %s', ...
+            sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN `%s` %s', ...
                 self.schema.dbname, self.info.name, attrName, sql(1:end-2));
             self.schema.conn.query(sql)
             disp 'table updated'
