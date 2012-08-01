@@ -2,7 +2,7 @@
 % General relvars do not have a table associated with them. They
 % represent a relational expression based on other relvars.
 
-% To make the code R2009 compatible, toggle comments on the following two lines  
+% To make the code R2009 compatible, toggle comments on the following two lines
 %classdef GeneralRelvar < dj.R2009CopyableRelvarMixin  % pre-R2011
 classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
     
@@ -92,11 +92,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             justify = nargin==1 || justify;
             display@handle(self)
             nTuples = self.count;
-            
-            header = self.header;
-            
             if nTuples>0
                 % print header
+                header = self.header;
                 ix = find( ~[header.isBlob] );  % header to display
                 fprintf \n
                 fprintf('  %12.12s', header(ix).name)
@@ -129,7 +127,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
             
             % print the total number of tuples
-            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
+            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)            
         end
         
         function view(self)
@@ -147,7 +145,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 
                 % specify table header
                 columnName = columns;
-                for iCol = 1:length(columns)                    
+                for iCol = 1:length(columns)
                     if self.header(iCol).iskey
                         columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
                     else
@@ -279,7 +277,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % You may also obtain the primary key values (as a structure
             % array) that match the retrieved field values.
             %
-            % [f1, ..., fn, keys] = rel.fetchn('field1',...,'fieldn')  
+            % [f1, ..., fn, keys] = rel.fetchn('field1',...,'fieldn')
             %
             % See also dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetch, dj.GeneralRelvar/pro
             
@@ -357,8 +355,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             if ~iscell(arg)
                 arg = {arg};
             end
-            ret = self.copy; 
-            ret.restrictions = [ret.restrictions arg];  
+            ret = self.copy;
+            ret.restrictions = [ret.restrictions arg];
         end
         
         function ret = minus(self, arg)
@@ -366,22 +364,22 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
             end
-            ret = self.copy;  
-            ret.restrictions = [ret.restrictions {'not' arg}]; 
+            ret = self.copy;
+            ret.restrictions = [ret.restrictions {'not' arg}];
         end
-
+        
         function ret = plus(self, arg)
             ret = self.or(self,arg);
         end
         
         function ret = or(self, arg)
-            % the relational union operator. 
-            % 
+            % the relational union operator.
+            %
             % arg can be another relvar, a string condition, or a structure array of tuples.
             %
-            % The result will be a special kind of relvar that can only be used 
-            % as an argument in another restriction operator. It cannot be 
-            % queried on its own. 
+            % The result will be a special kind of relvar that can only be used
+            % as an argument in another restriction operator. It cannot be
+            % queried on its own.
             %
             % For example:
             %   B + C   cannot be used on its own, but:
@@ -402,7 +400,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
             ret = init(dj.GeneralRelvar, 'union', operandList);
         end
-                
+        
         
         function ret = times(self, arg)
             % alias for backward compatibility
@@ -481,7 +479,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
             
             ret = init(dj.GeneralRelvar, op, [{self} arg params]);
-        end        
+        end
         
         function ret = mtimes(self, arg)
             % dj.GeneralRelvar/mtimes - relational natural join.
@@ -542,7 +540,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             %   header = structure array with attribute properties
             %
             % The input argument enclose controls whether the statement
-            % must be enclosed in parentheses: 
+            % must be enclosed in parentheses:
             %   0 - don't enclose
             %   1 - enclose only if some attributes are aliased
             %   2 - enclose if anything but a simple table
@@ -559,13 +557,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             if nargin<2
                 enclose = 0;
             end
-                        
+            
             % apply relational operators recursively
             switch self.operator
                 case 'union'
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
-                    'The union operator must be used in a restriction'))
-                
+                        'The union operator must be used in a restriction'))
+                    
                 case 'table'  % terminal node
                     r = self.operands{1};
                     header = r.header;
@@ -605,13 +603,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     
                 otherwise
                     error 'unknown relational operator'
-            end 
+            end
             
             haveAliasedAttrs = ~all(arrayfun(@(x) isempty(x.alias), header));
             
             % apply restrictions
             if ~isempty(self.restrictions)
-                % clear aliases and enclose 
+                % clear aliases and enclose
                 if haveAliasedAttrs
                     [attrStr, header] = makeAttrList(header);
                     sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
@@ -624,10 +622,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             % enclose in parentheses if necessary
             if enclose==1 && haveAliasedAttrs ...
                     || enclose==2 && (~strcmp(self.operator,'table') || ~isempty(self.restrictions)) ...
-                    || enclose==3 && strcmp(self.operator, 'aggregate')  
+                    || enclose==3 && strcmp(self.operator, 'aggregate')
                 [attrStr, header] = makeAttrList(header);
                 sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
-            end                 
+            end
         end
     end
 end
@@ -657,11 +655,11 @@ for arg = restrictions
     switch true
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
             % union
-            s = cellfun(@(x) stripWhere(makeWhereClause(selfAttrs, {x})), cond.operands, 'UniformOutput', false);  
+            s = cellfun(@(x) stripWhere(makeWhereClause(selfAttrs, {x})), cond.operands, 'UniformOutput', false);
             assert(~isempty(s));
             s = sprintf('(%s) OR ', s{:});
             clause = sprintf('%s %s %s(%s)', clause, word, not, s(1:end-4));
-        
+            
         case ischar(cond) && strcmpi(cond,'NOT')
             % negation of the next condition
             not = 'NOT ';
@@ -689,8 +687,8 @@ for arg = restrictions
                 [attrStr, condAttrs] = makeAttrList(condAttrs);
                 condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', attrStr, condSQL, aliasCount);
             end
-                        
-            % common attributes for matching. Blobs are not included 
+            
+            % common attributes for matching. Blobs are not included
             commonAttrs = intersect(...
                 {selfAttrs(~[selfAttrs.isBlob]).name}, ...
                 {condAttrs(~[condAttrs.isBlob]).name});

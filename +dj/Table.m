@@ -35,7 +35,7 @@ classdef (Sealed) Table < handle
     end
     
     properties(Access=private)
-        declaration 
+        declaration
     end
     
     
@@ -66,14 +66,17 @@ classdef (Sealed) Table < handle
         end
         
         
+        function yes = exists(self)
+            yes = any(strcmp(self.className, self.schema.classNames));
+        end
+        
+        
         function info = get.info(self)
-            ix = strcmp(self.className, self.schema.classNames);
-            if ~any(ix)   % table does not exist. Create it.
+            if ~self.exists   % table does not exist. Create it.
                 self.create
-                ix = strcmp(self.className, self.schema.classNames);
-                assert(any(ix), 'Table %s is not found', self.className);
+                assert(self.exists, 'Table %s is not found', self.className)
             end
-            info = self.schema.tables(ix);
+            info = self.schema.tables(strcmp(self.className, self.schema.classNames));
         end
         
         
@@ -374,13 +377,17 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Table, dj.BaseRelvar/del
             
-            self.schema.conn.cancelTransaction   % exit ongoing transaction
+            if ~self.exists
+                disp 'Nothing to drop'
+                return
+            end
             
+            self.schema.conn.cancelTransaction   % exit ongoing transaction
             % warn user if self is a subtable
             if ismember(self.info.tier, {'imported','computed'}) && ...
                     ~isempty(which(self.className))
                 rel = eval(self.className);
-                if ~isa(rel,'dj.AutoPopulate')
+                if ~isa(rel,'dj.AutoPopulate') && ~isa(rel,'dj.Automatic')
                     fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
                         'drop its parent table instead.\n'], self.className)
                     if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
@@ -438,7 +445,7 @@ classdef (Sealed) Table < handle
         
         function declaration = getDeclaration(self)
             % extract the table declaration with the first percent-brace comment
-            % block of the matching .m file. 
+            % block of the matching .m file.
             if ~isempty(self.declaration)
                 declaration = self.declaration;
             else
