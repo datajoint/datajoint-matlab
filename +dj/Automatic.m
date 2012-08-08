@@ -1,7 +1,7 @@
 % dj.Automatic is an abstract mixin class that allows a dj.Relvar object
-% to automatically populate its table. 
-% 
-% Derived classes must also inherit from dj.Relvar and must define the 
+% to automatically populate its table.
+%
+% Derived classes must also inherit from dj.Relvar and must define the
 % constant property 'popRel' of type dj.GeneralRelvar.
 %
 % Derived classes must define the callback function makeTuples(self, key),
@@ -12,7 +12,7 @@
 % dj.Automatic/populate uses self.popRel to generate the list of unpopulated keys
 % for which makeTuples will be invoked. Thus popRel determines the scope
 % and granularity of makeTuples calls.
-% 
+%
 % Once self.makeTuples and self.popRel are defined, the user may
 % invoke self.populate to automatically populate the table.
 %
@@ -43,49 +43,6 @@ classdef Automatic < handle
     
     
     methods
-        
-        function varargout = parpopulate(self, varargin)
-            % dj.Automatic/parpopulate works identically to dj.Automatic/populate.
-            % The only differences is that papPopulate uses a job reservation
-            % mechanism to enable multiple processes to work in parallel without
-            % collision.
-            %
-            % Upon the first invokation of obj.parpopulate, it creates the
-            % job reservation table that is specific to obj's table.
-            % The job reservation table has the same name as the obj's
-            % table prefixed with '~jobs_rsrv_'.
-            %
-            % A job is considered to available when the job reservation
-            % table contains no matching entry.
-            %
-            % For each unpopulated key in popRel, parpopulate first inserts a tuple
-            % with the job_status set to 'reserved'. Upon completion, the  status
-            % is changed to 'completed'. If the job resulted in error, the status
-            % is changed to 'error' and the error messaage is saved into the jobs table.
-            %
-            % Users must explicitly manage the contents of the jobs table once it
-            % gets filled as it is not automatically cleared. Users can get access
-            % to the jobs table through the 'jobs' property.
-            
-            if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
-                throwAsCaller(MException('DataJoint:invalidPopRel', ...
-                    sprintf('%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))))
-            end
-            self.schema.conn.cancelTransaction  % rollback any unfinished transaction
-            jobClassName = [self.schema.package '.Jobs'];
-            try
-                jobs_ = eval(jobClassName);
-                assert(isa(jobs_, 'dj.Relvar'))
-                self.jobs = jobs_;
-            catch %#ok<CTCH>
-                throwAsCaller(MException('DataJoint:missingJobs', 'Could not find class <package>.Jobs'))
-            end
-            
-            self.useReservations = true;
-            [varargout{1:nargout}] = self.populate_(varargin{:});
-        end
-        
-        
         function varargout = populate(self, varargin)
             % [failedKeys, errors] = populate(baseRelvar [, restrictors...])
             % populates a table based on the contents self.popRel
@@ -119,6 +76,61 @@ classdef Automatic < handle
             end
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = false;
+            [varargout{1:nargout}] = self.populate_(varargin{:});
+        end
+        
+        
+        function varargout = parpopulate(self, varargin)
+            % dj.Automatic/parpopulate works identically to dj.Automatic/populate.
+            % The only difference is that pappopulate uses a job reservation
+            % mechanism to enable multiple processes to work in parallel without
+            % collision.
+            %
+            % To enable parpopulate, create the job reservation table
+            % <package>.Jobs which must have the following declaration:            
+            %   %{
+            %   package.Jobs (job)        # the job reservation table
+            %   table_name : varchar(255) # className of the table
+            %   key_hash   : char(32)     # key hash
+            %   -----
+            %   status                      : enum('reserved','error','ignore') # if tuple is missing, the job is available
+            %   error_key=null              : blob                              # non-hashed key for errors only
+            %   error_message=""            : varchar(1023)                     # error message returned if failed
+            %   error_stack=null            : blob                              # error stack if failed
+            %   timestamp=CURRENT_TIMESTAMP : timestamp                         # automatic timestamp
+            %   %}
+            %
+            % A job is considered to be available when <package>.Jobs contains 
+            % no matching entry.
+            %
+            % For each makeTuples call, parpopulate sets the job status to
+            % "reserved".  When the job is completed, the record is
+            % removed. If the job results in error, the job record is left
+            % in place with the status set to "error" and the error message
+            % and error stacks saved. Consequently, jobs that ended in
+            % error during the last execution will not be attempted again
+            % until you delete the job tuples from package.Jobs.
+            %
+            % The primary key of the jobs table comprises the name of the
+            % class and the 32-bit MD5 hash of the primary key. However, the 
+            % key is saved in a separate field for errors for debugging
+            % purposes.
+            
+            if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
+                throwAsCaller(MException('DataJoint:invalidPopRel', ...
+                    sprintf('%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))))
+            end
+            self.schema.conn.cancelTransaction  % rollback any unfinished transaction
+            jobClassName = [self.schema.package '.Jobs'];
+            try
+                jobs_ = eval(jobClassName);
+                assert(isa(jobs_, 'dj.Relvar'))
+                self.jobs = jobs_;
+            catch %#ok<CTCH>
+                throwAsCaller(MException('DataJoint:missingJobs', 'Could not find class <package>.Jobs'))
+            end
+            
+            self.useReservations = true;
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
     end
@@ -177,8 +189,10 @@ classdef Automatic < handle
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
                                     errors = [errors; err];         %#ok<AGROW>
                                 else
-                                    % rethrow error only if not returned
-                                    rethrow(err)
+                                    if ~self.useReservations
+                                        % rethrow error only if not returned
+                                        rethrow(err)
+                                    end
                                 end
                             end
                         end
@@ -202,6 +216,7 @@ classdef Automatic < handle
                     case 'error'
                         tuple = jobKey;
                         tuple.status = status;
+                        tuple.error_key = key;
                         tuple.error_message = errMsg;
                         tuple.error_stack = errStack;
                         self.jobs.insert(tuple,'REPLACE')
