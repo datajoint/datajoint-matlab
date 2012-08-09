@@ -324,17 +324,27 @@ classdef Schema < handle
         end
         
         
-        function backup(self, backupDir, tiers)
+        function backup(self, backupDir, tiers, restrictor)
             % dj.Schema/backup - saves tables into .mat files
             % SYNTAX:
             %    s.backup(folder)    -- save all lookup and manual tables
             %    s.backup(folder, {'manual'})    -- save all manual tables
             %    s.backup(folder, {'manual','imported'})
+            %    s.backup(folder, [], restrictor)  -- backup only tuples that match restrictor
+            % 
             % Each table must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
+            % 
+            % restrictor may contain a cell array of conditions. However,
+            % string conditions can cause errors for some tables. 
+            % The best practice is to use a structure or a relvar as a restrictor, e.g. 
+            % backup(ephys.getSchema, '/backup', [], ephys.Session('session_date > "2012-07-10"')) 
             
-            if nargin<3
+            if nargin<3 || isempty(tiers{3})
                 tiers = {'lookup','manual'};
+            end
+            if nargin<4
+                restrictor = {};
             end
             assert(all(ismember(tiers, dj.utils.allowedTiers)))
             backupDir = fullfile(backupDir, self.dbname);
@@ -352,9 +362,9 @@ classdef Schema < handle
             [~,order] = sort(self.tableLevels(ix));
             ix = ix(order);
             for iTable = ix(:)'
-                contents = self.conn.query(sprintf('SELECT * FROM `%s`.`%s`', ...
-                    self.dbname, self.tables(iTable).name));
-                contents = dj.struct.fromFields(contents); %#ok<NASGU>
+                className = self.classNames{iTable};
+                rel = init(dj.BaseRelvar, dj.Table(className)) & restrictor;
+                contents = rel.fetch('*'); %#ok<NASGU>
                 filename = fullfile(backupDir, ...
                     regexprep(self.classNames{iTable}, '^.*\.', ''));
                 fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
