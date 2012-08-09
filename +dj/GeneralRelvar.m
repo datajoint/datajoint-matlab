@@ -41,24 +41,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         function s = get.sql(self)
             [~, s] = self.compile();
         end
-        
-        function list = getBaseRelvars(self)
-            % get the base relvars from which the relation primarily
-            % derives. Restrictions are not counted amongst the base
-            % relvars.
-            
-            switch self.operator
-                case 'table'
-                    list = {self.operands{1}.className};
-                case {'pro','aggregate'}
-                    list = getBaseRelvars(self.operands{1});
-                case 'join'
-                    list = [getBaseRelvars(self.operands{1}) getBaseRelvars(self.operands{2})];
-                otherwise
-                    list = {};
-            end
-        end
-        
+                
         function schema = get.schema(self)
             schema = self.getSchema();
         end
@@ -91,8 +74,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             tic
             justify = nargin==1 || justify;
             display@handle(self)
-            nTuples = self.count;
-            if nTuples>0
+            nTuples = 0;
+            if self.exists
                 % print header
                 header = self.header;
                 ix = find( ~[header.isBlob] );  % header to display
@@ -101,6 +84,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 fprintf \n
                 maxRows = 12;
                 tuples = self.fetch(header(ix).name,maxRows+1);
+                nTuples = max(self.count, length(tuples));  
                 
                 % print rows
                 for s = tuples(1:min(end,maxRows))'
@@ -133,7 +117,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         function view(self)
             % dj.Relvar/view - view the data in speadsheet form
             
-            if ~self.count
+            if ~self.exists
                 disp 'empty relation'
             else
                 columns = {self.header.name};
@@ -168,9 +152,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         
         
         %%%%%%%%%%%%%%%%%% FETCHING DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+       
+        function yes = exists(self)
+            % dj.GeneralRelvar/exists - a fast check whether the relvar
+            % contains any tuples
+            [~, sql] = self.compile(3);
+            yes = self.schema.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql));
+            yes = logical(yes.yes);
+        end
         
         function n = count(self)
-            % GeneralRelvar/count - the number of tuples in the relation.
+            % dj.GeneralRelvar/count - the number of tuples in the relation.
             [~, sql] = self.compile(3);
             n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
             n=n.n;

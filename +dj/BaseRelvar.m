@@ -53,7 +53,7 @@ classdef BaseRelvar < dj.GeneralRelvar
             
             self.schema.conn.cancelTransaction  % exit ongoing transaction, if any
             
-            if self.count==0
+            if ~self.exists
                 disp 'nothing to delete'
             else
                 % warn the user if deleting from a subtable

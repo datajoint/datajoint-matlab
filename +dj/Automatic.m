@@ -87,7 +87,7 @@ classdef Automatic < handle
             % collision.
             %
             % To enable parpopulate, create the job reservation table
-            % <package>.Jobs which must have the following declaration:            
+            % <package>.Jobs which must have the following declaration:
             %   %{
             %   package.Jobs (job)        # the job reservation table
             %   table_name : varchar(255) # className of the table
@@ -100,7 +100,7 @@ classdef Automatic < handle
             %   timestamp=CURRENT_TIMESTAMP : timestamp                         # automatic timestamp
             %   %}
             %
-            % A job is considered to be available when <package>.Jobs contains 
+            % A job is considered to be available when <package>.Jobs contains
             % no matching entry.
             %
             % For each makeTuples call, parpopulate sets the job status to
@@ -112,7 +112,7 @@ classdef Automatic < handle
             % until you delete the job tuples from package.Jobs.
             %
             % The primary key of the jobs table comprises the name of the
-            % class and the 32-bit MD5 hash of the primary key. However, the 
+            % class and the 32-bit MD5 hash of the primary key. However, the
             % key is saved in a separate field for errors for debugging
             % purposes.
             
@@ -168,9 +168,10 @@ classdef Automatic < handle
                 for key = unpopulated'
                     if self.setJobStatus(key, 'reserved')
                         self.schema.conn.startTransaction
-                        % check again in case a parallel process has already populated
-                        if count(self & key)
+                        if exists(self & key)
+                            % already populated
                             self.schema.conn.cancelTransaction
+                            self.setJobStatus(key, 'completed')
                         else
                             fprintf('Populating %s for:\n', class(self))
                             disp(key)
@@ -212,7 +213,8 @@ classdef Automatic < handle
                 jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
                 switch status
                     case 'completed'
-                        delQuick(self.jobs & jobKey);
+                        delQuick(self.jobs & jobKey)
+                        
                     case 'error'
                         tuple = jobKey;
                         tuple.status = status;
