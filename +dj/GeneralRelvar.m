@@ -67,12 +67,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             clause = makeWhereClause(self.header, self.restrictions);
         end
         
-        function display(self, justify)
+        function display(self)
             % dj.GeneralRelvar/display - display the contents of the relation.
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             tic
-            justify = nargin==1 || justify;
             display@handle(self)
             nTuples = 0;
             if self.exists
@@ -93,11 +92,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                         if isnumeric(v)
                             fprintf('  %12g',v)
                         else
-                            if justify
-                                fprintf('  %12.12s',v)
-                            else
-                                fprintf('  ''%12s''', v)
-                            end
+                            fprintf('  %12.12s',v)
                         end
                     end
                     fprintf '\n'

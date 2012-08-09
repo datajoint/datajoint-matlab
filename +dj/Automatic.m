@@ -10,22 +10,20 @@
 %
 % The constant property 'popRel' must be defined in the derived class.
 % dj.Automatic/populate uses self.popRel to generate the list of unpopulated keys
-% for which makeTuples will be invoked. Thus popRel determines the scope
+% for which self.makeTuples() will be invoked. Thus popRel determines the scope
 % and granularity of makeTuples calls.
 %
 % Once self.makeTuples and self.popRel are defined, the user may
-% invoke self.populate to automatically populate the table.
+% invoke methods poopulate or parpopulate to automatically populate the table.
 %
-% The method parpopulate works similarly to populate but it uses the job
-% reservation table to reserve jobs thereby enabling multiple processes to
-% populate the table without conflicts.
+% The method parpopulate works similarly to populate but it uses the job reservation 
+% table <package>.Jobs to enable execution by multiple processes in parallel.
 %
 % The job reservation table must be declated as <package>.Jobs in the same
 % schema package as this computed table. You may query the job reservation.
 % While the job is executing, the job status is set to "reserved". When the
 % job is completed, the entry is removed. When the job ends in error, the
 % status is set to "error" and the error stack is saved.
-
 
 classdef Automatic < handle
     
@@ -39,8 +37,6 @@ classdef Automatic < handle
         % populated relvar. makeTuples copies key as tuple, adds computed
         % fields to tuple and inserts tuple as self.insert(tuple)
     end
-    
-    
     
     methods
         function varargout = populate(self, varargin)
@@ -58,8 +54,6 @@ classdef Automatic < handle
             % applied to self.popRel.  Therefore, all keys to be populated
             % are obtained as fetch((self.popRel - self) & varargin).
             %
-            % See also dj.Relvar/fetch, dj.Relvar/minus, dj.Relvar/and.
-            %
             % Without any output arguments, populate rethrows errors
             % that occur in makeTuples. However, if output arguments are
             % requested, errors are suppressed and accumuluated into output
@@ -69,6 +63,8 @@ classdef Automatic < handle
             %   populate(tp.OriMaps)   % populate all tp.OriMaps
             %   populate(tp.OriMaps, 'mouse_id=12')    % populate OriMaps for mouse 12
             %   [failedKeys, errs] = populate(tp.OriMaps);  % skip errors and return their list
+            % 
+            % See also dj.Automatic/parpopulate
             
             if ~isempty(self.restrictions)
                 throwAsCaller(MException('DataJoint:invalidInput', ...
@@ -81,10 +77,9 @@ classdef Automatic < handle
         
         
         function varargout = parpopulate(self, varargin)
-            % dj.Automatic/parpopulate works identically to dj.Automatic/populate.
-            % The only difference is that pappopulate uses a job reservation
-            % mechanism to enable multiple processes to work in parallel without
-            % collision.
+            % dj.Automatic/parpopulate works identically to dj.Automatic/populate
+            % except that it uses a job reservation mechanism to enable multiple 
+            % processes to populate the same table in parallel without collision.
             %
             % To enable parpopulate, create the job reservation table
             % <package>.Jobs which must have the following declaration:
@@ -115,6 +110,7 @@ classdef Automatic < handle
             % class and the 32-bit MD5 hash of the primary key. However, the
             % key is saved in a separate field for errors for debugging
             % purposes.
+            % See also dj.Automatic/populate
             
             if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
                 throwAsCaller(MException('DataJoint:invalidPopRel', ...
@@ -150,13 +146,10 @@ classdef Automatic < handle
     methods(Access = private)
         
         function [failedKeys, errors] = populate_(self, varargin)
-            % see populate
-            
             if nargout
                 failedKeys = struct([]);
                 errors = struct([]);
-            end
-            
+            end            
             unpopulated = self.popRel;
             assert(isa(unpopulated, 'dj.GeneralRelvar'), ...
                 'property popRel must be a subclass of dj.GeneralRelvar')
@@ -213,8 +206,7 @@ classdef Automatic < handle
                 jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
                 switch status
                     case 'completed'
-                        delQuick(self.jobs & jobKey)
-                        
+                        delQuick(self.jobs & jobKey)                        
                     case 'error'
                         tuple = jobKey;
                         tuple.status = status;
@@ -223,9 +215,8 @@ classdef Automatic < handle
                         tuple.error_stack = errStack;
                         self.jobs.insert(tuple,'REPLACE')
                     case 'reserved'
-                        % this reservation process relies on the API to
-                        % throw an error when attempting to insert a
-                        % duplicate without delay. (No delayed inserts)
+                        % this reservation process assumes that MySQL API
+                        % will throw an error when inserting a duplicate entry.
                         try
                             tuple = jobKey;
                             tuple.status = status;
