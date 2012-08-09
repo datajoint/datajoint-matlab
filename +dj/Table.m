@@ -287,7 +287,7 @@ classdef (Sealed) Table < handle
         
         function addAttribute(self, definition)
             sql = fieldToSQL(parseAttrDef(definition, false));
-            sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN `%s`', ...
+            sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN %s', ...
                 self.schema.dbname, self.info.name, sql(1:end-2));
             self.schema.conn.query(sql)
             disp 'table updated'

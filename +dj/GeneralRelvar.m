@@ -369,7 +369,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         end
         
         function ret = plus(self, arg)
-            ret = self.or(self,arg);
+            ret = self.or(arg);
         end
         
         function ret = or(self, arg)
