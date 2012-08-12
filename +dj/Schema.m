@@ -17,12 +17,22 @@ classdef Schema < handle
         tableLevels   % levels in dependency hiararchy
     end
     
+    properties(Constant)
+        % Table naming convention
+        %   lookup:   tableName starts with a '#'
+        %   manual:   tableName starts with a letter
+        %   imported: tableName with a '_'
+        %   computed: tableName with '__'
+        allowedTiers = {'lookup' 'manual' 'imported' 'computed','job'}
+        tierPrefixes = {'#', '', '_', '__','~'}
+    end
+
+    
     properties(Access=private)
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
-    methods
-        
+    methods    
         function self = Schema(conn, package, dbname)
             assert(isa(conn, 'dj.Connection'), ...
                 'dj.Schema''s first input must be a dj.Connection')
@@ -31,8 +41,7 @@ classdef Schema < handle
             self.package = package;
             addPackage(self.conn, dbname, package)
         end
-        
-        
+              
         function val = get.classNames(self)
             self.reload(false)
             val = self.classNames;
@@ -57,8 +66,7 @@ classdef Schema < handle
             self.reload(false)
             val = self.tableLevels;
         end
-        
-        
+         
         function makeClass(self, className)
             % create a base relvar class for the new className in schema directory.
             %
@@ -183,7 +191,6 @@ classdef Schema < handle
             fclose(f);
             edit(filename)
         end
-        
         
         function erd(self, subset)
             % ERD -- plot the Entity Relationship Diagram of the entire schema
@@ -321,8 +328,7 @@ classdef Schema < handle
                 y = y(1) + (y(2)-y(1))*t;
                 plot(x, y, lineStyle)
             end
-        end
-        
+        end   
         
         function backup(self, backupDir, tiers, restrictor)
             % dj.Schema/backup - saves tables into .mat files
@@ -346,7 +352,7 @@ classdef Schema < handle
             if nargin<4
                 restrictor = {};
             end
-            assert(all(ismember(tiers, dj.utils.allowedTiers)))
+            assert(all(ismember(tiers, dj.Schema.allowedTiers)))
             backupDir = fullfile(backupDir, self.dbname);
             if ~exist(backupDir, 'dir')
                 assert(mkdir(backupDir), ...
@@ -372,8 +378,7 @@ classdef Schema < handle
                 fprintf 'done\n'
             end
         end
-        
-        
+                
         function restore(self, backupDir)
             % insert all missing tuples from tables saved in <ClassName>.MAT files in backupDir
             d = dir(fullfile(backupDir,'*.mat'));
@@ -415,7 +420,6 @@ classdef Schema < handle
             end
         end
         
-        
         function reload(self, force)
             force = nargin<2 || force;
             if self.loaded && ~force
@@ -436,11 +440,11 @@ classdef Schema < handle
             
             % determine table tier (see dj.Table)
             re = cellfun(@(x) sprintf('^%s[a-z][a-z0-9_]*$',x), ...
-                dj.utils.tierPrefixes, 'UniformOutput', false); % regular expressions to determine table tier
+                dj.Schema.tierPrefixes, 'UniformOutput', false); % regular expressions to determine table tier
             tierIdx = cellfun(@(x) ...
                 find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
                 self.tables.name);
-            self.tables.tier = dj.utils.allowedTiers(tierIdx)';
+            self.tables.tier = dj.Schema.allowedTiers(tierIdx)';
             
             self.tables.comment = cellfun(@(x) strtok(x,'$'), ...
                 self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
@@ -545,11 +549,10 @@ classdef Schema < handle
                 else
                     str = ['$' db];
                 end
-                str = sprintf('%s.%s', str, dj.utils.camelCase(tab));
+                str = sprintf('%s.%s', str, dj.Schema.toCamelCase(tab));
             end
         end
-        
-        
+                
         function names = getParents(self, className, hierarchy, crossSchemas)
             % retrieve the class names of the parents of given table classes
             if nargin<3
@@ -559,7 +562,6 @@ classdef Schema < handle
             names = self.getRelatives(className, true, hierarchy, crossSchemas);
         end
         
-        
         function names = getChildren(self, className, hierarchy, crossSchemas)
             % retrieve the class names of the parents of given table classes
             if nargin<3
@@ -568,7 +570,6 @@ classdef Schema < handle
             crossSchemas = nargin>=4 && crossSchemas;
             names = self.getRelatives(className, false, hierarchy, crossSchemas);
         end
-        
         
         function names = getRelatives(self, className, up, hierarchy, crossSchemas)
             names = {};
@@ -604,6 +605,47 @@ classdef Schema < handle
                     end
                 end
             end
+        end    
+    end
+    
+    methods(Static)
+        function str = toCamelCase(str)
+            % converts underscore_compound_words to CamelCase 
+            %
+            % Not always exactly inversible
+            %
+            % Examples:
+            %   toCamelCase('one')            -->  'One'
+            %   toCamelCase('one_two_three')  -->  'OneTwoThree'
+            %   toCamelCase('#$one_two,three') --> 'OneTwoThree'
+            %   toCamelCase('One_Two_Three')  --> !error! upper case only mixes with alphanumericals
+            %   toCamelCase('5_two_three')    --> !error! cannot start with a digit
+            
+            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
+            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')            
+            assert(isempty(regexp(str, '[A-Z]', 'once')), ...
+                'underscore_compound_words must not contain uppercase characters')
+            str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
+        end
+        
+        
+        
+        function str = fromCamelCase(str)
+            % converts CamelCase to underscore_compound_words.
+            % 
+            % Examples:
+            %   fromCamelCase('oneTwoThree')    --> 'one_two_three'
+            %   fromCamelCase('OneTwoThree')    --> 'one_two_three'
+            %   fromCamelCase('one two three')  --> !error! white space is not allowed
+            %   fromCamelCase('ABC')            --> 'a_b_c'
+
+            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
+            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
+            
+            assert(~isempty(regexp(str, '^[a-zA-Z0-9]*$', 'once')), ...
+                'fromCamelCase string can only contain alphanumeric characters');
+            str = regexprep(str, '([A-Z])', '_${lower($1)}');
+            str = str(1+(str(1)=='_'):end);  % remove leading underscore
         end
     end
-end
+end    

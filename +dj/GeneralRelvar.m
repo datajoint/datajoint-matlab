@@ -1,10 +1,8 @@
-% GeneralRelvar: a relational variable supporting relational operators.
-% General relvars do not have a table associated with them. They
-% represent a relational expression based on other relvars.
+% DJ.GENERALRELVAR - a relational variable supporting relational operators.
+% General relvars can be base relvars (associated with a table) or derived 
+% relvars constructed from other relvars by relational operators.
 
-% To make the code R2009 compatible, toggle comments on the following two lines
-%classdef GeneralRelvar < dj.R2009CopyableRelvarMixin  % pre-R2011
-classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
+classdef GeneralRelvar < matlab.mixin.Copyable 
     
     properties(Dependent, SetAccess = private)
         schema       % schema object
@@ -110,8 +108,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
         end
         
         function view(self)
-            % dj.Relvar/view - view the data in speadsheet form
-            
+            % dj.Relvar/view - view the data in speadsheet form. Blobs are omitted.            
             if ~self.exists
                 disp 'empty relation'
             else
@@ -144,8 +141,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     'ColumnFormat', format, 'Data', struct2cell(data)');
             end
         end
-        
-        
+                
         %%%%%%%%%%%%%%%%%% FETCHING DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
        
         function yes = exists(self)
@@ -161,8 +157,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             [~, sql] = self.compile(3);
             n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
             n=n.n;
-        end
-        
+        end        
         
         function ret = fetch(self, varargin)
             % dj.GeneralRelvar/fetch retrieve data from a relation as a struct array
@@ -205,7 +200,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 makeAttrList(header), sql, limit));
             ret = dj.struct.fromFields(ret);
         end
-        
         
         function varargout = fetch1(self, varargin)
             % dj.GeneralRelvar/fetch1 same as dj.Relvat/fetch but each field is
@@ -251,7 +245,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 varargout{iArg} = s.(name{1}{1});
             end
         end
-        
         
         function varargout = fetchn(self, varargin)
             % dj.GeneralRelvar/fetchn same as dj.GeneralRelvar/fetch1 but can fetch
@@ -326,7 +319,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             self.restrictions = [self.restrictions args];
         end
         
-        
         function ret = and(self, arg)
             % dj.GeneralRelvar/and - relational restriction
             %
@@ -344,19 +336,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
             end
             ret = self.copy;
             ret.restrictions = [ret.restrictions arg];
-        end
-        
-        function ret = minus(self, arg)
-            if iscell(arg)
-                throwAsCaller(MException('DataJoint:invalidOperator',...
-                    'Antijoin only accepts single restrictions'))
-            end
-            ret = self.copy;
-            ret.restrictions = [ret.restrictions {'not' arg}];
-        end
-        
-        function ret = plus(self, arg)
-            ret = self.or(arg);
         end
         
         function ret = or(self, arg)
@@ -386,19 +365,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                 operandList = [operandList arg.operands];
             end
             ret = init(dj.GeneralRelvar, 'union', operandList);
+        end        
+        
+        function ret = minus(self, arg)
+            if iscell(arg)
+                throwAsCaller(MException('DataJoint:invalidOperator',...
+                    'Antijoin only accepts single restrictions'))
+            end
+            ret = self.copy;
+            ret.restrictions = [ret.restrictions {'not' arg}];
         end
-        
-        
-        function ret = times(self, arg)
-            % alias for backward compatibility
-            ret = self & arg;
-        end
-        
-        function ret = rdivide(self, arg)
-            % alias for backward compatibility
-            ret = self - arg;
-        end
-        
+                            
         function ret = pro(self, varargin)
             % dj.GeneralRelvar/pro - relational operators that modify the relvar's header:
             % project, rename, extend, and aggregate.
@@ -488,29 +465,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable  %post-R2011
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
             end
             ret = init(dj.GeneralRelvar, 'join', {self arg});
-        end
-        
-        function length(self)
-            % prohibit the use of length() to avoid ambiguity
-            throwAsCaller(MException('DataJoint:invalidOperator',....
-                'dj.GeneralRelvar/length is not defined Use count()'))
-        end
-        
-        function isempty(self)
-            % prohibit the use of isempty() tp avoid ambiguity
-            throwAsCaller(MException('DataJoint:invalidOperator',....
-                'dj.GeneralRelvar/isempty is not defined. Use count()'))
-        end
-        
+        end        
     end
     
     
     %%%%%%%%%%%%%%% PRIVATE HELPER FUNCTIONS %%%%%%%%%%%%%%%%%%%%%
-    
-    
     methods(Access = private)
         
         function schema = getSchema(self)
+            % get reference to the schema from the first base relvar
             schema = self.operands{1};
             if strcmp(self.operator, 'table')
                 schema = schema.schema;

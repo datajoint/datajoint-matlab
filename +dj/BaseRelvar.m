@@ -58,7 +58,7 @@ classdef BaseRelvar < dj.GeneralRelvar
             else
                 % warn the user if deleting from a subtable
                 if ismember(self.tab.info.tier, {'imported','computed'}) ...
-                        && ~isa(self, 'dj.AutoPopulate') && ~isa(self, 'dj.Automatic')
+                        && ~isa(self, 'dj.Automatic')
                     fprintf(['!!! %s is a subtable. For referential integrity, ' ...
                         'delete from its parent instead.\n'], class(self))
                     if ~strcmpi('yes', input('Prceed anyway? yes/no >','s'))
