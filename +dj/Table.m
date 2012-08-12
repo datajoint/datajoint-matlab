@@ -31,7 +31,7 @@ classdef (Sealed) Table < handle
     end
     
     properties(Constant)
-        mysql_constants = {'CURRENT_TIMESTAMP','CURRENT_TIME','CURRENT_DATE'}
+        mysql_constants = {'CURRENT_TIMESTAMP'}
     end
     
     properties(Access=private)
@@ -436,13 +436,8 @@ classdef (Sealed) Table < handle
         end
     end
     
-    
-    
-    
-    
     methods(Access=private)
-        
-        
+    
         function declaration = getDeclaration(self)
             % extract the table declaration with the first percent-brace comment
             % block of the matching .m file.
@@ -460,7 +455,6 @@ classdef (Sealed) Table < handle
         
         
         function create(self)
-            
             [tableInfo parents references fieldDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
@@ -474,7 +468,7 @@ classdef (Sealed) Table < handle
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
-            % add inherited primary key header
+            % add inherited primary key attributes
             primaryKeyFields = {};
             for iRef = 1:length(parents)
                 for iField = find([parents{iRef}.table.header.iskey])
@@ -487,7 +481,7 @@ classdef (Sealed) Table < handle
                 end
             end
             
-            % add the new primary key header
+            % add the new primary key attribites
             if ~isempty(fieldDefs)
                 for iField = find([fieldDefs.iskey])
                     field = fieldDefs(iField);
@@ -498,7 +492,7 @@ classdef (Sealed) Table < handle
                 end
             end
             
-            % add secondary foreign key header
+            % add secondary foreign key attributes
             for iRef = 1:length(references)
                 for iField = find([references{iRef}.table.header.iskey])
                     field = references{iRef}.table.header(iField);
@@ -508,7 +502,7 @@ classdef (Sealed) Table < handle
                 end
             end
             
-            % add dependent header
+            % add dependent attributes
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
