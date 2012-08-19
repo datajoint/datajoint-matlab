@@ -172,15 +172,14 @@ classdef Schema < handle
             % metod makeTuples
             if isAuto
                 if ~isSubtable
-                    fprintf(f, '\tend\n');
                     fprintf(f, '\n\tmethods(Access=protected)\n');
                 end
                 fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
                 fprintf(f, '\t\tend\n');
+                fprintf(f, '\tend\n');
             end
-            fprintf(f, '\tend\n');
             fprintf(f, 'end\n');
             fclose(f);
             edit(filename)
