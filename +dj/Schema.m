@@ -167,13 +167,7 @@ classdef Schema < handle
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
             end
-            fprintf(f, '\tend\n');
-            
-            % constructor
-            fprintf(f, '\n\tmethods\n');
-            fprintf(f, '\t\tfunction self = %s(varargin)\n', className);
-            fprintf(f, '\t\t\tself.restrict(varargin)\n');
-            fprintf(f, '\t\tend\n');
+            fprintf(f, '\tend\n');            
             
             % metod makeTuples
             if isAuto

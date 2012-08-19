@@ -16,7 +16,7 @@
 % Once self.makeTuples and self.popRel are defined, the user may
 % invoke methods poopulate or parpopulate to automatically populate the table.
 %
-% The method parpopulate works similarly to populate but it uses the job reservation 
+% The method parpopulate works similarly to populate but it uses the job reservation
 % table <package>.Jobs to enable execution by multiple processes in parallel.
 %
 % The job reservation table must be declated as <package>.Jobs in the same
@@ -63,7 +63,7 @@ classdef Automatic < handle
             %   populate(tp.OriMaps)   % populate all tp.OriMaps
             %   populate(tp.OriMaps, 'mouse_id=12')    % populate OriMaps for mouse 12
             %   [failedKeys, errs] = populate(tp.OriMaps);  % skip errors and return their list
-            % 
+            %
             % See also dj.Automatic/parpopulate
             
             if ~isempty(self.restrictions)
@@ -78,7 +78,7 @@ classdef Automatic < handle
         
         function varargout = parpopulate(self, varargin)
             % dj.Automatic/parpopulate works identically to dj.Automatic/populate
-            % except that it uses a job reservation mechanism to enable multiple 
+            % except that it uses a job reservation mechanism to enable multiple
             % processes to populate the same table in parallel without collision.
             %
             % To enable parpopulate, create the job reservation table
@@ -149,15 +149,15 @@ classdef Automatic < handle
             if nargout
                 failedKeys = struct([]);
                 errors = struct([]);
-            end            
+            end
             unpopulated = self.popRel;
             assert(isa(unpopulated, 'dj.GeneralRelvar'), ...
                 'property popRel must be a subclass of dj.GeneralRelvar')
             unpopulated = fetch((unpopulated & varargin) - self);
             if isempty(unpopulated)
-                disp 'Nothing to populate'
+                fprintf('%s: Nothing to populate\n', self.table.className)
             else
-                fprintf('\n** Found %d unpopulated keys\n\n', length(unpopulated))
+                fprintf('\n**%s: Found %d unpopulated keys\n\n', self.table.className, length(unpopulated))
                 for key = unpopulated'
                     if self.setJobStatus(key, 'reserved')
                         self.schema.conn.startTransaction
@@ -166,7 +166,7 @@ classdef Automatic < handle
                             self.schema.conn.cancelTransaction
                             self.setJobStatus(key, 'completed')
                         else
-                            fprintf('Populating %s for:\n', class(self))
+                            fprintf('Populating %s for:\n', self.table.className)
                             disp(key)
                             try
                                 % do the work
@@ -206,7 +206,7 @@ classdef Automatic < handle
                 jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
                 switch status
                     case 'completed'
-                        delQuick(self.jobs & jobKey)                        
+                        delQuick(self.jobs & jobKey)
                     case 'error'
                         tuple = jobKey;
                         tuple.status = status;
@@ -217,14 +217,19 @@ classdef Automatic < handle
                     case 'reserved'
                         % this reservation process assumes that MySQL API
                         % will throw an error when inserting a duplicate entry.
-                        try
+                        success = ~exists(self.jobs & jobKey);
+                        if success
                             tuple = jobKey;
                             tuple.status = status;
-                            self.jobs.insert(tuple);
-                            success = true;
-                        catch %#ok<CTCH>
-                            success = false;
-                            disp '** skipped reserved job:'
+                            try
+                                self.jobs.insert(tuple);
+                                success = true;
+                            catch %#ok<CTCH>
+                                success = false;
+                            end
+                        end
+                        if ~success
+                            fprintf('** %s: skipped reserved job:', self.table.className)
                             disp(key)
                         end
                 end
