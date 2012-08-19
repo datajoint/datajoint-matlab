@@ -25,7 +25,7 @@ classdef Relvar < dj.BaseRelvar
             % a subtable is an imported or computed tables that does not
             % have its own auto-populate functionality.
             yes = ismember(self.table.info.tier, {'imported','computed'}) && ...
-                ~isa(self, 'dj.AutoPopulate') && ~isa(self, 'dj.Automatic');
+                ~isa(self, 'dj.AutoPopulate');
         end        
     end
 end

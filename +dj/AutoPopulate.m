@@ -1,4 +1,4 @@
-% dj.Automatic is an abstract mixin class that allows a dj.Relvar object
+% dj.AutoPopulate is an abstract mixin class that allows a dj.Relvar object
 % to automatically populate its table.
 %
 % Derived classes must also inherit from dj.Relvar and must define the
@@ -9,7 +9,7 @@
 % self.insert(tuple).
 %
 % The constant property 'popRel' must be defined in the derived class.
-% dj.Automatic/populate uses self.popRel to generate the list of unpopulated keys
+% dj.AutoPopulate/populate uses self.popRel to generate the list of unpopulated keys
 % for which self.makeTuples() will be invoked. Thus popRel determines the scope
 % and granularity of makeTuples calls.
 %
@@ -25,7 +25,7 @@
 % job is completed, the entry is removed. When the job ends in error, the
 % status is set to "error" and the error stack is saved.
 
-classdef Automatic < handle
+classdef AutoPopulate < handle
     
     properties(Constant,Abstract)
         popRel     % specify the relation providing tuples for which makeTuples is called.
@@ -64,7 +64,7 @@ classdef Automatic < handle
             %   populate(tp.OriMaps, 'mouse_id=12')    % populate OriMaps for mouse 12
             %   [failedKeys, errs] = populate(tp.OriMaps);  % skip errors and return their list
             %
-            % See also dj.Automatic/parpopulate
+            % See also dj.AutoPopulate/parpopulate
             
             if ~isempty(self.restrictions)
                 throwAsCaller(MException('DataJoint:invalidInput', ...
@@ -77,7 +77,7 @@ classdef Automatic < handle
         
         
         function varargout = parpopulate(self, varargin)
-            % dj.Automatic/parpopulate works identically to dj.Automatic/populate
+            % dj.AutoPopulate/parpopulate works identically to dj.AutoPopulate/populate
             % except that it uses a job reservation mechanism to enable multiple
             % processes to populate the same table in parallel without collision.
             %
@@ -110,7 +110,7 @@ classdef Automatic < handle
             % class and the 32-bit MD5 hash of the primary key. However, the
             % key is saved in a separate field for errors for debugging
             % purposes.
-            % See also dj.Automatic/populate
+            % See also dj.AutoPopulate/populate
             
             if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
                 throwAsCaller(MException('DataJoint:invalidPopRel', ...

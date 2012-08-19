@@ -149,7 +149,7 @@ classdef Schema < handle
             % class definition
             fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
             if isAuto && ~isSubtable
-                fprintf(f, ' & dj.Automatic');
+                fprintf(f, ' & dj.AutoPopulate');
             end
             
             % properties

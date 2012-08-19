@@ -466,6 +466,18 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
             ret = init(dj.GeneralRelvar, 'join', {self arg});
         end        
+        
+        %%%%% DEPRECATED RELATIIONAL OPERATORS (for backward compatibility)
+        function ret = times(self, arg)
+            ret = self & arg;
+        end
+        function ret = rdivide(self, arg)
+            ret = self - arg;
+        end
+        function ret = plus(self, arg)
+            ret = self | arg;
+        end
+        
     end
     
     

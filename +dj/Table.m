@@ -387,7 +387,7 @@ classdef (Sealed) Table < handle
             if ismember(self.info.tier, {'imported','computed'}) && ...
                     ~isempty(which(self.className))
                 rel = eval(self.className);
-                if ~isa(rel,'dj.AutoPopulate') && ~isa(rel,'dj.Automatic')
+                if ~isa(rel,'dj.AutoPopulate')
                     fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
                         'drop its parent table instead.\n'], self.className)
                     if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
