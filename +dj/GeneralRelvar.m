@@ -180,16 +180,19 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %
             % If the last input argument is numerical, the number of
             % retrieved tuples will be limited to that number.
-            % If two numerical arguments trail the argument list, then the
-            % first is used as the starting index.
+            % If the last two input arguments are numerical, then the
+            % first is used as the starting index and the second limits the
+            % number of returned tuples.
             %
             % For example:
             %    s = R.fetch('*', 100);        % tuples 1-100 from R
             %    s = R.fetch('*', 1, 100);     % still tuples 1-100
             %    s = R.fetch('*', 101, 100);   % tuples 101-200
             %
-            % The numerical indexing into the relvar is a deviation from
-            % relational theory and should be reserved for special cases only.
+            % The numerical indexing into a relvar is a deviation from
+            % relational theory and should be reserved for special cases
+            % only since the order of tuples in a relation is not
+            % guaranteed.
             %
             % See also dj.GeneralRelvar.pro, dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetchn
             

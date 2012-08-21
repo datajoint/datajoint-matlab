@@ -1,6 +1,5 @@
 function kill
-% DJ.KILL - show MySQL processes and connections and prompt to kill a
-% connection.
+% DJ.KILL - show MySQL connections and prompt to kill a connection.
 
 while true
     query(dj.conn, 'show processlist')
