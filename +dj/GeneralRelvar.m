@@ -1,4 +1,4 @@
-% DJ.GENERALRELVAR - a relational variable supporting relational operators.
+% dj.GeneralRelvar - a relational variable supporting relational operators.
 % General relvars can be base relvars (associated with a table) or derived 
 % relvars constructed from other relvars by relational operators.
 

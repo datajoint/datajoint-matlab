@@ -1,4 +1,4 @@
-% manages information about database tables and their dependencies
+% dj.Schema - manages information about database tables and their dependencies
 % Complete documentation is available at <a href=http://code.google.com/p/datajoint/wiki/TableOfContents>Datajoint wiki</a>
 % See also dj.Table, dj.BaseRelvar, dj.GeneralRelvar
 
@@ -224,7 +224,6 @@ classdef Schema < handle
             
             % optimize graph appearance by minimizing disctances.^2 to connected nodes
             % while maximizing distances to nodes on the same level.
-            fprintf 'optimizing layout...'
             j1 = cell(1,length(xi));
             j2 = cell(1,length(xi));
             for i=1:length(xi)
@@ -310,8 +309,6 @@ classdef Schema < handle
             axis off
             title(sprintf('%s (%s)', self.package, self.dbname), ...
                 'Interpreter', 'none', 'fontsize', 14,'FontWeight','bold', 'FontName', 'Ariel')
-            disp done
-            
             
             function connectNodes(x, y, lineStyle)
                 assert(length(x)==2 && length(y)==2)

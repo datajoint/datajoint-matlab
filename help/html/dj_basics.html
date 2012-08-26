@@ -1,0 +1,113 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Basic concepts</title><meta name="generator" content="MATLAB 7.14"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2012-08-25"><meta name="DC.source" content="dj_basics.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, tt, code { font-size:12px; }
+pre { margin:0px 0px 20px; }
+pre.error { color:red; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+
+  </style></head><body><div class="content"><h1>Basic concepts</h1><!--introduction--><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">The relational data model</a></li><li><a href="#2">Attributes and tuples</a></li><li><a href="#3">Relations</a></li><li><a href="#4">Relvars</a></li><li><a href="#5">Matching tuples</a></li><li><a href="#6">Primary keys</a></li><li><a href="#7">Foreign keys</a></li></ul></div><h2>The relational data model<a name="1"></a></h2><p>Invented by IBM researcher <a href="matlab:web('http://en.wikipedia.org/wiki/Edgar_F._Codd','-browser')">Edgar F. Codd</a> in 1969, (E. F. Codd. "A relational model of data for large shared data banks." <i>Communications of the ACM</i>, 13(<b>6</b>):387, 1970) the <a href="matlab:web('http://en.wikipedia.org/wiki/Relational_model','-browser')">relational data model</a> for databases steadily replaced the earlier hierarchical and network models and has become the de facto standard for mainstream databases today, supporting banking transactions, airfare bookings, and data-intensive websites such as Facebook, Wikipedia, and YouTube, to pick but a few examples.  Modern relational database management systems execute fast, precise, and flexible data queries and preclude inconsistencies arising from simultaneous or interrupted manipulations by multiple users. Interactions with a relational database are performed in a query language such as <a href="matlab:web('http://en.wikipedia.org/wiki/SQL','-browser')">SQL</a>.</p><h2>Attributes and tuples<a name="2"></a></h2><p>A tuple is a set of attribute name/value pairs. For example, the tuple</p><pre>mouse_id      measure_date      weight
+  1001          2010-10-10       21.5</pre><p>in a given relation may represent a real-world fact such as "On Oct. 10, 2010, mouse #1001 weighed 21.5 grams." An attribute name is more than just a name: it implies a particular <i>datatype</i> (domain) and a unique <i>role</i> in the tuple and in the external world. Thus attribute names must be unique in a tuple and their order in the tuple is not significant.</p><p>The closest equivalent of a tuple in Matlab is a structure. We will use the terms <i>attribute</i> and <i>field</i> interchangeably.</p><h2>Relations<a name="3"></a></h2><p>A relation is a set of tuples that share the same set of attribute names. No duplicate tuples can exist in a relation.  The ordering of tuples in a relation is not significant.</p><h2>Relvars<a name="4"></a></h2><p>A relvar (relation variable) is a variable specifying a relation. It is distinguished from the relation itself due to the fact that, even if a relvar remains unchanged, its corresponding  relation may be changed by other transactions elsewhere.</p><p>Starting with a <i>base relvar</i> expressing the complete contents of a given  <i>table</i> in the database, we can transform them into <i>derived relations</i> by applying <i>relational operators</i> until they contain only all the necessary information, and then retrieve their values into the MATLAB workspace.  We will use the term <i>table</i> and <i>base relvar</i> interchangeably.</p><h2>Matching tuples<a name="5"></a></h2><p>The key concept at the foundation of data manipulations in the relational model is <i>tuple matching</i>.  Two tuples match if their identically named attributes contain equal values.</p><p>Thus one tuple may be used to address a group of  other matching tuples in a relation (e.g. see [[restrict, semijoin, antijoin, and union]]). Two tuples may be merged into one if they match, but not otherwise. The <i>join</i> of two relations is the set of all possible merged pairs from the two original relations.</p><h2>Primary keys<a name="6"></a></h2><p>In DataJoint, each relation has one <i>primary key</i> comprising a subset of its attributes that are designated to uniquely identify any tuple in the relation. No two tuples in the same relation can have the same combination of values in their primary key fields.  To uniquely identify a tuple in the relation, one must provide the values of the primary key fields as a matching tuple.</p><p>Learn more in <a href="primary_keys.html">primary keys</a>.</p><h2>Foreign keys<a name="7"></a></h2><p>A base relation may have one or more <i>foreign keys</i>, i.e. a subset of its attributes that correspond to the primary key of another, <i>referenced</i> base relation. The database will enforce <i>referential constraints</i>: a base relation cannot contain a tuple whose foreign key value does not match the primary key value of a tuple in the referenced relation.</p><p>Learn more in <a href="foreign_keys.html">foreign keys</a></p><p>Copyright 2012  Dimitri Yatsenko</p><p class="footer"><br>
+      Published with MATLAB&reg; 7.14<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Basic concepts 
+%
+%% The relational data model
+% Invented by IBM researcher <matlab:web('http://en.wikipedia.org/wiki/Edgar_F._Codd','-browser') Edgar F. Codd> in 1969, 
+% (E. F. Codd. "A relational model of data for large shared data banks." _Communications of the ACM_, 13(*6*):387, 1970) 
+% the <matlab:web('http://en.wikipedia.org/wiki/Relational_model','-browser') relational data model> for databases steadily 
+% replaced the earlier hierarchical and network models and has become the de facto standard for mainstream databases today, 
+% supporting banking transactions, airfare bookings, and data-intensive websites such as Facebook, Wikipedia, and YouTube, 
+% to pick but a few examples.  Modern relational database management systems execute fast, precise, and flexible data 
+% queries and preclude inconsistencies arising from simultaneous or interrupted manipulations by multiple users. 
+% Interactions with a relational database are performed in a query language such as <matlab:web('http://en.wikipedia.org/wiki/SQL','-browser') SQL>. 
+%
+%% Attributes and tuples 
+% A tuple is a set of attribute name/value pairs. For example, the tuple
+%
+%  mouse_id      measure_date      weight 
+%    1001          2010-10-10       21.5 
+%
+% in a given relation may represent a real-world fact such as "On Oct. 10, 2010, mouse #1001 weighed 21.5 grams."  
+% An attribute name is more than just a name: it implies a particular _datatype_ (domain) and a unique _role_ in the tuple and in the external world.  
+% Thus attribute names must be unique in a tuple and their order in the tuple is not significant.  
+%
+% The closest equivalent of a tuple in Matlab is a structure. We will use the terms _attribute_ and _field_ interchangeably.
+%
+%% Relations
+% A relation is a set of tuples that share the same set of attribute names. No duplicate tuples can exist in a relation.  The ordering of tuples in a relation is not significant.  
+%
+%% Relvars
+% A relvar (relation variable) is a variable specifying a relation. It is distinguished from the relation itself due to the fact that, 
+% even if a relvar remains unchanged, its corresponding  relation may be changed by other transactions elsewhere.
+% 
+% Starting with a _base relvar_ expressing the complete contents of a given  _table_ in the database, we can transform them into _derived relations_ by applying _relational operators_ until they contain only all the necessary information, and then retrieve their values into the MATLAB workspace.  We will use the term _table_ and _base relvar_ interchangeably. 
+%
+%% Matching tuples
+% The key concept at the foundation of data manipulations in the relational model is _tuple matching_.  Two tuples match if their identically named attributes contain equal values.  
+%
+% Thus one tuple may be used to address a group of  other matching tuples in a relation (e.g. see [[restrict, semijoin, antijoin, and union]]). Two tuples may be merged into one if they match, but not otherwise. The _join_ of two relations is the set of all possible merged pairs from the two original relations.
+%
+%% Primary keys
+% In DataJoint, each relation has one _primary key_ comprising a subset of its attributes that are designated to uniquely identify any tuple in the relation. No two tuples in the same relation can have the same combination of values in their primary key fields.  To uniquely identify a tuple in the relation, one must provide the values of the primary key fields as a matching tuple.
+%
+% Learn more in <primary_keys.html primary keys>.
+%
+%% Foreign keys
+% A base relation may have one or more _foreign keys_, i.e. a subset of its attributes that correspond to the primary key of another, _referenced_ base relation. The database will enforce _referential constraints_: a base relation cannot contain a tuple whose foreign key value does not match the primary key value of a tuple in the referenced relation. 
+%
+% Learn more in <foreign_keys.html foreign keys>
+%
+% Copyright 2012  Dimitri Yatsenko
+ 
+##### SOURCE END #####
+--></body></html>

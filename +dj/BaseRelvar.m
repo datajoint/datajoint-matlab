@@ -1,9 +1,12 @@
+% dj.BaseRelvar - a relational variable linked to a table in the database.
+% BaseRelvar provides data manipulation operators del and insert.
+%
+% SYNTAX:
+%    obj = dj.BaseRelvar(table)  % table must be of class dj.Table
+
+% -- Dimitri Yatsenko, 2012
+
 classdef BaseRelvar < dj.GeneralRelvar
-    % BaseRelvar: a relational variable linked to a table in the database.
-    % BaseRelvar provides data manipulation operators del and insert.
-    %
-    % SYNTAX:
-    %    obj = dj.BaseRelvar(table)  % table must be of class dj.Table
     
     properties(Dependent,Access=private)
         tab     % associated table
@@ -28,14 +31,14 @@ classdef BaseRelvar < dj.GeneralRelvar
         
         
         function delQuick(self)
-            % dj.BaseRelvar/delQuick - remove all tuples of relation self from its table. 
+            % dj.BaseRelvar/delQuick - remove all tuples of relation self from its table.
             % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
-            
-                
+        
+        
         function del(self)
             % dj.BaseRelvar/del - remove all tuples of relation self from its table
             % as well as all dependent tuples in dependent tables.

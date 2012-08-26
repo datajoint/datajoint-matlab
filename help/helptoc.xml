@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding="utf-8"?>
+
+<toc version="2.0">
+    <!-- First tocitem specifies top level in Help browser Contents pane -->
+    <!-- This can be a roadmap page, as shown below, or a content page -->
+    <tocitem target="html/dj_features.html">DataJoint toolbox
+        <!-- Nest tocitems to create hierarchical entries in  Contents-->
+        <!-- To include icons, use the following syntax for tocitems: -->
+        <!-- <tocitem target="foo.html" image="HelpIcon.NAME"> -->
+        <!-- Title-of-Section </tocitem> -->
+        <!-- where NAME is one of the following (use capital letters): -->
+        <!-- FUNCTION, USER_GUIDE, EXAMPLES, BLOCK, GETTING_STARTED, -->
+        <!-- DEMOS, RELEASE_NOTES --> 
+        <!-- Icon images used for these entries are also stored in -->
+        <!-- matlabroot/toolbox/matlab/icons -->
+        <!-- A Getting Started Guide usually comes first -->
+        <tocitem target="html/dj_top.html" image="HelpIcon.GETTING_STARTED">
+            Getting Started with the DataJoint Toolbox
+        </tocitem>
+        <!-- User Guide comes next -->
+        <tocitem target="html/dj_guide.html" 
+                 image="HelpIcon.USER_GUIDE">DataJoint User Guide
+            <tocitem target="html/dj_features.html">DataJoint Features
+            </tocitem>
+            <tocitem target="html/dj_basics.html">Basic Concepts
+            </tocitem>
+            <tocitem target="html/dj_setup.html">Setting up
+            </tocitem>
+            <tocitem target="html/dj_ddl.html">Data definition
+            </tocitem>
+            <tocitem target="html/dj_entry.html">Data entry
+            </tocitem>
+            <tocitem target="html/dj_algebra.html">Relational algebra
+            </tocitem>
+            <tocitem target="html/dj_entry.html">Retrieving and deleting data
+            </tocitem>
+            
+        </tocitem>
+        <!-- Optional List of Examples, with hyperlinks to examples in other files -->
+        <tocitem target="dj_examples.html" 
+                 image="HelpIcon.HelpIcon.EXAMPLES">DataJoint Examples
+            <tocitem target="html/dj_schema_common.html">Schema "common"
+            </tocitem>
+            <tocitem target="html/dj_schema_psy">Schema "visual stimuli"
+            </tocitem>
+            <tocitem target="html/dj_schema_opt">Schema "optical imaging"
+            </tocitem>
+            <tocitem target="html/dj_schema_tp">Schema "two-photon"
+            </tocitem>
+        </tocitem>
+        <!-- Optional link or links to your or other Web sites -->
+        <tocitem target="http://github.com/dimitri-yatsenko/datajoint-matlab" 
+                 image="$toolbox/matlab/icons/webicon.gif">
+            DataJoint Web Site
+        </tocitem>
+    </tocitem>
+</toc>

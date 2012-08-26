@@ -16,7 +16,7 @@
 % The syntax of the table definition can be found at
 % http://code.google.com/p/datajoint/wiki/TableDeclarationSyntax
 
-% Dimitri Yatsenko, 2009-2011.
+% -- Dimitri Yatsenko, 2009-2011.
 
 classdef (Sealed) Table < handle
     
