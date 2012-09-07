@@ -1,8 +1,8 @@
 % dj.GeneralRelvar - a relational variable supporting relational operators.
-% General relvars can be base relvars (associated with a table) or derived 
+% General relvars can be base relvars (associated with a table) or derived
 % relvars constructed from other relvars by relational operators.
 
-classdef GeneralRelvar < matlab.mixin.Copyable 
+classdef GeneralRelvar < matlab.mixin.Copyable
     
     properties(Dependent, SetAccess = private)
         schema       % schema object
@@ -39,7 +39,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function s = get.sql(self)
             [~, s] = self.compile();
         end
-                
+        
         function schema = get.schema(self)
             schema = self.getSchema();
         end
@@ -81,7 +81,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 fprintf \n
                 maxRows = 12;
                 tuples = self.fetch(header(ix).name,maxRows+1);
-                nTuples = max(self.count, length(tuples));  
+                nTuples = max(self.count, length(tuples));
                 
                 % print rows
                 for s = tuples(1:min(end,maxRows))'
@@ -104,11 +104,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
             
             % print the total number of tuples
-            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)            
+            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
         end
         
         function view(self)
-            % dj.Relvar/view - view the data in speadsheet form. Blobs are omitted.            
+            % dj.Relvar/view - view the data in speadsheet form. Blobs are omitted.
             if ~self.exists
                 disp 'empty relation'
             else
@@ -141,9 +141,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     'ColumnFormat', format, 'Data', struct2cell(data)');
             end
         end
-                
+        
         %%%%%%%%%%%%%%%%%% FETCHING DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-       
+        
         function yes = exists(self)
             % dj.GeneralRelvar/exists - a fast check whether the relvar
             % contains any tuples
@@ -157,7 +157,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [~, sql] = self.compile(3);
             n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
             n=n.n;
-        end        
+        end
         
         function ret = fetch(self, varargin)
             % dj.GeneralRelvar/fetch retrieve data from a relation as a struct array
@@ -351,9 +351,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % queried on its own.
             %
             % For example:
-            %   B + C   cannot be used on its own, but:
-            %   A & (B + C) returns all tuples in A that have matching tuples in B or C.
-            %   A - (B + C) returns all tuples in A that have no matching tuples in B or C.
+            %   B | C   cannot be used on its own, but:
+            %   A & (B | C) returns all tuples in A that have matching tuples in B or C.
+            %   A - (B | C) returns all tuples in A that have no matching tuples in B or C.
+            %
+            % Warning:
+            %  ~A  does not produce a valid relation by itself. Negation is
+            %  only valid when applied to a restricing relvar.
             
             if ~strcmp(self.operator, 'union')
                 operandList = {self};
@@ -368,9 +372,23 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 operandList = [operandList arg.operands];
             end
             ret = init(dj.GeneralRelvar, 'union', operandList);
-        end        
+        end
+        
+        function ret = not(self)
+            %  dj.Relvar/not - negation operator.
+            %  A & ~B   is equivalent to  A - B
+            % But here is an example where minus could not be used.
+            %  A & (B & cond | ~B)    % -- if B has matching tuples, also apply cond.
+            if strcmp(self.operator, 'not')
+                % negation cancels negation
+                ret = self.operands{1};
+            else
+                ret = init(dj.GeneralRelvar, 'not', {self});
+            end
+        end
         
         function ret = minus(self, arg)
+            % dj.GeneralRelvar/minus -- relational antijoin
             if iscell(arg)
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'Antijoin only accepts single restrictions'))
@@ -378,7 +396,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret = self.copy;
             ret.restrictions = [ret.restrictions {'not' arg}];
         end
-                            
+        
         function ret = pro(self, varargin)
             % dj.GeneralRelvar/pro - relational operators that modify the relvar's header:
             % project, rename, extend, and aggregate.
@@ -468,7 +486,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
             end
             ret = init(dj.GeneralRelvar, 'join', {self arg});
-        end        
+        end
+        
+        
         
         %%%%% DEPRECATED RELATIIONAL OPERATORS (for backward compatibility)
         function ret = times(self, arg)
@@ -496,7 +516,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 schema = schema.getSchema();
             end
         end
-        
         
         function [header, sql] = compile(self, enclose)
             % compile the query tree into an SQL expression
@@ -528,6 +547,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 case 'union'
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                         'The union operator must be used in a restriction'))
+
+                case 'not'
+                    throwAsCaller(MException('DataJoint:invalidOperator', ...
+                        'The NOT operator must be used in a restriction'))
                     
                 case 'table'  % terminal node
                     r = self.operands{1};
@@ -596,7 +619,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
 end
 
 
-
 function clause = makeWhereClause(selfAttrs, restrictions)
 % make the where clause from self.restrictions
 persistent aliasCount
@@ -623,7 +645,11 @@ for arg = restrictions
             s = cellfun(@(x) stripWhere(makeWhereClause(selfAttrs, {x})), cond.operands, 'UniformOutput', false);
             assert(~isempty(s));
             s = sprintf('(%s) OR ', s{:});
-            clause = sprintf('%s %s %s(%s)', clause, word, not, s(1:end-4));
+            clause = sprintf('%s %s %s(%s)', clause, word, not, s(1:end-4));  % strip trailing " OR "
+            
+        case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'not')
+            clause = sprintf('%s %s NOT(%s)', clause, word, ...
+                stripWhere(makeWhereClause(selfAttrs, cond.operands))); 
             
         case ischar(cond) && strcmpi(cond,'NOT')
             % negation of the next condition
@@ -680,7 +706,6 @@ end
 end
 
 
-
 function cond = struct2cond(keys, header)
 % convert the structure array keys into an SQL condition
 if length(keys)>512
@@ -725,7 +750,6 @@ end
 end
 
 
-
 function [limit, args] = makeLimitClause(varargin)
 % makes the SQL limit clause from fetch() input arguments.
 % If the last one or two inputs are numeric, a LIMIT clause is
@@ -742,7 +766,6 @@ if nargin>0 && isnumeric(args{end})
     end
 end
 end
-
 
 
 function header = projectHeader(header, params)
@@ -801,7 +824,6 @@ header = header(include);
 end
 
 
-
 function [str, header] = makeAttrList(header)
 % make an SQL list of attributes for header, expanding aliases and strip
 % aliases from header
@@ -818,4 +840,3 @@ if ~isempty(header)
     str = str(2:end);
 end
 end
-

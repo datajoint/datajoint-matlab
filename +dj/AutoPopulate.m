@@ -229,7 +229,7 @@ classdef AutoPopulate < handle
                             end
                         end
                         if ~success
-                            fprintf('** %s: skipped reserved job:', self.table.className)
+                            fprintf('** %s: skipping already reserved', self.table.className)
                             disp(key)
                         end
                 end
