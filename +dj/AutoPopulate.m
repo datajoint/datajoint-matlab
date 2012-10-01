@@ -153,11 +153,17 @@ classdef AutoPopulate < handle
             unpopulated = self.popRel;
             assert(isa(unpopulated, 'dj.GeneralRelvar'), ...
                 'property popRel must be a subclass of dj.GeneralRelvar')
+            % if the last argument is a function handle, apply it to popRel.
+            if ~isempty(varargin) && isa(varargin{end}, 'function_handle')
+                unpopulated = varargin{end}(unpopulated);
+            end
+            % restrict the popRel to unpopulated tuples
             unpopulated = fetch((unpopulated & varargin) - self);
             if isempty(unpopulated)
                 fprintf('%s: Nothing to populate\n', self.table.className)
             else
                 fprintf('\n**%s: Found %d unpopulated keys\n\n', self.table.className, length(unpopulated))
+                
                 for key = unpopulated'
                     if self.setJobStatus(key, 'reserved')
                         self.schema.conn.startTransaction
