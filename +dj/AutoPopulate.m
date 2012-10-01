@@ -66,9 +66,18 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/parpopulate
             
+            % perform error checks more carefully than parpopulate.
             if ~isempty(self.restrictions)
                 throwAsCaller(MException('DataJoint:invalidInput', ...
                     'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)'))
+            end
+            if ~isa(self.popRel, 'dj.GeneralRelvar')
+                throwAsCaller(MException('DataJoint:invalidInput', ...
+                    'property popRel must be a subclass of dj.GeneralRelvar'))
+            end
+            if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
+                throwAsCaller(MException('DataJoint:invalidPopRel', ...
+                    sprintf('%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))))
             end
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = false;
@@ -112,20 +121,47 @@ classdef AutoPopulate < handle
             % purposes.
             % See also dj.AutoPopulate/populate
             
-            if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
-                throwAsCaller(MException('DataJoint:invalidPopRel', ...
-                    sprintf('%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))))
-            end
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             jobClassName = [self.schema.package '.Jobs'];
-            try
-                jobs_ = eval(jobClassName);
-                assert(isa(jobs_, 'dj.Relvar'))
-                self.jobs = jobs_;
-            catch %#ok<CTCH>
-                throwAsCaller(MException('DataJoint:missingJobs', 'Could not find class <package>.Jobs'))
+            if ~exist(jobClassName,'class')
+                answer = input(sprintf('Class %s does not exist. Would you like to create it? yes/no >', jobClassName), 's');
+                if ~strcmpi(answer,'yes')                    
+                    throwAsCaller(MException('DataJoint:jobs', ...
+                        'Did not answer yes. Cancelling populate'))
+                end
+                schemaPath = which([self.schema.package '.getSchema']);
+                if isempty(schemaPath)
+                    throwAsCaller(MException('DataJoint:invalidSchema',...
+                        sprintf('missing function %s.getSchema', self.schema.package)));
+                end
+                path = fullfile(fileparts(schemaPath), 'Jobs.m');
+                f = fopen(path,'w');
+                fprintf(f, '%% %s.Jobs -- job reservation table\n\n', self.schema.package);
+                fprintf(f, '%%{\n');
+                fprintf(f, '%s.Jobs (job)    # the job reservation table\n', self.schema.package);
+                fprintf(f, 'table_name : varchar(255) # className of the table\n');
+                fprintf(f, 'key_hash   : char(32)     # key hash\n');
+                fprintf(f, '-----\n');
+                fprintf(f, 'status    : enum("reserved","error","ignore") # if tuple is missing, the job is available\n');
+                fprintf(f, 'error_key=null     : blob                              # non-hashed key for errors only\n');
+                fprintf(f, 'error_message=""   : varchar(1023)                     # error message returned if failed\n');
+                fprintf(f, 'error_stack=null   : blob                              # error stack if failed\n');
+                fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp                # automatic timestamp\n');
+                fprintf(f, '%%}\n\n');
+                fprintf(f, 'classdef Jobs < dj.Relvar\n');
+                fprintf(f, '    properties(Constant)\n');
+                fprintf(f, '        table = dj.Table(''%s.Jobs'')\n', self.schema.package);
+                fprintf(f, '    end\n');
+                fprintf(f, '    methods\n');
+                fprintf(f, '        function self = Jobs(varargin)\n');
+                fprintf(f, '            self.restrict(varargin)\n');
+                fprintf(f, '        end\n');
+                fprintf(f, '    end\n');
+                fprintf(f, 'end\n');
+                fclose(f);
+                rehash path
             end
-            
+            self.jobs = eval(jobClassName);            
             self.useReservations = true;
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
@@ -151,11 +187,11 @@ classdef AutoPopulate < handle
                 errors = struct([]);
             end
             unpopulated = self.popRel;
-            assert(isa(unpopulated, 'dj.GeneralRelvar'), ...
-                'property popRel must be a subclass of dj.GeneralRelvar')
+            
             % if the last argument is a function handle, apply it to popRel.
             if ~isempty(varargin) && isa(varargin{end}, 'function_handle')
                 unpopulated = varargin{end}(unpopulated);
+                varargin{end}=[];
             end
             % restrict the popRel to unpopulated tuples
             unpopulated = fetch((unpopulated & varargin) - self);
