@@ -6,7 +6,7 @@
    <!--
 This HTML was auto-generated from MATLAB code.
 To make changes, update the MATLAB code and republish this document.
-      --><title>Relational algebra</title><meta name="generator" content="MATLAB 7.14"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2012-08-25"><meta name="DC.source" content="dj_algebra.m"><style type="text/css">
+      --><title>Relational algebra</title><meta name="generator" content="MATLAB 7.14"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2012-08-26"><meta name="DC.source" content="dj_algebra.m"><style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
 
 html { min-height:100%; margin-bottom:1px; }
@@ -71,6 +71,8 @@ span.syscmd { color:#B28C00 }
 	  <span class="keyword">end</span>
 <span class="keyword">end</span>
 </pre><pre class="codeinput">common.Animal
+
+erd <span class="string">common</span>
 </pre><pre class="codeoutput">
 self = 
 
@@ -102,9 +104,9 @@ self =
            481           481    2012-03-11             M        C57BL6  2012-04-12 1
            482           482    2012-03-11             M                2012-04-17 1
          .....         .....         .....         .....         .....         .....
-48 tuples (0.0602 s)
+48 tuples (0.035 s)
 
-</pre><p class="footer"><br>
+</pre><img vspace="5" hspace="5" src="dj_algebra_01.png" alt=""> <p></p><p class="footer"><br>
       Published with MATLAB&reg; 7.14<br></p></div><!--
 ##### SOURCE BEGIN #####
 %% Relational algebra
@@ -128,5 +130,20 @@ self =
 %   end
 
 common.Animal
+
+erd common
+
+
+%% 
+% 
+% <latex>
+% \begin{tabular}{|c|c|} \hline
+% $n$ & $n!$ \\ \hline
+% 1 & 1 \\
+% 2 & 2 \\
+% 3 & 6 \\ \hline
+% \end{tabular}
+% </latex>
+% 
 ##### SOURCE END #####
 --></body></html>

@@ -547,7 +547,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 case 'union'
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                         'The union operator must be used in a restriction'))
-
+                    
                 case 'not'
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                         'The NOT operator must be used in a restriction'))
@@ -571,11 +571,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                         throwAsCaller(MException('DataJoint:invalidOperator', ...
                             'join cannot be done on blob attributes'))
                     end
-                    commonAttrs = intersect({header.name}, {header2.name});
-                    commonAttrs = sprintf(',`%s`', commonAttrs{:});
+                    pkeyAttrs = sprintf(',`%s`', header([header.iskey]).name);
                     sql = sprintf(...
                         '%s NATURAL JOIN %s GROUP BY %s', ...
-                        sql, sql2, commonAttrs(2:end));
+                        sql, sql2, pkeyAttrs(2:end));
                     header = projectHeader(header, self.operands(3:end));
                     
                     if all(arrayfun(@(x) isempty(x.alias), header))
@@ -649,7 +648,7 @@ for arg = restrictions
             
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'not')
             clause = sprintf('%s %s NOT(%s)', clause, word, ...
-                stripWhere(makeWhereClause(selfAttrs, cond.operands))); 
+                stripWhere(makeWhereClause(selfAttrs, cond.operands)));
             
         case ischar(cond) && strcmpi(cond,'NOT')
             % negation of the next condition

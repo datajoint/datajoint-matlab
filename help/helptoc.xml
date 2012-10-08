@@ -25,8 +25,30 @@
             <tocitem target="html/dj_basics.html">Basic Concepts
             </tocitem>
             <tocitem target="html/dj_setup.html">Setting up
+                <tocitem target="html/dj_mysqld.html">Set up a MySQL server 
+                </tocitem>
+                <tocitem target="html/dj_schemas.html">Creating a DataJoint schema 
+                </tocitem>
             </tocitem>
             <tocitem target="html/dj_ddl.html">Data definition
+                <tocitem target="html/dj_baserelvars.html">Base relvars
+                </tocitem>
+                <tocitem target="html/dj_tiers.html">Table tiers
+                </tocitem>
+                <tocitem target="html/dj_datatypes.html">Datatypes
+                </tocitem>
+                <tocitem target="html/dj_primarykeys.html">Primary keys
+                </tocitem>
+                <tocitem target="html/dj_primarykeys.html">Foreignkeys
+                </tocitem>
+                <tocitem target="html/dj_primarykeys.html">Subtables
+                </tocitem>
+                <tocitem target="html/dj_primarykeys.html">Entity Relational Diagram
+                </tocitem>
+                <tocitem target="html/dj_primarykeys.html">Dropping tables
+                </tocitem>
+                <tocitem target="html/dj_primarykeys.html">Modifying tables
+                </tocitem>
             </tocitem>
             <tocitem target="html/dj_entry.html">Data entry
             </tocitem>

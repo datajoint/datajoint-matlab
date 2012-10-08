@@ -124,6 +124,7 @@ classdef AutoPopulate < handle
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             jobClassName = [self.schema.package '.Jobs'];
             if ~exist(jobClassName,'class')
+                % Create the Jobs class if it does not yet exist
                 answer = input(sprintf('Class %s does not exist. Would you like to create it? yes/no >', jobClassName), 's');
                 if ~strcmpi(answer,'yes')                    
                     throwAsCaller(MException('DataJoint:jobs', ...
@@ -168,10 +169,7 @@ classdef AutoPopulate < handle
     end
     
     
-    
-    
     %%%% private stuff %%%%%
-    
     
     properties(Access=private)
         useReservations
