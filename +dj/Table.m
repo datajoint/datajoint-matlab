@@ -16,7 +16,7 @@
 % The syntax of the table definition can be found at
 % http://code.google.com/p/datajoint/wiki/TableDeclarationSyntax
 
-% -- Dimitri Yatsenko, 2009-2011.
+% -- Dimitri Yatsenko, 2009-2012.
 
 classdef (Sealed) Table < handle
     
@@ -314,6 +314,22 @@ classdef (Sealed) Table < handle
             self.syncDef
         end
         
+        function addForeignKey(self, target)
+            % add a foreign key constraint.
+            % The target must be a dj.Relvar object.
+            % EXAMPLE:
+            %    tp.Align.table.addForeignKey(common.Scan)
+            
+            fieldList = sprintf('%s,', target.primaryKey{:});
+            fieldList(end)=[];  % drop trailing comma 
+            sql = sprintf(...
+                'ALTER TABLE `%s`.`%s` ADD FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT\n', ...
+                self.schema.dbname, self.info.name, fieldList, ...
+                target.table.schema.dbname, target.table.info.name, fieldList);
+            self.schema.conn.query(sql)
+            self.schema.reload
+            self.syncDef
+        end
         
         
         function syncDef(self)
@@ -437,7 +453,7 @@ classdef (Sealed) Table < handle
     end
     
     methods(Access=private)
-    
+        
         function declaration = getDeclaration(self)
             % extract the table declaration with the first percent-brace comment
             % block of the matching .m file.
@@ -455,7 +471,7 @@ classdef (Sealed) Table < handle
         
         
         function create(self)
-            [tableInfo parents references fieldDefs] = ...
+            [tableInfo, parents, references, fieldDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
@@ -517,20 +533,11 @@ classdef (Sealed) Table < handle
             sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
             
             % add foreign key declarations
-            indices = {primaryKeyFields};
-            for ref = [parents, references]
+            for ref = [parents references]
                 fieldList = sprintf('%s,', ref{1}.primaryKey{:});
                 fieldList(end)=[];
-                if ~any(cellfun(@(x) isequal(ref{1}.primaryKey, x(1:min(end,length(ref{1}.primaryKey)))), indices));
-                    % add index if necessary. From MySQL manual:
-                    % "In the referencing table, there must be an index where the foreign
-                    % key columns are listed as the first columns in the same order."
-                    % http://dev.mysql.com/doc/refman/5.6/en/innodb-foreign-key-constraints.html
-                    sql = sprintf('%sINDEX (%s),\n', sql, fieldList);
-                    indices{end+1} = ref{1}.primaryKey;  %#ok<AGROW>
-                end
                 sql = sprintf(...
-                    '%sCONSTRAINT FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
+                    '%sFOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
                     sql, fieldList, ref{1}.table.schema.dbname, ref{1}.table.info.name, fieldList);
             end
             
@@ -614,7 +621,7 @@ end
 
 
 
-function [tableInfo parents references fieldDefs] = parseDeclaration(declaration)
+function [tableInfo, parents, references, fieldDefs] = parseDeclaration(declaration)
 parents = {};
 references = {};
 fieldDefs = [];
