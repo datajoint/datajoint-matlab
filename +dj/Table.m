@@ -304,6 +304,7 @@ classdef (Sealed) Table < handle
             self.syncDef
         end
         
+        
         function alterAttribute(self, attrName, newDefinition)
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
             sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN `%s` %s', ...
@@ -314,6 +315,7 @@ classdef (Sealed) Table < handle
             self.syncDef
         end
         
+        
         function addForeignKey(self, target)
             % add a foreign key constraint.
             % The target must be a dj.Relvar object.
@@ -321,7 +323,7 @@ classdef (Sealed) Table < handle
             %    tp.Align.table.addForeignKey(common.Scan)
             
             fieldList = sprintf('%s,', target.primaryKey{:});
-            fieldList(end)=[];  % drop trailing comma 
+            fieldList(end)=[];  % drop trailing comma
             sql = sprintf(...
                 'ALTER TABLE `%s`.`%s` ADD FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT\n', ...
                 self.schema.dbname, self.info.name, fieldList, ...
@@ -331,6 +333,27 @@ classdef (Sealed) Table < handle
             self.syncDef
         end
         
+        function dropForeignKey(self, target)
+            % drop a foreign key constraint.
+            % The target must be a dj.Relvar object.
+            
+            % get constraint name
+            sql = 'SELECT distinct constraint_name AS name FROM information_schema.key_column_usage';
+            sql = sprintf('%s WHERE table_schema="%s" and table_name="%s"', ...
+                sql, self.schema.dbname, self.info.name);
+            sql = sprintf('%s AND referenced_table_schema="%s" AND referenced_table_name="%s"', ...
+                sql, target.table.schema.dbname, target.table.info.name);
+            name = self.schema.conn.query(sql);
+            if isempty(name.name)
+                disp 'No matching foreign key'
+            else
+                sql = sprintf('ALTER TABLE `%s`.`%s` DROP FOREIGN KEY %s', ...
+                    self.schema.dbname, self.info.name, name.name{1});
+                self.schema.conn.query(sql);
+                self.schema.reload
+                self.syncDef
+            end
+        end
         
         function syncDef(self)
             % dj.Table/syncDef replace the table declaration in the file
@@ -556,10 +579,6 @@ classdef (Sealed) Table < handle
         end
     end
 end
-
-
-
-
 
 
 
