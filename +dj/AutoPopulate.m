@@ -66,7 +66,7 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/parpopulate
             
-            % perform error checks more carefully than parpopulate.
+            % perform error checks 
             if ~isempty(self.restrictions)
                 throwAsCaller(MException('DataJoint:invalidInput', ...
                     'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)'))
@@ -120,6 +120,20 @@ classdef AutoPopulate < handle
             % key is saved in a separate field for errors for debugging
             % purposes.
             % See also dj.AutoPopulate/populate
+
+            % perform error checks 
+            if ~isempty(self.restrictions)
+                throwAsCaller(MException('DataJoint:invalidInput', ...
+                    'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)'))
+            end
+            if ~isa(self.popRel, 'dj.GeneralRelvar')
+                throwAsCaller(MException('DataJoint:invalidInput', ...
+                    'property popRel must be a subclass of dj.GeneralRelvar'))
+            end
+            if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
+                throwAsCaller(MException('DataJoint:invalidPopRel', ...
+                    sprintf('%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))))
+            end
             
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             jobClassName = [self.schema.package '.Jobs'];
