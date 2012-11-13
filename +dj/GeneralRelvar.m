@@ -583,10 +583,16 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     end
                     
                 case 'join'
-                    [header, sql] = compile(self.operands{1},2);
+                    [header1, sql] = compile(self.operands{1},2);
                     [header2, sql2] = compile(self.operands{2},2);
-                    header = [header; header2(~ismember({header2.name}, {header.name}))];
                     sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
+                    % merge primary key attributes
+                    header = header1([header1.iskey]);
+                    header = [header; header2([header2.iskey] & ~ismember({header2.name}, {header.name}))];
+                    % merge dependent fields
+                    header = [header; header1(~ismember({header1.name}, {header.name}))];
+                    header = [header; header2(~ismember({header2.name}, {header.name}))];
+                    clear header1 header2 sql2
                     
                 otherwise
                     error 'unknown relational operator'

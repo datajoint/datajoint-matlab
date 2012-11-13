@@ -115,8 +115,7 @@ classdef Schema < handle
                     choice = input('Is this a subtable? yes/no > ', 's');
                 end
                 isSubtable = strcmp('yes',choice);
-            end
-            
+            end            
             
             f = fopen(filename,'wt');
             assert(-1 ~= f, 'Could not open %s', filename)
@@ -171,10 +170,11 @@ classdef Schema < handle
             
             % metod makeTuples
             if isAuto
+                fprintf(f, '\n\tmethods');
                 if ~isSubtable
-                    fprintf(f, '\n\tmethods(Access=protected)\n');
-                end
-                fprintf(f, '\n\t\tfunction makeTuples(self, key)\n');
+                    fprintf(f, '(Access=protected)');
+                end 
+                fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
                 fprintf(f, '\t\tend\n');
