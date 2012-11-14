@@ -172,7 +172,6 @@ classdef (Sealed) Table < handle
         end
         
         
-        
         function str = re(self, expandForeignKeys)
             % dj.Table/re - "reverse engineer" the table declaration.
             %
@@ -269,6 +268,7 @@ classdef (Sealed) Table < handle
             disp(status.Msg_text{end})
         end
         
+                
         
         
         
@@ -304,7 +304,6 @@ classdef (Sealed) Table < handle
             self.syncDef
         end
         
-        
         function alterAttribute(self, attrName, newDefinition)
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
             sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN `%s` %s', ...
@@ -314,7 +313,6 @@ classdef (Sealed) Table < handle
             self.schema.reload
             self.syncDef
         end
-        
         
         function addForeignKey(self, target)
             % add a foreign key constraint.
@@ -401,6 +399,23 @@ classdef (Sealed) Table < handle
                 end
             end
         end
+        
+        function list = getEnumValues(self, attr)
+            % returns the list of allowed values for the attribute attr of type enum
+            ix = strcmpi(attr, {self.header.name});
+            if ~any(ix)
+                throwAsCaller(MException('DataJoint:invalidAttributeName', ...
+                    'attribute "%s" not found', attr))
+            end
+            list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
+            if isempty(list)
+                throwAsCaller(MException('DataJoint:invalidAttributeName', ...
+                    'attribute "%s" not of type ENUM', attr))
+            end
+            list = regexp(list.list,'''(?<item>[^'']+)''','names');
+            list = {list.item};
+        end
+            
         %%%%%  END ALTER METHODS
         
         
