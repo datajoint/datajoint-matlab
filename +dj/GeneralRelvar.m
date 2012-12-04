@@ -194,7 +194,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % only since the order of tuples in a relation is not
             % guaranteed.
             %
-            % See also dj.GeneralRelvar.pro, dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetchn
+            % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
             
             [limit, args] = makeLimitClause(varargin{:});
             self = self.pro(args{:});
@@ -217,7 +217,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %    v1 = R.fetch1('attr1');
             %    [v1,v2,qn] = R.fetch1(Q,'attr1','attr2','count(*)->n')
             %
-            % See also dj.GeneralRelvar.fetch, dj.GeneralRelvar/fetchn, dj.GeneralRelvar/pro
+            % See also dj.Relvar.fetch, dj.Relvar/fetchn, dj.Relvar/pro
             
             % validate input
             specs = varargin(cellfun(@ischar, varargin));  %attribute specifiers
@@ -262,7 +262,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %
             % [f1, ..., fn, keys] = rel.fetchn('field1',...,'fieldn')
             %
-            % See also dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetch, dj.GeneralRelvar/pro
+            % See also dj.Relvar/fetch1, dj.Relvar/fetch, dj.Relvar/pro
             
             specs = varargin(cellfun(@ischar, varargin));  % attribute specifiers
             returnKey = nargout==length(specs)+1;
@@ -446,7 +446,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %   average value of field 'a' in r2.
             %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
             %
-            % See also: dj.GeneralRelvar/fetch
+            % See also: dj.Relvar/fetch
             if nargin>2 && isa(varargin{1}, 'dj.GeneralRelvar')
                 % if the first argument is a relvar, perform aggregate operator
                 op = 'aggregate';
@@ -476,11 +476,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % in R1 and tuples in R2. Two tuples make a matching
             % combination if their commonly named attributes contain the
             % same values.
-            % Blobs and nullable header should not be joined on.
+            % To control on which attributes the join performed, individual 
+            % attributes of the arguments may be renamed using dj.Relvar/pro.
+            % Blobs and nullable attributes should not be joined on.
             % To prevent an attribute from being joined on, rename it using
             % dj.GeneralRelvar/pro's rename syntax.
             %
-            % See also dj.GeneralRelvar/pro, dj.GeneralRelvar/fetch
+            % See also dj.Relvar/pro, dj.Relvar/fetch
             if ~isa(arg, 'dj.GeneralRelvar')
                 throwAsCaller(MException('DataJoint:invalidOperotor', ...
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
