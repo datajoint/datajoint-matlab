@@ -691,12 +691,8 @@ for arg = restrictions
                 {selfAttrs(~[selfAttrs.isBlob]).name}, ...
                 {condAttrs(~[condAttrs.isBlob]).name});
             if isempty(commonAttrs)
+                % no common attributes. Semijoin = original relation, antijoin = empty relation
                 if ~isempty(not)
-                    warning('DataJoint:suspiciousRelation', ...
-                        'antijoin without common parameters: no restriction applied')
-                else
-                    warning('DataJoint:suspiciousRelation', ...
-                        'semijoin without common attributes: empty relation')
                     clause = ' WHERE FALSE';
                 end
             else
