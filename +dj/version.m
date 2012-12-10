@@ -1,7 +1,7 @@
 function varargout = version
 % report DataJoint version
 
-v = sprintf('DataJoint version 2.5.1\n(c) 2012, Dimitri Yatsenko');
+v = sprintf('DataJoint version 2.5.1');
 if ~nargout
     fprintf('\n%s\n\n',v)
 else
