@@ -28,6 +28,8 @@ classdef (Sealed) Table < handle
     properties(Dependent, SetAccess = private)
         info     % name, tier, comment.  See dj.Schema
         header    % structure array describing header
+        fullTableName  % table name with database, escaped in backquotes
+        plainTableName  % just the table name
     end
     
     properties(Constant)
@@ -85,10 +87,24 @@ classdef (Sealed) Table < handle
         end
         
         
-        function name = getFullTableName(self)
-            name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
+        function name = get.fullTableName(self)
+            if isempty(self.schema.prefix) 
+                name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
+            else
+                name = sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name);
+            end
         end
         
+        
+        function name = get.plainTableName(self)
+            % just the table name, no database and no backquotes
+            if isempty(self.schema.prefix) 
+                name = self.info.name;
+            else
+                name = sprintf('%s/%s', self.schema.prefix, self.info.name);
+            end
+        end
+               
         
         function display(self)
             display@handle(self)
@@ -263,8 +279,8 @@ classdef (Sealed) Table < handle
             % optimizes the table if it has become fragmented after repeated inserts and deletes.
             % See http://dev.mysql.com/doc/refman/5.6/en/optimize-table.html
             fprintf 'optimizing ...'
-            status = self.schema.conn.query(sprintf('OPTIMIZE LOCAL TABLE `%s`.`%s`', ...
-                self.schema.dbname, self.info.name));
+            status = self.schema.conn.query(...
+                sprintf('OPTIMIZE LOCAL TABLE %s', self.fullTableName));
             disp(status.Msg_text{end})
         end
         
@@ -278,8 +294,8 @@ classdef (Sealed) Table < handle
             % dj.Table/setTableComment - update the table comment
             % in the table declaration
             self.schema.conn.query(...
-                sprintf('ALTER TABLE `%s`.`%s` COMMENT="%s"', ...
-                self.schema.dbname, self.info.name, newComment));
+                sprintf('ALTER TABLE %s COMMENT="%s"', ...
+                self.fullTableName, newComment));
             disp 'table updated'
             self.schema.reload
             self.syncDef
@@ -287,8 +303,8 @@ classdef (Sealed) Table < handle
         
         function addAttribute(self, definition)
             sql = fieldToSQL(parseAttrDef(definition, false));
-            sql = sprintf('ALTER TABLE `%s`.`%s` ADD COLUMN %s', ...
-                self.schema.dbname, self.info.name, sql(1:end-2));
+            sql = sprintf('ALTER TABLE %s ADD COLUMN %s', ...
+                self.fullTableName, sql(1:end-2));
             self.schema.conn.query(sql)
             disp 'table updated'
             self.schema.reload
@@ -296,8 +312,8 @@ classdef (Sealed) Table < handle
         end
         
         function dropAttribute(self, attrName)
-            sql = sprintf('ALTER TABLE `%s`.`%s` DROP COLUMN `%s`', ...
-                self.schema.dbname, self.info.name, attrName);
+            sql = sprintf('ALTER TABLE %s DROP COLUMN `%s`', ...
+                self.fullTableName, attrName);
             self.schema.conn.query(sql)
             disp 'table updated'
             self.schema.reload
@@ -306,8 +322,8 @@ classdef (Sealed) Table < handle
         
         function alterAttribute(self, attrName, newDefinition)
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
-            sql = sprintf('ALTER TABLE `%s`.`%s` CHANGE COLUMN `%s` %s', ...
-                self.schema.dbname, self.info.name, attrName, sql(1:end-2));
+            sql = sprintf('ALTER TABLE %s CHANGE COLUMN `%s` %s', ...
+                self.fullTableName, attrName, sql(1:end-2));
             self.schema.conn.query(sql)
             disp 'table updated'
             self.schema.reload
@@ -323,9 +339,9 @@ classdef (Sealed) Table < handle
             fieldList = sprintf('%s,', target.primaryKey{:});
             fieldList(end)=[];  % drop trailing comma
             sql = sprintf(...
-                'ALTER TABLE `%s`.`%s` ADD FOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT\n', ...
-                self.schema.dbname, self.info.name, fieldList, ...
-                target.table.schema.dbname, target.table.info.name, fieldList);
+                'ALTER TABLE %s ADD FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT\n', ...
+                self.fullTableName, fieldList, ...
+                target.fullTableName, fieldList);
             self.schema.conn.query(sql)
             self.schema.reload
             self.syncDef
@@ -338,15 +354,15 @@ classdef (Sealed) Table < handle
             % get constraint name
             sql = 'SELECT distinct constraint_name AS name FROM information_schema.key_column_usage';
             sql = sprintf('%s WHERE table_schema="%s" and table_name="%s"', ...
-                sql, self.schema.dbname, self.info.name);
+                sql, self.table.schema.dbname, self.plainTableName);
             sql = sprintf('%s AND referenced_table_schema="%s" AND referenced_table_name="%s"', ...
-                sql, target.table.schema.dbname, target.table.info.name);
+                sql, target.table.schema.dbname, target.table.plainTableName);
             name = self.schema.conn.query(sql);
             if isempty(name.name)
                 disp 'No matching foreign key'
             else
-                sql = sprintf('ALTER TABLE `%s`.`%s` DROP FOREIGN KEY %s', ...
-                    self.schema.dbname, self.info.name, name.name{1});
+                sql = sprintf('ALTER TABLE % DROP FOREIGN KEY %s', ...
+                    self.fullTableName, name.name{1});
                 self.schema.conn.query(sql);
                 self.schema.reload
                 self.syncDef
@@ -454,8 +470,8 @@ classdef (Sealed) Table < handle
             % compile the list of dropped tables
             names = self.getNeighbors(0, +1000, true);
             names = cellfun(@(x) self.schema.conn.getPackage(x), names, 'uni', false);
-            names = [{self.getFullTableName}, ...
-                cellfun(@(x) getFullTableName(dj.Table(x)), names(2:end), 'uni', false)];
+            names = [{self.fullTableName}, ...
+                cellfun(@(x) get.fullTableName(dj.Table(x)), names(2:end), 'uni', false)];
             
             % inform user about what's being deleted
             fprintf 'ABOUT TO DROP TABLES: \n'
@@ -519,6 +535,9 @@ classdef (Sealed) Table < handle
             tableName = [...
                 dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                 dj.Schema.fromCamelCase(tableInfo.className)];
+            if ~isempty(self.schema.prefix)
+                tableName = sprintf('%s/%s', self.schema.prefix, tableName);
+            end
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
@@ -575,8 +594,8 @@ classdef (Sealed) Table < handle
                 fieldList = sprintf('%s,', ref{1}.primaryKey{:});
                 fieldList(end)=[];
                 sql = sprintf(...
-                    '%sFOREIGN KEY (%s) REFERENCES `%s`.`%s` (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-                    sql, fieldList, ref{1}.table.schema.dbname, ref{1}.table.info.name, fieldList);
+                    '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
+                    sql, fieldList, ref{1}.fullTableName, fieldList);
             end
             
             % close the declaration

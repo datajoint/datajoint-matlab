@@ -7,6 +7,7 @@ classdef Schema < handle
     properties(SetAccess = private)
         package % the package (directory starting with a +) that stores schema classes, must be on path
         dbname  % database (schema) name
+        prefix=''  % optional table prefix, allowing multiple schemas per database
         conn    % handle to the dj.Connection object
         
         % table information loaded from the schema
@@ -23,8 +24,8 @@ classdef Schema < handle
         %   manual:   tableName starts with a letter
         %   imported: tableName with a '_'
         %   computed: tableName with '__'
-        allowedTiers = {'lookup' 'manual' 'imported' 'computed','job'}
-        tierPrefixes = {'#', '', '_', '__','~'}
+        allowedTiers = {'lookup' 'manual' 'imported' 'computed' 'job'}
+        tierPrefixes = {'#', '', '_', '__', '~'}
     end
 
     
@@ -37,7 +38,11 @@ classdef Schema < handle
             assert(isa(conn, 'dj.Connection'), ...
                 'dj.Schema''s first input must be a dj.Connection')
             self.conn = conn;
-            self.dbname = dbname;
+            if ~any(dbname=='/')
+                self.dbname = dbname;
+            else
+                [self.dbname, self.prefix] = fileparts(dbname);
+            end
             self.package = package;
             addPackage(self.conn, dbname, package)
         end
