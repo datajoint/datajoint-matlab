@@ -487,7 +487,18 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 throwAsCaller(MException('DataJoint:invalidOperotor', ...
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
             end
-            ret = init(dj.GeneralRelvar, 'join', {self arg});
+            % catch n-way joins
+            if strcmp(self.operator, 'join') && isempty(self.restrictions)
+                arg1 = self.operands;
+            else
+                arg1 = {self};
+            end
+            if strcmp(arg.operator, 'join') && isempty(arg.restrictions)
+                arg2 = self.operands;
+            else
+                arg2 = {arg};
+            end
+            ret = init(dj.GeneralRelvar, 'join', [arg1 arg2]);
         end
         
         
@@ -585,17 +596,22 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     end
                     
                 case 'join'
-                    [header1, sql] = compile(self.operands{1},2);
-                    [header2, sql2] = compile(self.operands{2},2);
-                    sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
-                    % merge primary key attributes
-                    header = header1([header1.iskey]);
-                    header = [header; header2([header2.iskey] & ~ismember({header2.name}, {header.name}))];
-                    % merge dependent fields
-                    header = [header; header1(~ismember({header1.name}, {header.name}))];
-                    header = [header; header2(~ismember({header2.name}, {header.name}))];
-                    clear header1 header2 sql2
-                    
+                    [header, sql] = compile(self.operands{1}, 2);
+                    for operand = self.operands(2 : end)
+                        [h, s] = compile(operand{1}, 2);
+                        header = [header; h]; %#ok
+                        sql = sprintf('%s NATURAL JOIN %s', sql, s);
+                    end
+                    % determine key attributes
+                    key = header([header.iskey]);
+                    [~, idx] = unique({key.name}, 'first');
+                    key = key(sort(idx));
+                    % merge remaining attributes
+                    attr = header(~[header.iskey] & ~ismember({header.name}, {key.name}));
+                    [~, idx] = unique({attr.name}, 'first');
+                    attr = attr(sort(idx));
+                    header = [key; attr];
+
                 otherwise
                     error 'unknown relational operator'
             end
