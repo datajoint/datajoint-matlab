@@ -476,7 +476,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % in R1 and tuples in R2. Two tuples make a matching
             % combination if their commonly named attributes contain the
             % same values.
-            % To control on which attributes the join performed, individual 
+            % To control on which attributes the join performed, individual
             % attributes of the arguments may be renamed using dj.Relvar/pro.
             % Blobs and nullable attributes should not be joined on.
             % To prevent an attribute from being joined on, rename it using
