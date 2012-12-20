@@ -595,7 +595,7 @@ classdef (Sealed) Table < handle
                 fieldList(end)=[];
                 sql = sprintf(...
                     '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-                    sql, fieldList, ref{1}.fullTableName, fieldList);
+                    sql, fieldList, ref{1}.table.fullTableName, fieldList);
             end
             
             % close the declaration
