@@ -85,9 +85,9 @@ classdef (Sealed) Table < handle
         end
         
         
-            if isempty(self.schema.prefix) 
         function name = fullTableName(self)
             % table name with database, escaped in backquotes
+            if isempty(self.schema.prefix) 
                 name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
             else
                 name = sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name);
