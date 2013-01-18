@@ -37,7 +37,7 @@ classdef BaseRelvar < dj.GeneralRelvar
             
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
-        
+      
         
         function del(self)
             % dj.BaseRelvar/del - remove all tuples of relation self from its table
@@ -72,12 +72,13 @@ classdef BaseRelvar < dj.GeneralRelvar
                 
                 % get the names of the dependent tables
                 names = self.tab.getNeighbors(0, +1000, false);
-                names = self.schema.conn.getPackage(names);
                 
                 % construct relvars to delete restricted by self
                 rels = {self};
                 for i=2:length(names)
-                    rels{end+1} = init(dj.BaseRelvar, dj.Table(names{i})) & self; %#ok:<AGROW>
+                    if names{i}(1) ~= '$'   % skip unloaded schemas
+                        rels{end+1} = init(dj.BaseRelvar, dj.Table(names{i})) & self; %#ok:<AGROW>
+                    end
                 end
                 clear names
                 
