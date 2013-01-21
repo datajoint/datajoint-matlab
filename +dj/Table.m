@@ -28,8 +28,6 @@ classdef (Sealed) Table < handle
     properties(Dependent, SetAccess = private)
         info     % name, tier, comment.  See dj.Schema
         header    % structure array describing header
-        fullTableName  % table name with database, escaped in backquotes
-        plainTableName  % just the table name
     end
     
     properties(Constant)
@@ -87,7 +85,8 @@ classdef (Sealed) Table < handle
         end
         
         
-        function name = get.fullTableName(self)
+        function name = fullTableName(self)
+            % table name with database, escaped in backquotes
             if isempty(self.schema.prefix) 
                 name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
             else
@@ -96,7 +95,7 @@ classdef (Sealed) Table < handle
         end
         
         
-        function name = get.plainTableName(self)
+        function name = plainTableName(self)
             % just the table name, no database and no backquotes
             if isempty(self.schema.prefix) 
                 name = self.info.name;
@@ -471,7 +470,7 @@ classdef (Sealed) Table < handle
             names = self.getNeighbors(0, +1000, true);
             names = cellfun(@(x) self.schema.conn.getPackage(x), names, 'uni', false);
             names = [{self.fullTableName}, ...
-                cellfun(@(x) get.fullTableName(dj.Table(x)), names(2:end), 'uni', false)];
+                cellfun(@(x) fullTableName(dj.Table(x)), names(2:end), 'uni', false)];
             
             % inform user about what's being deleted
             fprintf 'ABOUT TO DROP TABLES: \n'
