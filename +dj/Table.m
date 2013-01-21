@@ -175,6 +175,9 @@ classdef (Sealed) Table < handle
             %   t.erd(-1);  % plot only immediate ancestors
             %
             % See also dj.Schema/erd
+            if ~self.exists
+                self.create
+            end
             switch nargin
                 case 1
                     depth1 = -2;
@@ -333,6 +336,9 @@ classdef (Sealed) Table < handle
         function addForeignKey(self, target)
             % add a foreign key constraint.
             % The target must be a dj.Relvar object.
+            % The referencing table must already possess all the attributes
+            % of the primary key of the referenced table.
+            % 
             % EXAMPLE:
             %    tp.Align.table.addForeignKey(common.Scan)
             
@@ -469,18 +475,16 @@ classdef (Sealed) Table < handle
             
             % compile the list of dropped tables
             names = self.getNeighbors(0, +1000, true);
-            names = cellfun(@(x) self.schema.conn.getPackage(x), names, 'uni', false);
-            names = [{self.fullTableName}, ...
-                cellfun(@(x) get.fullTableName(dj.Table(x)), names(2:end), 'uni', false)];
+            tables = cellfun(@(x) dj.Table(self.schema.conn.getPackage(x)), names, 'uni', false);
             
             % inform user about what's being deleted
             fprintf 'ABOUT TO DROP TABLES: \n'
-            counts = zeros(size(names));
-            for iTable = 1:length(names)
+            counts = zeros(size(tables));
+            for iTable = 1:length(tables)
                 n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', ...
-                    names{iTable}));
+                    tables{iTable}.fullTableName));
                 counts(iTable) = n.n;
-                fprintf('%s... %d tuples \n', names{iTable}, n.n)
+                fprintf('%s... %d tuples \n', tables{iTable}.fullTableName, n.n)
             end
             fprintf \n
             
@@ -492,8 +496,8 @@ classdef (Sealed) Table < handle
             else
                 try
                     for iTable = length(names):-1:1
-                        self.schema.conn.query(sprintf('DROP TABLE %s', names{iTable}))
-                        fprintf('Dropped table %s\n', names{iTable})
+                        self.schema.conn.query(sprintf('DROP TABLE %s', tables{iTable}.fullTableName))
+                        fprintf('Dropped table %s\n', tables{iTable}.fullTableName)
                     end
                 catch err
                     self.schema.conn.reload
