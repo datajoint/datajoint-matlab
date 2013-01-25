@@ -69,37 +69,48 @@ classdef BaseRelvar < dj.GeneralRelvar
                         return
                     end
                 end
-                
-                % get the names of the dependent tables
-                names = self.tab.getNeighbors(0, +1000, false);
-                
-                % construct relvars to delete restricted by self
-                rels = {self};
-                for i=2:length(names)
-                    if names{i}(1) ~= '$'   % skip unloaded schemas
-                        rels{end+1} = init(dj.BaseRelvar, dj.Table(names{i})) & self; %#ok:<AGROW>
-                    end
-                end
-                clear names
-                
-                % exclude relvar with no matching tuples
-                counts = cellfun(@(x) count(x), rels);
-                include =  counts > 0;
-                counts = counts(include);
-                rels = rels(include);
-                
-                % inform the  user about what's being deleted
+                               
+                % compile the list of relvars to be deleted
                 disp 'ABOUT TO DELETE:'
-                for iRel = 1:length(rels)
-                    fprintf('%s %s: %d', ...
-                        rels{iRel}.tab.info.tier, ...
-                        rels{iRel}.tab.info.name, counts(iRel));
-                    if ismember(rels{iRel}.tab.info.tier, {'manual','lookup'})
-                        fprintf ' !!!'
+                fprintf('%s %s: %d tuples\n', ...
+                    self.tab.info.tier, ...
+                    self.tab.info.name, self.count);
+
+                names = {self.tab.className};
+                rels = {self};
+                new = struct('rel',self,'restrictByMe',~isempty(self.restrictions));
+                while ~isempty(new)
+                    curr = new(1);
+                    new(1) = [];
+                    sch = curr.rel.schema;
+                    ixCurr = strcmp(sch.classNames, curr.rel.tab.className);
+                    j = find(sch.dependencies(:,ixCurr));
+                    j = j(~ismember(sch.classNames(j),names));  % remove duplicates
+                    j = j(:)';  
+                    primary = full(sch.dependencies(j,ixCurr))==1;
+                    children = sch.classNames(j);                
+                    names = [names children]; %#ok<AGROW>
+                    for j=1:length(children)
+                        child = sch.conn.getPackage(children{j},false);
+                        if child(1) == '$'  % ignore unloaded schemas
+                            warning('Ignoring %s because its schema is not loaded.', child)
+                        else
+                            if curr.restrictByMe
+                                rel = init(dj.BaseRelvar, dj.Table(child)) & curr.rel;
+                            else
+                                rel = init(dj.BaseRelvar, dj.Table(child)) & curr.rel.restrictions;
+                            end
+                            n = rel.count;
+                            if n
+                                fprintf('%s %s: %d tuples\n', ...
+                                    rel.tab.info.tier, ...
+                                    rel.tab.info.name, n);
+                                rels{end+1} = rel; %#ok<AGROW>
+                                new(end+1) = struct('rel', rel,'restrictByMe', ~primary(j)); %#ok<AGROW>
+                            end
+                        end
                     end
-                    fprintf \n
                 end
-                fprintf \n
                 
                 % confirm and delete
                 if ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
@@ -108,14 +119,13 @@ classdef BaseRelvar < dj.GeneralRelvar
                     self.schema.conn.startTransaction
                     try
                         for iRel = length(rels):-1:1
-                            fprintf('Deleting %d tuples from %s... ', ...
-                                counts(iRel), rels{iRel}.tab.className)
+                            fprintf('Deleting from %s... ', rels{iRel}.tab.className)
                             self.schema.conn.query(sprintf('DELETE FROM `%s`.`%s`%s', ...
                                 rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, rels{iRel}.whereClause))
-                            fprintf 'done (not committed)\n'
+                            fprintf '(not committed)\n'
                         end
+                        disp 'committing ...'
                         self.schema.conn.commitTransaction
-                        fprintf ' ** delete committed\n'
                     catch err
                         fprintf '\n ** delete rolled back due to to error\n'
                         self.schema.conn.cancelTransaction

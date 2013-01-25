@@ -10,8 +10,8 @@ classdef Connection < handle
     end
     
     properties
-        reconnectTransaction = true   % if true, reconnect to the server even within a transaction. 
-                                      % set false to guarantee transaction automicity
+        reconnectTransaction = true   % if true, reconnect to the server even within a transaction.
+        % set false to guarantee transaction automicity
     end
     
     properties(Access = private)
@@ -46,11 +46,12 @@ classdef Connection < handle
         
         
         function name = getPackage(self, name, strict)
-            % replaces the schema name with its package name iff necessary
+            % replaces the schema name with its package name if necessary
+            % and possible.  If the schema is not loaded and strict=true,
+            % throws error.
             strict = nargin<3 || strict;
-            if iscellstr(name)
-                name = cellfun(@(x) self.getPackage(x, strict), name, 'uni', false);
-            elseif all(name~='.') || name(1)=='$'
+            assert(ischar(name), 'name must be a string');
+            if all(name~='.') || name(1)=='$'
                 s = regexp(name, '^\$?(\w+)','tokens');
                 assert(length(s)==1, 'invalid schema name in "%s"', name)
                 try

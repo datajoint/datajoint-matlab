@@ -29,7 +29,7 @@ classdef Schema < handle
     end
 
     
-    properties(Access=private)
+    properties(SetAccess=private)
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
@@ -552,7 +552,8 @@ classdef Schema < handle
                 str = sprintf('%s.%s', str, dj.Schema.toCamelCase(tab));
             end
         end
-                
+        
+        
         function names = getParents(self, className, hierarchy, crossSchemas)
             % retrieve the class names of the parents of given table classes
             if nargin<3
@@ -561,6 +562,7 @@ classdef Schema < handle
             crossSchemas = nargin>=4 && crossSchemas;
             names = self.getRelatives(className, true, hierarchy, crossSchemas);
         end
+        
         
         function names = getChildren(self, className, hierarchy, crossSchemas)
             % retrieve the class names of the parents of given table classes
@@ -571,7 +573,9 @@ classdef Schema < handle
             names = self.getRelatives(className, false, hierarchy, crossSchemas);
         end
         
+        
         function names = getRelatives(self, className, up, hierarchy, crossSchemas)
+            % gets the list of parent tables (up=true) or children tables (up=false) 
             names = {};
             if ~isempty(className)
                 if ischar(className)
