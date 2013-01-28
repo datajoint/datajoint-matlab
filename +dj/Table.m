@@ -88,7 +88,7 @@ classdef (Sealed) Table < handle
         
         
         function name = get.fullTableName(self)
-            if isempty(self.schema.prefix) 
+            if isempty(self.schema.prefix)
                 name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
             else
                 name = sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name);
@@ -98,60 +98,19 @@ classdef (Sealed) Table < handle
         
         function name = get.plainTableName(self)
             % just the table name, no database and no backquotes
-            if isempty(self.schema.prefix) 
+            if isempty(self.schema.prefix)
                 name = self.info.name;
             else
                 name = sprintf('%s/%s', self.schema.prefix, self.info.name);
             end
         end
-               
+        
         
         function display(self)
             display@handle(self)
-            disp(self.re(true))
-            fprintf \n
-        end
-        
-        
-        function neighbors = getNeighbors(self, depth1, depth2, crossSchemas)
-            % dj.Table/getNeighbors -- get the class names of tables that are
-            % directly related to the given table.
-            %
-            % depth1 and depth2 specify the connectivity radius upstream
-            % (depth<0) and downstream (depth>0) of this table.
-            % Omitting both depths defaults to (-2,2).
-            % Omitting any one of the depths sets it to zero.
-            %
-            % If crossSchemas is set to true, the search cascades into other schemas.
-            %
-            % Examples:
-            %   table.getNeighbors(-1,0)     % get table's parents
-            %   table.getNeighbors(0,1)      % get table's children
-            %   table.getNeighbors(-2,2)     % two levels up and down
-            
-            crossSchemas = nargin>=4 && crossSchemas;
-            
-            % find tables on which self depends
-            neighbors = {self.className};
-            nodes = {self.className};
-            for j=1:-depth1
-                nodes = unique(self.schema.getParents(nodes,[1 2],crossSchemas));
-                if isempty(nodes)
-                    break
-                end
-                neighbors(ismember(neighbors,nodes))=[];
-                neighbors = [nodes neighbors];  %#ok:<AGROW>
-            end
-            
-            % find tables dependent on self
-            nodes = {self.className};
-            for j=1:depth2
-                nodes = unique(self.schema.getChildren(nodes,[1 2],crossSchemas));
-                if isempty(nodes)
-                    break;
-                end
-                neighbors(ismember(neighbors,nodes))=[];
-                neighbors = [neighbors nodes];  %#ok:<AGROW>
+            for i=1:numel(self)
+                disp(self(i).re(true))
+                fprintf \n
             end
         end
         
@@ -287,7 +246,7 @@ classdef (Sealed) Table < handle
             disp(status.Msg_text{end})
         end
         
-                
+        
         
         
         
@@ -338,7 +297,7 @@ classdef (Sealed) Table < handle
             % The target must be a dj.Relvar object.
             % The referencing table must already possess all the attributes
             % of the primary key of the referenced table.
-            % 
+            %
             % EXAMPLE:
             %    tp.Align.table.addForeignKey(common.Scan)
             
@@ -437,7 +396,7 @@ classdef (Sealed) Table < handle
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
             list = {list.item};
         end
-            
+        
         %%%%%  END ALTER METHODS
         
         
@@ -474,30 +433,45 @@ classdef (Sealed) Table < handle
             end
             
             % compile the list of dropped tables
-            names = self.getNeighbors(0, +1000, true);
-            tables = cellfun(@(x) dj.Table(self.schema.conn.getPackage(x)), names, 'uni', false);
-            
-            % inform user about what's being deleted
+            doDrop = true;
             fprintf 'ABOUT TO DROP TABLES: \n'
-            counts = zeros(size(tables));
-            for iTable = 1:length(tables)
-                n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', ...
-                    tables{iTable}.fullTableName));
-                counts(iTable) = n.n;
-                fprintf('%s... %d tuples \n', tables{iTable}.fullTableName, n.n)
+            names = {self.className};
+            tables = self;
+            new = [self];
+            while ~isempty(new)
+                curr = new(1);
+                new(1) = [];
+                sch = curr.schema;
+                ixCurr = strcmp(sch.classNames, curr.className);
+                j = find(sch.dependencies(:,ixCurr));
+                j = j(~ismember(sch.classNames(j),names));  % remove duplicates
+                j = j(:)';
+                children = sch.classNames(j);
+                names = [names children]; %#ok<AGROW>
+                for j=1:length(children)
+                    child = sch.conn.getPackage(children{j},false);
+                    if child(1) == '$'  % ignore unloaded schemas
+                        throwAsCaller(MException('DataJoint:dropTable', ...
+                            'cannot drop %s because its schema is not loaded', child))
+                    else
+                        table = dj.Table(child);
+                        n = count(init(dj.BaseRelvar, table));
+                        fprintf('%s %s: %d tuples\n', table.info.tier, table.info.name, n);
+                        tables(end+1) = table; %#ok<AGROW>
+                        new(end+1) = table; %#ok<AGROW>
+                        doDrop = doDrop && ~n;   % drop without prompt if empty
+                    end
+                end
             end
-            fprintf \n
             
             % if any table has data, give option to cancel
-            doDrop = ~any(counts) || ...
-                strncmpi('yes', input('Proceed to drop? yes/no >', 's'), 3);
-            if ~doDrop
+            if ~doDrop && ~strcmpi('yes', input('Proceed to drop? yes/no >', 's'));
                 disp 'User cancelled table drop'
             else
                 try
-                    for iTable = length(names):-1:1
-                        self.schema.conn.query(sprintf('DROP TABLE %s', tables{iTable}.fullTableName))
-                        fprintf('Dropped table %s\n', tables{iTable}.fullTableName)
+                    for table = tables(end:-1:1)
+                        self.schema.conn.query(sprintf('DROP TABLE %s', table.fullTableName))
+                        fprintf('Dropped table %s\n', table.fullTableName)
                     end
                 catch err
                     self.schema.conn.reload
@@ -511,6 +485,51 @@ classdef (Sealed) Table < handle
     end
     
     methods(Access=private)
+        
+        function neighbors = getNeighbors(self, depth1, depth2, crossSchemas)
+            % dj.Table/getNeighbors -- get the class names of tables that are
+            % directly related to the given table.
+            %
+            % depth1 and depth2 specify the connectivity radius upstream
+            % (depth<0) and downstream (depth>0) of this table.
+            % Omitting both depths defaults to (-2,2).
+            % Omitting any one of the depths sets it to zero.
+            %
+            % If crossSchemas is set to true, the search cascades into other schemas.
+            %
+            % Examples:
+            %   table.getNeighbors(-1,0)     % get table's parents
+            %   table.getNeighbors(0,1)      % get table's children
+            %   table.getNeighbors(-2,2)     % two levels up and down
+            
+            crossSchemas = nargin>=4 && crossSchemas;
+            
+            % find tables on which self depends
+            neighbors = {self.className};
+            nodes = {self.className};
+            for j=1:-depth1
+                nodes = unique(self.schema.getParents(nodes,[1 2],crossSchemas));
+                if isempty(nodes)
+                    break
+                end
+                neighbors(ismember(neighbors,nodes))=[];
+                neighbors = [nodes neighbors];  %#ok:<AGROW>
+            end
+            
+            % find tables dependent on self
+            nodes = {self.className};
+            for j=1:depth2
+                nodes = unique(self.schema.getChildren(nodes,[1 2],crossSchemas));
+                if isempty(nodes)
+                    break;
+                end
+                neighbors(ismember(neighbors,nodes))=[];
+                neighbors = [neighbors nodes];  %#ok:<AGROW>
+            end
+        end
+        
+        
+        
         
         function declaration = getDeclaration(self)
             % extract the table declaration with the first percent-brace comment
