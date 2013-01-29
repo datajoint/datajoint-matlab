@@ -63,9 +63,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function clause = whereClause(self)
             % public where clause
-            clause = makeWhereClause(self.header, self.restrictions);
-            if ~isempty(clause)
-                clause = sprintf(' WHERE %s', clause);
+            if ~isempty(self.restrictions)
+                clause = sprintf(' WHERE %s', makeWhereClause(self.header, self.restrictions));
             end
         end
         
@@ -673,12 +672,29 @@ for arg = restrictions
             clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
         case isstruct(cond)
-            % struct array
-            c = struct2cond(cond, selfAttrs);
-            if isempty(c)
-                continue
+            % restriction by an array of structures
+            cond = dj.struct.pro(cond, selfAttrs.name); % project onto common attributes
+            if isempty(fieldnames(cond))
+                % restrictor has no common attributes:
+                %    semijoin leaves relation unchanged. 
+                %    antijoin returns the empty relation.
+                if ~isempty(not)
+                    clause = ' AND FALSE';
+                end
             else
-                clause = sprintf('%s AND %s(%s)', clause, not, c);
+                if ~isempty(cond)
+                    % normal restricton
+                    clause = sprintf('%s AND %s', clause, struct2cond(cond, selfAttrs));
+                else
+                    if isempty(cond)
+                        % restrictor has common attributes but is empty:
+                        %     semijoin makes the empty relation
+                        %     antijoin leavs relation unchanged
+                        if isempty(not)
+                            clause = ' AND FALSE';
+                        end
+                    end
+                end
             end
             
         case isa(cond, 'dj.GeneralRelvar')
@@ -710,53 +726,45 @@ for arg = restrictions
     end
     not = '';
 end
-if ~isempty(clause)
-    clause = clause(6:end);  % strip " AND "
-end
+clause = clause(min(6,end):end);  % strip " AND "
 end
 
 
 function cond = struct2cond(keys, header)
-% convert the structure array keys into an SQL condition
-if length(keys)>512
+% convert the structure array into an SQL condition
+n = length(keys);
+assert(n>=1)
+if n>512
     warning('DataJoint:longCondition', ...
         'consider replacing the long array of keys with a more succinct condition')
 end
-conds = cell(1,length(keys));
-keyFields = fieldnames(keys)';
-foundAttributes = ismember(keyFields, {header.name});
-if ~any(foundAttributes)
-    cond = '';
-else
-    for iKey= 1:length(keys)
-        key = keys(iKey);
-        word = '';
-        cond = '';
-        for field = keyFields(foundAttributes)
-            value = key.(field{1});
-            if ~isempty(value)
-                iField = find(strcmp(field{1}, {header.name}));
-                assert(~header(iField).isBlob,...
-                    'The key must not include blob header.');
-                if header(iField).isString
-                    assert( ischar(value), ...
-                        'Value for key.%s must be a string', field{1})
-                    value=sprintf('"%s"',value);
-                else
-                    assert(isnumeric(value), ...
-                        'Value for key.%s must be numeric', field{1});
-                    value=sprintf('%1.16g',value);
-                end
-                cond = sprintf('%s%s`%s`=%s', ...
-                    cond, word, header(iField).name, value);
-                word = ' AND';
-            end
-        end
-        conds{iKey} = cond;
-    end
-    cond = sprintf('OR (%s)', conds{:});
-    cond = cond(4:end);
+cond = '';
+for key = keys(:)'
+    cond = sprintf('%s OR (%s)', cond, makeCond(key));
 end
+cond = cond(min(end,5):end);  % strip " OR "
+
+    function subcond = makeCond(key)
+        subcond = '';
+        for field = fieldnames(key)'
+            value = key.(field{1});
+            iField = find(strcmp(field{1}, {header.name}));
+            assert(~header(iField).isBlob,...
+                'The key must not include blob header.');
+            if header(iField).isString
+                assert(ischar(value), ...
+                    'Value for key.%s must be a string', field{1})
+                value=sprintf('"%s"', value);
+            else
+                assert(isnumeric(value) && isscalar(value), ...
+                    'Value for key.%s must be a numeric scalar', field{1});
+                value=sprintf('%1.16g', value);
+            end
+            subcond = sprintf('%s AND `%s`=%s', ...
+                subcond, header(iField).name, value);
+        end
+        subcond = subcond(min(6,end):end);  % strip " AND "
+    end
 end
 
 
