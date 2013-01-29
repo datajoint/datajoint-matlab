@@ -62,7 +62,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         function clause = whereClause(self)
+            % public where clause
             clause = makeWhereClause(self.header, self.restrictions);
+            if ~isempty(clause)
+                clause = sprintf(' WHERE %s', clause);
+            end
         end
         
         function display(self)
@@ -611,7 +615,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     haveAliasedAttrs = false;
                 end
                 % add WHERE clause
-                sql = sprintf('%s%s', sql, makeWhereClause(header, self.restrictions));
+                sql = sprintf('%s%s', sql);
+                whereClause = makeWhereClause(header, self.restrictions);
+                if ~isempty(whereClause)
+                    sql = sprintf('%s WHERE %s', sql, whereClause);
+                end
             end
             
             % enclose in parentheses if necessary
@@ -639,24 +647,21 @@ assert(all(arrayfun(@(x) isempty(x.alias), selfAttrs)), ...
     'aliases must be resolved before restriction')
 
 clause = '';
-word = 'WHERE';
 not = '';
-
-stripWhere = @(s) s(7:end);
 
 for arg = restrictions
     cond = arg{1};
     switch true
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
             % union
-            s = cellfun(@(x) stripWhere(makeWhereClause(selfAttrs, {x})), cond.operands, 'UniformOutput', false);
+            s = cellfun(@(x) makeWhereClause(selfAttrs, {x}), cond.operands, 'UniformOutput', false);
             assert(~isempty(s));
             s = sprintf('(%s) OR ', s{:});
-            clause = sprintf('%s %s %s(%s)', clause, word, not, s(1:end-4));  % strip trailing " OR "
+            clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
             
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'not')
-            clause = sprintf('%s %s NOT(%s)', clause, word, ...
-                stripWhere(makeWhereClause(selfAttrs, cond.operands)));
+            clause = sprintf('%s AND NOT(%s)', clause, ...
+                makeWhereClause(selfAttrs, cond.operands));
             
         case ischar(cond) && strcmpi(cond,'NOT')
             % negation of the next condition
@@ -665,7 +670,7 @@ for arg = restrictions
             
         case ischar(cond) && ~strcmpi(cond, 'NOT')
             % SQL condition
-            clause = sprintf('%s %s %s(%s)', clause, word, not, cond);
+            clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
         case isstruct(cond)
             % struct array
@@ -673,7 +678,7 @@ for arg = restrictions
             if isempty(c)
                 continue
             else
-                clause = sprintf('%s %s %s(%s)', clause, word, not, c);
+                clause = sprintf('%s AND %s(%s)', clause, not, c);
             end
             
         case isa(cond, 'dj.GeneralRelvar')
@@ -693,18 +698,20 @@ for arg = restrictions
             if isempty(commonAttrs)
                 % no common attributes. Semijoin = original relation, antijoin = empty relation
                 if ~isempty(not)
-                    clause = ' WHERE FALSE';
+                    clause = ' AND FALSE';
                 end
             else
                 % make semijoin or antijoin clause
                 commonAttrs = sprintf( ',`%s`', commonAttrs{:});
                 commonAttrs = commonAttrs(2:end);
-                clause = sprintf('%s %s ((%s) %sIN (SELECT %s FROM %s))',...
-                    clause, word, commonAttrs, not, commonAttrs, condSQL);
+                clause = sprintf('%s AND ((%s) %s IN (SELECT %s FROM %s))',...
+                    clause, commonAttrs, not, commonAttrs, condSQL);
             end
     end
     not = '';
-    word = ' AND';
+end
+if ~isempty(clause)
+    clause = clause(6:end);  % strip " AND "
 end
 end
 
