@@ -63,7 +63,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function clause = whereClause(self)
             % public where clause
-            if ~isempty(self.restrictions)
+            if isempty(self.restrictions)
+                clause = '';
+            else
                 clause = sprintf(' WHERE %s', makeWhereClause(self.header, self.restrictions));
             end
         end
@@ -672,7 +674,7 @@ for arg = restrictions
             clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
         case isstruct(cond)
-            % restriction by an array of structures
+            % restriction by a
             cond = dj.struct.pro(cond, selfAttrs.name); % project onto common attributes
             if isempty(fieldnames(cond))
                 % restrictor has no common attributes:

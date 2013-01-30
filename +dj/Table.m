@@ -437,7 +437,11 @@ classdef (Sealed) Table < handle
             fprintf 'ABOUT TO DROP TABLES: \n'
             names = {self.className};
             tables = self;
-            new = [self];
+            new = self;
+            n = count(init(dj.BaseRelvar, self));
+            fprintf('%s %s: %d tuples\n', self.info.tier, self.info.name, n);
+            doDrop = doDrop && ~n;   % drop without prompt if empty
+                    
             while ~isempty(new)
                 curr = new(1);
                 new(1) = [];
