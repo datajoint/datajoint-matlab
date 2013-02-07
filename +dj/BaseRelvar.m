@@ -124,8 +124,9 @@ classdef BaseRelvar < dj.GeneralRelvar
                                 rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, rels{iRel}.whereClause))
                             fprintf '(not committed)\n'
                         end
-                        disp 'committing ...'
+                        fprintf 'committing ...'
                         self.schema.conn.commitTransaction
+                        disp done
                     catch err
                         fprintf '\n ** delete rolled back due to to error\n'
                         self.schema.conn.cancelTransaction

@@ -774,16 +774,11 @@ function [limit, args] = makeLimitClause(varargin)
 % makes the SQL limit clause from fetch() input arguments.
 % If the last one or two inputs are numeric, a LIMIT clause is
 % created.
-limit = '';
 args = varargin;
-if nargin>0 && isnumeric(args{end})
-    if nargin>1 && isnumeric(args{end-1})
-        limit = sprintf(' LIMIT %d, %d', args{end-1:end});
-        args(end-1:end) = [];
-    else
-        limit = sprintf(' LIMIT %d', varargin{end});
-        args(end) = [];
-    end
+limit = '';
+if nargin && (strncmp(varargin{end}, 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
+    limit = [' ' varargin{end}];
+    args = args(1:end-1);
 end
 end
 
