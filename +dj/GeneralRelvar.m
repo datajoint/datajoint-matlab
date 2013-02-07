@@ -85,7 +85,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 fprintf('  %12.12s', header(ix).name)
                 fprintf \n
                 maxRows = 12;
-                tuples = self.fetch(header(ix).name,maxRows+1);
+                tuples = self.fetch(header(ix).name, sprintf('LIMIT %d', maxRows+1));
                 nTuples = max(self.count, length(tuples));
                 
                 % print rows
