@@ -183,22 +183,21 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % Here s(i).n will contain the number of tuples in Q matching
             % the ith tuple in R.
             %
-            % If the last input argument is numerical, the number of
-            % retrieved tuples will be limited to that number.
-            % If the last two input arguments are numerical, then the
-            % first is used as the starting index and the second limits the
-            % number of returned tuples.
+            % If the last input argument is begins with 'ORDER BY' or 'LIMIT',
+            % it is not interpreted as an attribute specifier and is passed
+            % on to the SQL statement. This allows sorting the result or
+            % selecting a subset of tuples.
             %
             % For example:
-            %    s = R.fetch('*', 100);        % tuples 1-100 from R
-            %    s = R.fetch('*', 1, 100);     % still tuples 1-100
-            %    s = R.fetch('*', 101, 100);   % tuples 101-200
+            %    s = R.fetch('*', 'ORDER BY field1,field2');    % sort the result by field1
+            %    s = R.fetch('*', 'LIMIT 100 OFFSET 200')  % read tuples 200-299
+            %    s = R.fetch('*', 'ORDER BY field1 DESC, field 2  LIMIT 100');    
             %
             % The numerical indexing into a relvar is a deviation from
             % relational theory and should be reserved for special cases
             % only since the order of tuples in a relation is not
             % guaranteed.
-            %
+            % 
             % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
             
             [limit, args] = makeLimitClause(varargin{:});
@@ -225,16 +224,16 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % See also dj.Relvar.fetch, dj.Relvar/fetchn, dj.Relvar/pro
             
             % validate input
-            specs = varargin(cellfun(@ischar, varargin));  %attribute specifiers
-            if nargout~=length(specs) && (nargout~=0 || length(specs)~=1), ...
+            [~, args] = makeLimitClause(varargin{:});
+            if nargout~=length(args) && (nargout~=0 || length(args)~=1), ...
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                     'The number of fetch1() outputs must match the number of requested attributes'))
             end
-            if isempty(specs)
+            if isempty(args)
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'insufficient inputs'))
             end
-            if any(strcmp(specs,'*'))
+            if any(strcmp(args,'*'))
                 throwAsCaller(MException('DataJoint:invalidOpeator', ...
                     '"*" is not allwed in fetch1()'))
             end
@@ -247,9 +246,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
             
             % copy into output arguments
-            varargout = cell(length(specs));
-            for iArg=1:length(specs)
-                name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
+            varargout = cell(length(args));
+            for iArg=1:length(args)
+                name = regexp(args{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = s.(name{1}{1});
             end
         end
@@ -269,21 +268,20 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %
             % See also dj.Relvar/fetch1, dj.Relvar/fetch, dj.Relvar/pro
             
-            specs = varargin(cellfun(@ischar, varargin));  % attribute specifiers
-            returnKey = nargout==length(specs)+1;
-            if ~returnKey && nargout~=length(specs) && (nargout~=0 || length(specs)~=1), ...
+            [limit, args] = makeLimitClause(varargin{:});
+            returnKey = nargout==length(args)+1;
+            if ~returnKey && nargout~=length(args) && (nargout~=0 || length(args)~=1), ...
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                     'The number of fetchn() outputs must match the number of requested attributes'))
             end
-            if isempty(specs)
+            if isempty(args)
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'insufficient inputs'))
             end
-            if any(strcmp(specs,'*'))
+            if any(strcmp(args,'*'))
                 throwAsCaller(MException('DataJoint:invalidOpeator', ...
                     '"*" is not allwed in fetchn()'))
             end
-            [limit, args] = makeLimitClause(varargin{:});
             
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
@@ -292,15 +290,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 makeAttrList(header), sql, limit));
             
             % copy into output arguments
-            varargout = cell(length(specs));
-            for iArg=1:length(specs)
+            varargout = cell(length(args));
+            for iArg=1:length(args)
                 % if renamed, use the renamed attribute
-                name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
+                name = regexp(args{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = ret.(name{1}{1});
             end
             
             if returnKey
-                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.pro(ret, self.primaryKey{:}));
+                varargout{length(args)+1} = dj.struct.fromFields(dj.struct.pro(ret, self.primaryKey{:}));
             end
         end
         
@@ -465,7 +463,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             if ~iscellstr(params)
                 throwAsCaller(MException('DataJoint:invalidOperotor', ...
-                    'pro() requires a list of strings as attribute specs'))
+                    'pro() requires a list of strings as attribute args'))
             end
             
             ret = init(dj.GeneralRelvar, op, [{self} arg params]);
@@ -776,7 +774,7 @@ function [limit, args] = makeLimitClause(varargin)
 % created.
 args = varargin;
 limit = '';
-if nargin && (strncmp(varargin{end}, 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
+if nargin && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
     limit = [' ' varargin{end}];
     args = args(1:end-1);
 end
