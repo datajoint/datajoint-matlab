@@ -774,9 +774,15 @@ function [limit, args] = makeLimitClause(varargin)
 % created.
 args = varargin;
 limit = '';
-if nargin && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
-    limit = [' ' varargin{end}];
-    args = args(1:end-1);
+if nargin
+    lastArg = varargin{end};
+    if ischar(lastArg) && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
+        limit = [' ' varargin{end}];
+        args = args(1:end-1);
+    elseif isnumeric(lastArg)
+        limit = sprintf(' LIMIT %d', lastArg);
+        args = args(1:end-1);
+    end
 end
 end
 
