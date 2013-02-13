@@ -726,7 +726,9 @@ for arg = restrictions
     end
     not = '';
 end
-clause = clause(min(6,end):end);  % strip " AND "
+if length(clause)>6
+    clause = clause(6:end); % strip " AND "
+end
 end
 
 
