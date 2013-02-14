@@ -225,6 +225,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             % validate input
             [~, args] = makeLimitClause(varargin{:});
+            args = args(cellfun(@ischar, args)); % attribute specifiers
             if nargout~=length(args) && (nargout~=0 || length(args)~=1), ...
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                     'The number of fetch1() outputs must match the number of requested attributes'))
@@ -269,16 +270,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % See also dj.Relvar/fetch1, dj.Relvar/fetch, dj.Relvar/pro
             
             [limit, args] = makeLimitClause(varargin{:});
-            returnKey = nargout==length(args)+1;
-            if ~returnKey && nargout~=length(args) && (nargout~=0 || length(args)~=1), ...
+            specs = args(cellfun(@ischar, args)); % attribute specifiers
+            returnKey = nargout==length(specs)+1;
+            if ~returnKey && nargout~=length(specs) && (nargout~=0 || length(specs)~=1), ...
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                     'The number of fetchn() outputs must match the number of requested attributes'))
             end
-            if isempty(args)
+            if isempty(specs)
                 throwAsCaller(MException('DataJoint:invalidOperator',...
                     'insufficient inputs'))
             end
-            if any(strcmp(args,'*'))
+            if any(strcmp(specs,'*'))
                 throwAsCaller(MException('DataJoint:invalidOpeator', ...
                     '"*" is not allwed in fetchn()'))
             end
@@ -290,15 +292,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 makeAttrList(header), sql, limit));
             
             % copy into output arguments
-            varargout = cell(length(args));
-            for iArg=1:length(args)
+            varargout = cell(length(specs));
+            for iArg=1:length(specs)
                 % if renamed, use the renamed attribute
-                name = regexp(args{iArg}, '(\w+)\s*$', 'tokens');
+                name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
                 varargout{iArg} = ret.(name{1}{1});
             end
             
             if returnKey
-                varargout{length(args)+1} = dj.struct.fromFields(dj.struct.pro(ret, self.primaryKey{:}));
+                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.pro(ret, self.primaryKey{:}));
             end
         end
         
