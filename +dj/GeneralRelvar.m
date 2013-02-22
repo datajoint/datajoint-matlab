@@ -760,7 +760,7 @@ cond = cond(min(end,5):end);  % strip " OR "
                     'Value for key.%s must be a string', field{1})
                 value=sprintf('"%s"', value);
             else
-                assert(isnumeric(value) && isscalar(value), ...
+                assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                     'Value for key.%s must be a numeric scalar', field{1});
                 value=sprintf('%1.16g', value);
             end
