@@ -282,10 +282,6 @@ classdef AutoPopulate < handle
                                 success = false;
                             end
                         end
-                        if ~success
-                            fprintf('** %s: skipping already reserved', self.table.className)
-                            disp(key)
-                        end
                 end
             end
         end
