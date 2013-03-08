@@ -270,7 +270,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                     end
                 case header(ix).isNumeric
                     if islogical(value)
-                        value = uint8(valuealue);
+                        value = uint8(value);
                     end
                     assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
                     if isnan(value)
