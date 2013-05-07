@@ -513,7 +513,7 @@ classdef Schema < handle
                 ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
                 nTables = length(self.classNames);
                 
-                self.dependencies = sparse(ixFrom, ixTo, 2-[foreignKeys.hierarchical], nTables, nTables);
+                self.dependencies = sparse(ixFrom, ixTo, 2-double([foreignKeys.hierarchical]), nTables, nTables);
                 
                 % determine tables' hierarchical level
                 K = self.dependencies;
