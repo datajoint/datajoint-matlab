@@ -165,7 +165,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/count - the number of tuples in the relation.
             [~, sql] = self.compile(3);
             n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
-            n=n.n;
+            n = double(n.n);
         end
         
         function ret = fetch(self, varargin)
