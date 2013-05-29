@@ -513,7 +513,7 @@ classdef Schema < handle
                 ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
                 nTables = length(self.classNames);
                 
-                self.dependencies = sparse(ixFrom, ixTo, 1, nTables, nTables);
+                self.dependencies = sparse(ixFrom, ixTo, 2-double([foreignKeys.hierarchical]), nTables, nTables);
                 
                 % determine tables' hierarchical level
                 K = self.dependencies;
@@ -652,4 +652,8 @@ classdef Schema < handle
             str = str(1+(str(1)=='_'):end);  % remove leading underscore
         end
     end
+<<<<<<< HEAD
 end
+=======
+end    
+>>>>>>> a71dc536dbd3ef46c34a2844e84aed62748d9309

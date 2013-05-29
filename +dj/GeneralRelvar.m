@@ -686,7 +686,7 @@ for arg = restrictions
             else
                 if ~isempty(cond)
                     % normal restricton
-                    clause = sprintf('%s AND %s', clause, struct2cond(cond, selfAttrs));
+                    clause = sprintf('%s AND (%s)', clause, struct2cond(cond, selfAttrs));
                 else
                     if isempty(cond)
                         % restrictor has common attributes but is empty:
@@ -760,7 +760,7 @@ cond = cond(min(end,5):end);  % strip " OR "
                     'Value for key.%s must be a string', field{1})
                 value=sprintf('"%s"', value);
             else
-                assert(isnumeric(value) && isscalar(value), ...
+                assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                     'Value for key.%s must be a numeric scalar', field{1});
                 value=sprintf('%1.16g', value);
             end
