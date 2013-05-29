@@ -27,13 +27,13 @@ classdef Schema < handle
         allowedTiers = {'lookup' 'manual' 'imported' 'computed' 'job'}
         tierPrefixes = {'#', '', '_', '__', '~'}
     end
-
+    
     
     properties(SetAccess=private)
         dependencies  % sparse adjacency matrix with 1=parent/child and 2=non-primary key reference
     end
     
-    methods    
+    methods
         function self = Schema(conn, package, dbname)
             assert(isa(conn, 'dj.Connection'), ...
                 'dj.Schema''s first input must be a dj.Connection')
@@ -46,7 +46,7 @@ classdef Schema < handle
             self.package = package;
             addPackage(self.conn, dbname, package)
         end
-              
+        
         function val = get.classNames(self)
             self.reload(false)
             val = self.classNames;
@@ -71,7 +71,7 @@ classdef Schema < handle
             self.reload(false)
             val = self.tableLevels;
         end
-         
+        
         function makeClass(self, className)
             % create a base relvar class for the new className in schema directory.
             %
@@ -120,7 +120,7 @@ classdef Schema < handle
                     choice = input('Is this a subtable? yes/no > ', 's');
                 end
                 isSubtable = strcmp('yes',choice);
-            end            
+            end
             
             f = fopen(filename,'wt');
             assert(-1 ~= f, 'Could not open %s', filename)
@@ -171,14 +171,14 @@ classdef Schema < handle
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
             end
-            fprintf(f, '\tend\n');            
+            fprintf(f, '\tend\n');
             
             % metod makeTuples
             if isAuto
                 fprintf(f, '\n\tmethods');
                 if ~isSubtable
                     fprintf(f, '(Access=protected)');
-                end 
+                end
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
                 fprintf(f, '\t\t\tself.insert(key)\n');
@@ -206,7 +206,7 @@ classdef Schema < handle
             if nargin<2
                 % by default show all but the job tables
                 subset = self.classNames(~strcmp(tiers,'job'));
-            else                
+            else
                 % limit the diagram to the specified subset of tables
                 ix = find(~ismember(subset,self.classNames));
                 if ~isempty(ix)
@@ -323,7 +323,7 @@ classdef Schema < handle
                 y = y(1) + (y(2)-y(1))*t;
                 plot(x, y, lineStyle)
             end
-        end   
+        end
         
         function backup(self, backupDir, tiers, restrictor)
             % dj.Schema/backup - saves tables into .mat files
@@ -332,14 +332,14 @@ classdef Schema < handle
             %    s.backup(folder, {'manual'})    -- save all manual tables
             %    s.backup(folder, {'manual','imported'})
             %    s.backup(folder, [], restrictor)  -- backup only tuples that match restrictor
-            % 
+            %
             % Each table must be small enough to be loaded into memory.
             % By default, only lookup and manual tables are saved.
-            % 
+            %
             % restrictor may contain a cell array of conditions. However,
-            % string conditions can cause errors for some tables. 
-            % The best practice is to use a structure or a relvar as a restrictor, e.g. 
-            % backup(ephys.getSchema, '/backup', [], ephys.Session('session_date > "2012-07-10"')) 
+            % string conditions can cause errors for some tables.
+            % The best practice is to use a structure or a relvar as a restrictor, e.g.
+            % backup(ephys.getSchema, '/backup', [], ephys.Session('session_date > "2012-07-10"'))
             
             if nargin<3 || isempty(tiers{3})
                 tiers = {'lookup','manual'};
@@ -373,8 +373,9 @@ classdef Schema < handle
                 fprintf 'done\n'
             end
         end
-                
+        
         function restore(self, backupDir)
+            % restore(schema, backupDir)
             % insert all missing tuples from tables saved in <ClassName>.MAT files in backupDir
             d = dir(fullfile(backupDir,'*.mat'));
             
@@ -411,7 +412,7 @@ classdef Schema < handle
                     objects{i}.insert(s.contents, 'INSERT IGNORE');
                 catch err
                     warning('DataJoint:TableDeclarationMismatch', err.message)
-                end                    
+                end
             end
         end
         
@@ -427,11 +428,16 @@ classdef Schema < handle
             % reload table information
             fprintf('loading table definitions from %s... ', self.dbname)
             tic
+            if isempty(self.prefix)
+                tableRegexp = '(\\_|\\_\\_|#|~)?[a-z][a-z0-9\\_]*$';
+            else
+                tableRegexp = sprintf('^%s/(_|__|#|~)?[a-z][a-z0-9_]*$', self.prefix);
+            end
             self.tables = self.conn.query(sprintf([...
                 'SELECT table_name AS name, table_comment AS comment ' ...
                 'FROM information_schema.tables ' ...
-                'WHERE table_schema="%s" AND table_name REGEXP "^(__|_|#|~)?[a-z][a-z0-9_]*$"'], ...
-                self.dbname));
+                'WHERE table_schema="%s" AND table_name REGEXP "%s"'], ...
+                self.dbname, tableRegexp));
             
             % determine table tier (see dj.Table)
             re = cellfun(@(x) sprintf('^%s[a-z][a-z0-9_]*$',x), ...
@@ -450,11 +456,6 @@ classdef Schema < handle
             % read field information
             if ~isempty(self.tables)
                 fprintf('%.3g s\nloading field information... ', toc), tic
-                if isempty(self.prefix)
-                    tableRegexp = '^(__|_|#|~)?[a-z][a-z0-9_]*$';
-                else
-                    tableRegexp = sprintf('^%s/(__|_|#|~)?[a-z][a-z0-9_]*$', self.prefix);
-                end                
                 self.header = self.conn.query(sprintf([...
                     'SELECT table_name AS `table`, column_name as `name`,'...
                     '(column_key="PRI") AS `iskey`,column_type as `type`,'...
@@ -485,23 +486,22 @@ classdef Schema < handle
                 end
                 
                 % reload table dependencies
+                tableList = sprintf('"%s",',self.tables.name);
+                tableList = tableList(1:max(0,end-1));
                 fprintf('%.3g s\nloading table dependencies... ', toc), tic
                 foreignKeys = dj.struct.fromFields(self.conn.query(sprintf([...
                     'SELECT'...
                     '  table_schema AS from_schema,'...
                     '  table_name AS from_table,'...
                     '  referenced_table_schema AS to_schema,'...
-                    '  referenced_table_name  AS to_table, '...
-                    '  min((table_schema, table_name, column_name) in'...
-                    '    (SELECT table_schema, table_name, column_name'...
-                    '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
+                    '  referenced_table_name  AS to_table '...
                     'FROM information_schema.key_column_usage '...
                     'WHERE (table_schema="%s" AND referenced_table_schema is not null'...
-                    '   OR referenced_table_schema="%s") '...
-                    '  AND table_name REGEXP "%s"'...
-                    '  AND referenced_table_name REGEXP "%s" '...
+                    '   OR referenced_table_schema="%s")'...
+                    '  AND table_name IN (%s)'...
+                    '  AND referenced_table_name IN (%s) '...
                     'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
-                    self.dbname, self.dbname, tableRegexp, tableRegexp)));
+                    self.dbname, self.dbname, tableList, tableList)));
                 
                 % compile classNames for linked tables from outside the schema
                 toClassNames = arrayfun(@(x) makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';
@@ -513,7 +513,7 @@ classdef Schema < handle
                 ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
                 nTables = length(self.classNames);
                 
-                self.dependencies = sparse(ixFrom, ixTo, 2-[foreignKeys.hierarchical], nTables, nTables);
+                self.dependencies = sparse(ixFrom, ixTo, 1, nTables, nTables);
                 
                 % determine tables' hierarchical level
                 K = self.dependencies;
@@ -575,7 +575,7 @@ classdef Schema < handle
         
         
         function names = getRelatives(self, className, up, hierarchy, crossSchemas)
-            % gets the list of parent tables (up=true) or children tables (up=false) 
+            % gets the list of parent tables (up=true) or children tables (up=false)
             names = {};
             if ~isempty(className)
                 if ischar(className)
@@ -609,12 +609,12 @@ classdef Schema < handle
                     end
                 end
             end
-        end    
+        end
     end
     
     methods(Static)
         function str = toCamelCase(str)
-            % converts underscore_compound_words to CamelCase 
+            % converts underscore_compound_words to CamelCase
             %
             % Not always exactly inversible
             %
@@ -626,7 +626,7 @@ classdef Schema < handle
             %   toCamelCase('5_two_three')    --> !error! cannot start with a digit
             
             assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')            
+            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
             assert(isempty(regexp(str, '[A-Z]', 'once')), ...
                 'underscore_compound_words must not contain uppercase characters')
             str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
@@ -636,13 +636,13 @@ classdef Schema < handle
         
         function str = fromCamelCase(str)
             % converts CamelCase to underscore_compound_words.
-            % 
+            %
             % Examples:
             %   fromCamelCase('oneTwoThree')    --> 'one_two_three'
             %   fromCamelCase('OneTwoThree')    --> 'one_two_three'
             %   fromCamelCase('one two three')  --> !error! white space is not allowed
             %   fromCamelCase('ABC')            --> 'a_b_c'
-
+            
             assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
             assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
             
@@ -652,4 +652,4 @@ classdef Schema < handle
             str = str(1+(str(1)=='_'):end);  % remove leading underscore
         end
     end
-end    
+end
