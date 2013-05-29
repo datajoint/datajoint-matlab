@@ -341,7 +341,7 @@ classdef Schema < handle
             % The best practice is to use a structure or a relvar as a restrictor, e.g.
             % backup(ephys.getSchema, '/backup', [], ephys.Session('session_date > "2012-07-10"'))
             
-            if nargin<3 || isempty(tiers{3})
+            if nargin<3 || isempty(tiers)
                 tiers = {'lookup','manual'};
             end
             if nargin<4
