@@ -18,6 +18,10 @@ classdef Schema < handle
         tableLevels   % levels in dependency hiararchy
     end
     
+    properties(Access=private)
+        tableRegexp   % regular expression for legal table names
+    end
+    
     properties(Constant)
         % Table naming convention
         %   lookup:   tableName starts with a '#'
@@ -45,6 +49,11 @@ classdef Schema < handle
             end
             self.package = package;
             addPackage(self.conn, dbname, package)
+            if isempty(self.prefix)
+                self.tableRegexp = '^(_|__|#|~)?[a-z][a-z0-9_]*$';
+            else
+                self.tableRegexp = sprintf('^%s/^(_|__|#|~)?[a-z][a-z0-9_]*', self.prefix);
+            end
         end
         
         function val = get.classNames(self)
@@ -64,11 +73,67 @@ classdef Schema < handle
         
         function val = get.dependencies(self)
             self.reload(false)
+            if isempty(self.dependencies)
+                % reload table dependencies
+                tic, fprintf('loading table dependencies... ')
+                foreignKeys = dj.struct.fromFields(self.conn.query(sprintf([...
+                    'SELECT'...
+                    ' table_schema AS from_schema,'...
+                    ' table_name AS from_table,'...
+                    ' referenced_table_schema AS to_schema,'...
+                    ' referenced_table_name  AS to_table,'...
+                    ' min((table_schema, table_name, column_name) in'...
+                    '    (SELECT table_schema, table_name, column_name'...
+                    '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
+                    'FROM information_schema.key_column_usage '...
+                    'WHERE (table_schema="%s" OR referenced_table_schema="%s")'...
+                    '   AND table_name REGEXP "{S}" AND referenced_table_name REGEXP "{S}" '...
+                    'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
+                    self.dbname,self.dbname),self.tableRegexp, self.tableRegexp));
+                
+                % compile classNames for linked tables from outside the schema
+                toClassNames = arrayfun(@(x) self.makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';
+                fromClassNames = arrayfun(@(x) self.makeClassName(x.from_schema, x.from_table), foreignKeys, 'uni', false)';
+                self.classNames = [self.classNames, setdiff(unique([toClassNames fromClassNames]), self.classNames)];
+                
+                % create dependency matrix
+                ixFrom = cellfun(@(x) find(strcmp(x, self.classNames)), fromClassNames);
+                ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
+                nTables = length(self.classNames);
+                
+                self.dependencies = sparse(ixFrom, ixTo, 2-double([foreignKeys.hierarchical]), nTables, nTables);
+                
+                % determine tables' hierarchical level
+                K = self.dependencies;
+                ik = 1:nTables;
+                levels = nan(size(ik));
+                level = 0;
+                while ~isempty(K)
+                    orphans = sum(K,2)==0;
+                    levels(ik(orphans)) = level;
+                    level = level + 1;
+                    ik = ik(~orphans);
+                    K = K(~orphans,~orphans);
+                end
+                
+                % lower level if possible
+                for ii=1:3
+                    for j=1:nTables
+                        ix = find(self.dependencies(:,j));
+                        if ~isempty(ix)
+                            levels(j)=min(levels(ix)-1);
+                        end
+                    end
+                end
+                fprintf('%.3g s\n', toc)
+                
+                self.tableLevels = levels;
+            end
             val = self.dependencies;
         end
         
         function val = get.tableLevels(self)
-            self.reload(false)
+            self.dependencies;
             val = self.tableLevels;
         end
         
@@ -296,7 +361,7 @@ classdef Schema < handle
                         if isSubtable(eval(name))
                             name = [name '*'];  %#ok:AGROW
                         end
-                    catch %#ok
+                    catch
                     end
                     name = name(length(self.package)+2:end);  %remove package name
                     edgeColor = 'none';
@@ -422,22 +487,17 @@ classdef Schema < handle
                 return
             end
             self.loaded = true;
-            
-            % reload schema information into memory: table names and table
-            % dependencies.
+            self.dependencies = [];
+            self.tableLevels = [];
+            % reload schema information into memory: table names and table dependencies.
             % reload table information
             fprintf('loading table definitions from %s... ', self.dbname)
             tic
-            if isempty(self.prefix)
-                tableRegexp = '(\\_|\\_\\_|#|~)?[a-z][a-z0-9\\_]*$';
-            else
-                tableRegexp = sprintf('^%s/(_|__|#|~)?[a-z][a-z0-9_]*$', self.prefix);
-            end
             self.tables = self.conn.query(sprintf([...
                 'SELECT table_name AS name, table_comment AS comment ' ...
                 'FROM information_schema.tables ' ...
-                'WHERE table_schema="%s" AND table_name REGEXP "%s"'], ...
-                self.dbname, tableRegexp));
+                'WHERE table_schema="%s" AND table_name REGEXP "{S}"'], ...
+                self.dbname),self.tableRegexp);
             
             % determine table tier (see dj.Table)
             re = cellfun(@(x) sprintf('^%s[a-z][a-z0-9_]*$',x), ...
@@ -450,7 +510,7 @@ classdef Schema < handle
             self.tables.comment = cellfun(@(x) strtok(x,'$'), ...
                 self.tables.comment, 'UniformOutput', false);  % strip MySQL's comment
             self.tables = dj.struct.fromFields(self.tables);
-            self.classNames = cellfun(@(x) makeClassName(self.dbname, x), ...
+            self.classNames = cellfun(@(x) self.makeClassName(self.dbname, x), ...
                 {self.tables.name}, 'UniformOutput', false);
             
             % read field information
@@ -462,8 +522,8 @@ classdef Schema < handle
                     '(is_nullable="YES") AS isnullable, column_comment as `comment`,'...
                     'if(is_nullable="YES","NULL",ifnull(CAST(column_default AS CHAR),"<<<none>>>"))  AS `default` '...
                     'FROM information_schema.columns '...
-                    'WHERE table_schema="%s" and table_name REGEXP "%s"'],...
-                    self.dbname, tableRegexp));
+                    'WHERE table_schema="%s" and table_name REGEXP "{S}"'],...
+                    self.dbname),self.tableRegexp);
                 self.header.isnullable = logical(self.header.isnullable);
                 self.header.iskey = logical(self.header.iskey);
                 self.header.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), ...
@@ -484,76 +544,10 @@ classdef Schema < handle
                     error('unsupported field type "%s" in %s.%s', ...
                         self.header(ix).type, self.header.table(ix), self.header.name(ix));
                 end
-                
-                % reload table dependencies
-                tableList = sprintf('"%s",',self.tables.name);
-                tableList = tableList(1:max(0,end-1));
-                fprintf('%.3g s\nloading table dependencies... ', toc), tic
-                foreignKeys = dj.struct.fromFields(self.conn.query(sprintf([...
-                    'SELECT'...
-                    ' table_schema AS from_schema,'...
-                    ' table_name AS from_table,'...
-                    ' referenced_table_schema AS to_schema,'...
-                    ' referenced_table_name  AS to_table,'...
-                    ' min((table_schema, table_name, column_name) in'...
-                    '    (SELECT table_schema, table_name, column_name'...
-                    '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
-                    'FROM information_schema.key_column_usage '...
-                    'WHERE (table_schema="%s" AND referenced_table_schema is not null'...
-                    '   OR referenced_table_schema="%s")'...
-                    '  AND table_name IN (%s)'...
-                    '  AND referenced_table_name IN (%s) '...
-                    'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
-                    self.dbname, self.dbname, tableList, tableList)));
-                
-                % compile classNames for linked tables from outside the schema
-                toClassNames = arrayfun(@(x) makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';
-                fromClassNames = arrayfun(@(x) makeClassName(x.from_schema, x.from_table), foreignKeys, 'uni', false)';
-                self.classNames = [self.classNames, setdiff(unique([toClassNames fromClassNames]), self.classNames)];
-                
-                % create dependency matrix
-                ixFrom = cellfun(@(x) find(strcmp(x, self.classNames)), fromClassNames);
-                ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
-                nTables = length(self.classNames);
-                
-                self.dependencies = sparse(ixFrom, ixTo, 2-double([foreignKeys.hierarchical]), nTables, nTables);
-                
-                % determine tables' hierarchical level
-                K = self.dependencies;
-                ik = 1:nTables;
-                levels = nan(size(ik));
-                level = 0;
-                while ~isempty(K)
-                    orphans = sum(K,2)==0;
-                    levels(ik(orphans)) = level;
-                    level = level + 1;
-                    ik = ik(~orphans);
-                    K = K(~orphans,~orphans);
-                end
-                
-                % lower level if possible
-                for ii=1:3
-                    for j=1:nTables
-                        ix = find(self.dependencies(:,j));
-                        if ~isempty(ix)
-                            levels(j)=min(levels(ix)-1);
-                        end
-                    end
-                end
-                fprintf('%.3g s\n', toc)
-                
-                self.tableLevels = levels;
+                fprintf('%.3g\n',toc)
             end
             
             
-            function str = makeClassName(db,tab)
-                if strcmp(db,self.dbname)
-                    str = self.package;
-                else
-                    str = ['$' db];
-                end
-                str = sprintf('%s.%s', str, dj.Schema.toCamelCase(tab));
-            end
         end
         
         
@@ -614,6 +608,19 @@ classdef Schema < handle
             end
         end
     end
+    
+    
+    methods(Access = private)
+        function str = makeClassName(self, db, tab)
+            if strcmp(db,self.dbname)
+                str = self.package;
+            else
+                str = ['$' db];
+            end
+            str = sprintf('%s.%s', str, dj.Schema.toCamelCase(tab));
+        end
+    end
+    
     
     methods(Static)
         function str = toCamelCase(str)
