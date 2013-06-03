@@ -82,7 +82,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 header = self.header;
                 ix = find( ~[header.isBlob] );  % header to display
                 fprintf \n
-                fprintf('  %12.12s', header(ix).name)
+                fprintf('  %16.16s', header(ix).name)
                 fprintf \n
                 maxRows = 12;
                 tuples = self.fetch(header(ix).name, sprintf('LIMIT %d', maxRows+1));
@@ -93,16 +93,20 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     for iField = ix
                         v = s.(header(iField).name);
                         if isnumeric(v)
-                            fprintf('  %12g',v)
+                            if ismember(class(v),{'double','single'})
+                                fprintf('  %16g',v)
+                            else
+                                fprintf('  %16d',v)
+                            end 
                         else
-                            fprintf('  %12.12s',v)
+                            fprintf('  %16.16s',v)
                         end
                     end
                     fprintf '\n'
                 end
                 if nTuples > maxRows
                     for iField = ix
-                        fprintf('  %12s','.....')
+                        fprintf('  %16s','...')
                     end
                     fprintf '\n'
                 end

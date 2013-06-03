@@ -18,14 +18,16 @@ classdef Schema < handle
         tableLevels   % levels in dependency hiararchy
     end
     
+    
     properties(Access=private)
         tableRegexp   % regular expression for legal table names
     end
     
+    
     properties(Constant)
         % Table naming convention
         %   lookup:   tableName starts with a '#'
-        %   manual:   tableName starts with a letter
+        %   manual:   tableName starts with a letter (no prefix)
         %   imported: tableName with a '_'
         %   computed: tableName with '__'
         allowedTiers = {'lookup' 'manual' 'imported' 'computed' 'job'}
@@ -52,7 +54,7 @@ classdef Schema < handle
             if isempty(self.prefix)
                 self.tableRegexp = '^(_|__|#|~)?[a-z][a-z0-9_]*$';
             else
-                self.tableRegexp = sprintf('^%s/^(_|__|#|~)?[a-z][a-z0-9_]*', self.prefix);
+                self.tableRegexp = sprintf('^%s/(_|__|#|~)?[a-z][a-z0-9_]*', self.prefix);
             end
         end
         
@@ -86,10 +88,10 @@ classdef Schema < handle
                     '    (SELECT table_schema, table_name, column_name'...
                     '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
                     'FROM information_schema.key_column_usage '...
-                    'WHERE (table_schema="%s" OR referenced_table_schema="%s")'...
+                    'WHERE "%s" in (table_schema, referenced_table_schema)'...
                     '   AND table_name REGEXP "{S}" AND referenced_table_name REGEXP "{S}" '...
                     'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
-                    self.dbname,self.dbname),self.tableRegexp, self.tableRegexp));
+                    self.dbname),self.tableRegexp, self.tableRegexp));
                 
                 % compile classNames for linked tables from outside the schema
                 toClassNames = arrayfun(@(x) self.makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';
@@ -126,16 +128,17 @@ classdef Schema < handle
                     end
                 end
                 fprintf('%.3g s\n', toc)
-                
                 self.tableLevels = levels;
             end
             val = self.dependencies;
         end
         
+        
         function val = get.tableLevels(self)
             self.dependencies;
             val = self.tableLevels;
         end
+        
         
         function makeClass(self, className)
             % create a base relvar class for the new className in schema directory.
@@ -489,8 +492,8 @@ classdef Schema < handle
             self.loaded = true;
             self.dependencies = [];
             self.tableLevels = [];
-            % reload schema information into memory: table names and table dependencies.
-            % reload table information
+            
+            % reload schema information into memory: table names and field named.
             fprintf('loading table definitions from %s... ', self.dbname)
             tic
             self.tables = self.conn.query(sprintf([...
