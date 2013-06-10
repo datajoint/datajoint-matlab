@@ -66,7 +66,7 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/parpopulate
             
-            % perform error checks 
+            % perform error checks
             if ~isempty(self.restrictions)
                 throwAsCaller(MException('DataJoint:invalidInput', ...
                     'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)'))
@@ -120,8 +120,8 @@ classdef AutoPopulate < handle
             % key is saved in a separate field for errors for debugging
             % purposes.
             % See also dj.AutoPopulate/populate
-
-            % perform error checks 
+            
+            % perform error checks
             if ~isempty(self.restrictions)
                 throwAsCaller(MException('DataJoint:invalidInput', ...
                     'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)'))
@@ -140,7 +140,7 @@ classdef AutoPopulate < handle
             if ~exist(jobClassName,'class')
                 % Create the Jobs class if it does not yet exist
                 answer = input(sprintf('Class %s does not exist. Would you like to create it? yes/no >', jobClassName), 's');
-                if ~strcmpi(answer,'yes')                    
+                if ~strcmpi(answer,'yes')
                     throwAsCaller(MException('DataJoint:jobs', ...
                         'Did not answer yes. Cancelling populate'))
                 end
@@ -158,6 +158,8 @@ classdef AutoPopulate < handle
                 fprintf(f, 'key_hash   : char(32)     # key hash\n');
                 fprintf(f, '-----\n');
                 fprintf(f, 'status    : enum("reserved","error","ignore") # if tuple is missing, the job is available\n');
+                fprintf(f, 'host      : varchar(255)    # system hostname\n');
+                fprintf(f, 'pid         :  int unsigned                     # system process id\n');
                 fprintf(f, 'error_key=null     : blob                              # non-hashed key for errors only\n');
                 fprintf(f, 'error_message=""   : varchar(1023)                     # error message returned if failed\n');
                 fprintf(f, 'error_stack=null   : blob                              # error stack if failed\n');
@@ -176,7 +178,7 @@ classdef AutoPopulate < handle
                 fclose(f);
                 rehash path
             end
-            self.jobs = eval(jobClassName);            
+            self.jobs = eval(jobClassName);
             self.useReservations = true;
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
@@ -257,7 +259,12 @@ classdef AutoPopulate < handle
                     success = true;
                 end
             else
+                [~,host] = system('hostname');
                 jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
+                if all(ismember({'host','pid'},{self.jobs.header.name}))
+                    jobKey.host = strtrim(host);
+                    jobKey.pid = feature('getpid');
+                end
                 switch status
                     case 'completed'
                         delQuick(self.jobs & jobKey)

@@ -510,8 +510,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         function ret = plus(self, arg)
             ret = self | arg;
-        end
-        
+        end        
     end
     
     

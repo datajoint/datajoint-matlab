@@ -81,9 +81,11 @@ classdef Connection < handle
             
             if ~ret && self.inTransaction
                 if self.reconnectTransaction
-                    warning('DataJoint:TransactionReconnect', 'reconnecting after server disconnected during a transaction')
+                    warning('DataJoint:TransactionReconnect', ...
+                        'reconnecting after server disconnected during a transaction')
                 else
-                    throwAsCaller(MException('DataJoint:TransactionReconnect', 'server disconnected during a transaction'))
+                    throwAsCaller(MException('DataJoint:TransactionReconnect', ...
+                        'server disconnected during a transaction'))
                 end
             end
         end
@@ -91,11 +93,9 @@ classdef Connection < handle
         
         
         function ret = query(self, queryStr, varargin)
-            % dj.Schema/query - query(dbname, queryStr, varargin) issue an
+            % dj.Connection/query - query(connection, queryStr, varargin) issue an
             % SQL query and return the result if any.
-            % Reuses the same connection, which limits connections to one
-            % database server at a time, but multiple schemas are okay.
-            %}
+            % The same connection is re-used by all DataJoint objects.
             if ~self.isConnected
                 self.connId=mym('open', self.host, self.user, self.password);
                 if ~isempty(self.initQuery)
