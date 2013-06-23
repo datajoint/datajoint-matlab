@@ -26,7 +26,7 @@ classdef struct
         
         
         function ret = join(s1, s2)
-            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2            
+            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2
             assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
             ret = struct([]);
             commonFields = intersect(fieldnames(s1),fieldnames(s2));
@@ -86,5 +86,36 @@ classdef struct
             % convert into struct array
             s = struct(lst{:});
         end
+        
+        
+        function str = makeCode(s)
+            % str = dj.struct.makeCode(s) 
+            % make matlab code to reproduce the structure array s
+              
+            str = 'cell2struct({...';
+            for i=1:length(s)
+                str = sprintf('%s\n   %s', str, cellArrayString(struct2cell(s(i))));
+            end
+            f = fieldnames(s);
+            str = sprintf('%s\n},{...\n%s\n},2);',str,sprintf(' ''%s''',f{:}));
+        end
     end
+end
+
+
+function str = cellArrayString(array)
+% convert a cell array
+assert(iscell(array) && size(array,2)==1,'invalid array type or size')
+str = '';
+for i=1:length(array)
+    switch true
+        case isnumeric(array{i}) && isscalar(array{i})
+            s = sprintf('%1.16g', array{i});
+        case ischar(array{i})
+            s = sprintf('''%s''', array{i});
+        otherwise
+            error 'cannot convert field value into string'
+    end
+    str = sprintf('%s %s', str, s);
+end
 end
