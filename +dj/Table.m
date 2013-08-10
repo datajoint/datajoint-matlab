@@ -712,8 +712,8 @@ end
 assert(iscellstr(declaration), ...
     'declaration must be a multiline string or a cellstr');
 
-% remove empty lines
-declaration(cellfun(@(x) isempty(strtrim(x)), declaration)) = [];
+% remove empty lines and comment lines
+declaration(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), declaration)) = [];
 
 % concatenate lines that end with a backslash to the next line
 i = 1;

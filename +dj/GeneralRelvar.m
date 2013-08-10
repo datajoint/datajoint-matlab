@@ -151,6 +151,20 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
+        function clip(self)
+            % dj.GeneralRelvar/clip - copy into clipboard the matlab code to re-generate 
+            % the contents of the relation. Only scalar numeric or string values are allowed.
+            % This function may be useful for creating matlab code that fills a table with values.
+            % 
+            % USAGE:
+            %    r.clip
+            
+            str = dj.struct.makeCode(self.fetch('*'));
+            clc, disp(str)
+            clipboard('copy', str)
+            fprintf '\n *** in clipboard *** \n\n'
+        end
+        
         %%%%%%%%%%%%%%%%%% FETCHING DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
         function yes = exists(self)

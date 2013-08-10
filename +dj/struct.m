@@ -10,7 +10,7 @@ classdef struct
             % >> s = structSort(s, 'c');
             % >> s = structSort(s, {'b','a'})
             
-            assert(isstruct(s) && ndims(s)==2 && size(s,2)==1, ...
+            assert(isstruct(s) && ndim(s)==2 && size(s,2)==1, ...
                 'first input must be a column array of structures.')
             if ischar(fieldNames)
                 fieldNames = {fieldNames};
@@ -119,5 +119,40 @@ classdef struct
             tab(sub2ind(sz, ix{:})) = [s.(numField)];
             varargout = v';
         end
+        
+        function str = makeCode(s)
+            % str = dj.struct.makeCode(s) 
+            % make matlab code to reproduce the structure array s
+              
+            str = 'cell2struct({...';
+            for i=1:length(s)
+                str = sprintf('%s\n   %s', str, cellArrayString(struct2cell(s(i))));
+            end
+            f = fieldnames(s);
+            str = sprintf('%s\n},{...\n%s\n},2);',str,sprintf(' ''%s''',f{:}));
+        end
     end
+end
+
+
+function str = cellArrayString(array)
+% convert a cell array
+assert(iscell(array) && size(array,2)==1,'invalid array type or size')
+str = '';
+for i=1:length(array)
+    v = array{i};
+    switch true
+        case isnumeric(v) && isscalar(v)
+            if ismember(class(v),{'double','single'})
+                s = sprintf('%1.16g', v);
+            else
+                s = sprintf('%d', v);
+            end
+        case ischar(v)
+            s = sprintf('''%s''', v);
+        otherwise
+            error 'cannot convert field value into string'
+    end
+    str = sprintf('%s %s', str, s);
+end
 end
