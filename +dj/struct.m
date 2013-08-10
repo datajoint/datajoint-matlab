@@ -108,11 +108,16 @@ function str = cellArrayString(array)
 assert(iscell(array) && size(array,2)==1,'invalid array type or size')
 str = '';
 for i=1:length(array)
+    v = array{i};
     switch true
-        case isnumeric(array{i}) && isscalar(array{i})
-            s = sprintf('%1.16g', array{i});
-        case ischar(array{i})
-            s = sprintf('''%s''', array{i});
+        case isnumeric(v) && isscalar(v)
+            if ismember(class(v),{'double','single'})
+                s = sprintf('%1.16g', v);
+            else
+                s = sprintf('%d', v);
+            end
+        case ischar(v)
+            s = sprintf('''%s''', v);
         otherwise
             error 'cannot convert field value into string'
     end
