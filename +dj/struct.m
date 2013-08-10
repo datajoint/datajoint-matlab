@@ -26,7 +26,7 @@ classdef struct
         
         
         function ret = join(s1, s2)
-            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2            
+            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2
             assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
             ret = struct([]);
             commonFields = intersect(fieldnames(s1),fieldnames(s2));
@@ -85,6 +85,39 @@ classdef struct
             
             % convert into struct array
             s = struct(lst{:});
+        end
+        
+        
+        function [tab,varargout] = tabulate(s,numField,varargin)
+            % dj.structu.tablulate - convert structure array into a multidimensional array
+            %
+            % [tab,v1,..,vn] = dj.struct.tabulate(struc, numField, dim1, ..., dimn)
+            % creates the n-dimensional array tab from the structure array
+            % where each dimension is indexed by the value of the fields
+            % dim1,...,dimn and stores the values of numField.
+            %
+            % v1,...,vn  will contain arrays of unique values for the index
+            % fields corresponding to each dimension.
+            
+            indexFields = varargin;
+            assert(isstruct(s) && ~isempty(s))
+            assert(isnumeric(s(1).(numField)))
+            n = length(indexFields);
+            assert(n>0)
+            ix = cell(n,1);
+            v  = cell(n,1);
+            
+            for i=1:n
+                if isnumeric(s(1).(indexFields{i}))
+                    [v{i},~,ix{i}] = unique([s.(indexFields{i})]);
+                else
+                    [v{i},~,ix{i}] = unique({s.(indexFields{i})});
+                end
+            end
+            sz = cellfun(@length,v)';
+            tab = nan(sz);
+            tab(sub2ind(sz, ix{:})) = [s.(numField)];
+            varargout = v';
         end
     end
 end
