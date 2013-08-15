@@ -182,6 +182,23 @@ classdef AutoPopulate < handle
             self.useReservations = true;
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
+        
+        
+        function varargout = progress(self, varargin)
+            % show progress (fraction populated)
+            remaining = count((self.popRel&varargin) - self);
+            if nargout
+                % return remaning items if asking 
+                varargout{1} = remaining; 
+            else
+                if remaining==0
+                    disp 'Fully populated.'
+                else
+                    n = count(self.popRel&varargin);
+                    fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(n), remaining);
+                end
+            end
+        end
     end
     
     
