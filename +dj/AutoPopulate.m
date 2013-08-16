@@ -186,16 +186,23 @@ classdef AutoPopulate < handle
         
         function varargout = progress(self, varargin)
             % show progress (fraction populated)
+            if ~isempty(self.restrictions)
+                throwAsCaller(MException('DataJoint:invalidInput', ...
+                    'Cannot populate a restricted relation. Correct syntax: progress(rel, restriction)'))
+            end
+
             remaining = count((self.popRel&varargin) - self);
             if nargout
                 % return remaning items if asking 
                 varargout{1} = remaining; 
             else
-                if remaining==0
+                total = count(self.popRel&varargin);
+                if ~total
+                    disp 'Nothing to populate'
+                elseif remaining==0
                     disp 'Fully populated.'
                 else
-                    n = count(self.popRel&varargin);
-                    fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(n), remaining);
+                    fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(total), remaining);
                 end
             end
         end
