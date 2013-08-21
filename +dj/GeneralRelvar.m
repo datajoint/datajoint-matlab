@@ -734,7 +734,8 @@ else
                 if header(iField).isString
                     assert( ischar(value), ...
                         'Value for key.%s must be a string', field{1})
-                    value=sprintf('"%s"',value);
+                    % Escape ' characters in string literal
+                    value = sprintf('''%s''', strrep(value, '''', ''''''));
                 else
                     assert(isnumeric(value), ...
                         'Value for key.%s must be numeric', field{1});
