@@ -703,7 +703,7 @@ for arg = restrictions
             else
                 if ~isempty(cond)
                     % normal restricton
-                    clause = sprintf('%s AND (%s)', clause, struct2cond(cond, selfAttrs));
+                    clause = sprintf('%s AND %s(%s)', clause, not, struct2cond(cond, selfAttrs));
                 else
                     if isempty(cond)
                         % restrictor has common attributes but is empty:
