@@ -775,7 +775,7 @@ cond = cond(min(end,5):end);  % strip " OR "
             if header(iField).isString
                 assert(ischar(value), ...
                     'Value for key.%s must be a string', field{1})
-                value=sprintf('"%s"', value);
+                value = sprintf('''%s''', escapeString(value));
             else
                 assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                     'Value for key.%s must be a numeric scalar', field{1});
@@ -879,4 +879,15 @@ if ~isempty(header)
     end
     str = str(2:end);
 end
+end
+
+
+function str = escapeString(str)
+% Escapes strings that are used in SQL clauses by struct2cond.
+% We use ' to enclose strings, so we need to replace all instances
+% of ' with ''.
+% To prevent the expansion of MySQL escape characters, all instances
+% of \ have to be replaced with \\.
+str = strrep(str, '''', '''''');
+str = strrep(str, '\', '\\');
 end
