@@ -249,47 +249,34 @@ classdef (Sealed) Table < handle
         
         
         
-        
-        
         %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
         function setTableComment(self, newComment)
             % dj.Table/setTableComment - update the table comment
             % in the table declaration
-            self.schema.conn.query(...
-                sprintf('ALTER TABLE %s COMMENT="%s"', ...
-                self.fullTableName, newComment));
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            self.alter(sprintf('COMMENT="%s"', newComment));
         end
         
         function addAttribute(self, definition)
+            % dj.Table/addAttribute - add a new attribute to the
+            % table. A full line from the table definition is
+            % passed in as "definition".
             sql = fieldToSQL(parseAttrDef(definition, false));
-            sql = sprintf('ALTER TABLE %s ADD COLUMN %s', ...
-                self.fullTableName, sql(1:end-2));
-            self.schema.conn.query(sql)
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            self.alter(sprintf('ADD COLUMN %s', sql(1:end-2)));
         end
         
         function dropAttribute(self, attrName)
-            sql = sprintf('ALTER TABLE %s DROP COLUMN `%s`', ...
-                self.fullTableName, attrName);
-            self.schema.conn.query(sql)
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            % dj.Table/dropAttribute - drop the attribute attrName
+            % from the table definition
+            self.alter(sprintf('DROP COLUMN `%s`', attrName));
         end
         
         function alterAttribute(self, attrName, newDefinition)
+            % dj.Table/alterAttribute - Modify the definition of attribute
+            % attrName using its new line from the table definition
+            % "newDefinition"
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
-            sql = sprintf('ALTER TABLE %s CHANGE COLUMN `%s` %s', ...
-                self.fullTableName, attrName, sql(1:end-2));
-            self.schema.conn.query(sql)
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, ...
+                sql(1:end-2)));
         end
         
         function addForeignKey(self, target)
@@ -303,13 +290,10 @@ classdef (Sealed) Table < handle
             
             fieldList = sprintf('%s,', target.primaryKey{:});
             fieldList(end)=[];  % drop trailing comma
-            sql = sprintf(...
-                'ALTER TABLE %s ADD FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT\n', ...
-                self.fullTableName, fieldList, ...
-                target.fullTableName, fieldList);
-            self.schema.conn.query(sql)
-            self.schema.reload
-            self.syncDef
+            self.alter( sprintf(...
+                ['ADD FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
+                 'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
+                fieldList, target.fullTableName, fieldList));
         end
         
         function dropForeignKey(self, target)
@@ -317,21 +301,33 @@ classdef (Sealed) Table < handle
             % The target must be a dj.Relvar object.
             
             % get constraint name
-            sql = 'SELECT distinct constraint_name AS name FROM information_schema.key_column_usage';
-            sql = sprintf('%s WHERE table_schema="%s" and table_name="%s"', ...
-                sql, self.table.schema.dbname, self.plainTableName);
-            sql = sprintf('%s AND referenced_table_schema="%s" AND referenced_table_name="%s"', ...
-                sql, target.table.schema.dbname, target.table.plainTableName);
+            sql = sprintf( ...
+                ['SELECT distinct constraint_name AS name ' ...
+                 'FROM information_schema.key_column_usage ' ...
+                 'WHERE table_schema="%s" and table_name="%s"' ...
+                 'AND referenced_table_schema="%s" ' ...
+                 'AND referenced_table_name="%s"'], ...
+                self.table.schema.dbname, self.plainTableName, ...
+                target.table.schema.dbname, target.table.plainTableName);
             name = self.schema.conn.query(sql);
             if isempty(name.name)
                 disp 'No matching foreign key'
             else
-                sql = sprintf('ALTER TABLE % DROP FOREIGN KEY %s', ...
-                    self.fullTableName, name.name{1});
-                self.schema.conn.query(sql);
-                self.schema.reload
-                self.syncDef
+                self.alter(sprintf('DROP FOREIGN KEY %s', name.name{1}));
             end
+        end
+        
+        function alter(self, alter_statement)
+            % dj.Table/alter
+            % Executes an ALTER TABLE statement for this table
+            % alter(self, alter_statement).
+            % The schema is reloaded and syncDef is called
+            sql = sprintf('ALTER TABLE  %s %s', ...
+                self.fullTableName, alter_statement);
+            self.schema.conn.query(sql);
+            disp 'table updated'
+            self.schema.reload
+            self.syncDef
         end
         
         function syncDef(self)
