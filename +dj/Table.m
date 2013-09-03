@@ -231,6 +231,33 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s\n', str);
             
+            % list secondary indexes
+            indexes = dj.struct.fromFields( ...
+                self.schema.conn.query(sprintf(...
+                ['SHOW INDEX FROM `%s` IN `%s` ' ...
+                 'WHERE NOT `Key_name`="PRIMARY"'], ...
+                self.plainTableName, self.schema.dbname)));
+            if ~isempty(indexes)
+                str = sprintf('%s+++\n', str);
+            end
+            [indexNames, ~, indexId] = unique({indexes.Key_name});
+            for iIndex=1:numel(indexNames)
+                % Get attribute names and sort by position in index
+                thisIndex = indexes(indexId == iIndex);
+                [~, sortPerm] = sort([thisIndex.Seq_in_index]);
+                thisIndex = thisIndex(sortPerm);
+                attributeNames = {thisIndex.Column_name};
+                attributeList = sprintf('%s,', attributeNames{:});
+                attributeList = attributeList(1:end-1);
+                if ~thisIndex(1).Non_unique
+                    keyModifier = 'UNIQUE ';
+                else
+                    keyModifier = '';
+                end
+                str = sprintf('%s%sINDEX(%s)\n', ...
+                    str, keyModifier, attributeList);
+            end
+            
             if ~expandForeignKeys
                 str = sprintf('%s%%}\n', str);
             end
@@ -315,6 +342,62 @@ classdef (Sealed) Table < handle
             else
                 self.alter(sprintf('DROP FOREIGN KEY %s', name.name{1}));
             end
+        end
+        
+        function addIndex(self, isUniqueIndex, indexAttributes)
+            % dj.Table/addIndex - add a new secondary index to the
+            % table. 
+            % isUniqueIndex - Set true to add a unique index
+            % indexAttributes - cell array of attribute names to be indexed
+            if ischar(indexAttributes)
+                indexAttributes = {indexAttributes};
+            end
+            assert(~isempty(indexAttributes) && ...
+                all(ismember(indexAttributes, {self.header.name})), ...
+                'Index definition contains invalid attribute names');
+
+            fieldList = sprintf('`%s`,', indexAttributes{:});
+            fieldList(end)=[];
+            if isUniqueIndex
+                indexModifier = 'UNIQUE';
+            else
+                indexModifier = '';
+            end
+            self.alter(sprintf('ADD %s INDEX (%s)', ...
+                indexModifier, fieldList));
+        end
+        
+        function dropIndex(self, isUniqueIndex, indexAttributes)
+            % dj.Table/dropIndex - Drops a secondary index from the
+            % table. 
+            % isUniqueIndex   - Set true if the index you want to drop
+            %                   is a unique index
+            % indexAttributes - cell array of attribute names that define
+            %                   the index. The order of attributes
+            %                   matters!
+            if ischar(indexAttributes)
+                indexAttributes = {indexAttributes};
+            end
+            % Figure out the index name
+            indexes = dj.struct.fromFields( ...
+                self.schema.conn.query(sprintf(...
+                ['SHOW INDEX FROM `%s` IN `%s` ' ...
+                 'WHERE NOT `Key_name`="PRIMARY"'], ...
+                self.plainTableName, self.schema.dbname)));
+            
+            [indexNames, ~, indexId] = unique({indexes.Key_name});
+            for iIndex=1:numel(indexNames)
+                % Sort attributes by position in index
+                thisIndex = indexes(indexId == iIndex);
+                [~, sortPerm] = sort([thisIndex.Seq_in_index]);
+                thisIndex = thisIndex(sortPerm);
+                if isequal(indexAttributes, {thisIndex.Column_name}) && ...
+                        (isUniqueIndex ~= thisIndex(1).Non_unique)
+                    self.alter(sprintf('DROP INDEX `%s`', indexNames{iIndex}));
+                    return
+                end
+            end
+            error('Could not locate specfied index in database.')
         end
         
         function syncDef(self)
@@ -637,13 +720,13 @@ classdef (Sealed) Table < handle
             self.schema.reload
         end
                 
-        function alter(self, alter_statement)
+        function alter(self, alterStatement)
             % dj.Table/alter
-            % alter(self, alter_statement)
+            % alter(self, alterStatement)
             % Executes an ALTER TABLE statement for this table.
             % The schema is reloaded and syncDef is called.
             sql = sprintf('ALTER TABLE  %s %s', ...
-                self.fullTableName, alter_statement);
+                self.fullTableName, alterStatement);
             self.schema.conn.query(sql);
             disp 'table updated'
             self.schema.reload
