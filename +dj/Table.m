@@ -317,19 +317,6 @@ classdef (Sealed) Table < handle
             end
         end
         
-        function alter(self, alter_statement)
-            % dj.Table/alter
-            % Executes an ALTER TABLE statement for this table
-            % alter(self, alter_statement).
-            % The schema is reloaded and syncDef is called
-            sql = sprintf('ALTER TABLE  %s %s', ...
-                self.fullTableName, alter_statement);
-            self.schema.conn.query(sql);
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
-        end
-        
         function syncDef(self)
             % dj.Table/syncDef replace the table declaration in the file
             % <package>.<className>.m with the actual definition from the database.
@@ -548,7 +535,7 @@ classdef (Sealed) Table < handle
         
         
         function create(self)
-            [tableInfo, parents, references, fieldDefs] = ...
+            [tableInfo, parents, references, fieldDefs, indexDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
@@ -566,6 +553,7 @@ classdef (Sealed) Table < handle
             
             % add inherited primary key attributes
             primaryKeyFields = {};
+            nonKeyFields = {};
             for iRef = 1:length(parents)
                 for iField = find([parents{iRef}.table.header.iskey])
                     field = parents{iRef}.table.header(iField);
@@ -593,6 +581,7 @@ classdef (Sealed) Table < handle
                 for iField = find([references{iRef}.table.header.iskey])
                     field = references{iRef}.table.header(iField);
                     if ~ismember(field.name, primaryKeyFields)
+                        nonKeyFields{end+1} = field.name; %#ok<AGROW>
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
@@ -602,6 +591,7 @@ classdef (Sealed) Table < handle
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
+                    nonKeyFields{end+1} = field.name; %#ok<AGROW>
                     sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
             end
@@ -621,6 +611,18 @@ classdef (Sealed) Table < handle
                     sql, fieldList, ref{1}.table.fullTableName, fieldList);
             end
             
+            % add secondary index declarations
+            for iIndex = 1:numel(indexDefs)
+                assert(all(ismember(indexDefs(iIndex).attributes, ...
+                    [primaryKeyFields, nonKeyFields])), ...
+                    'Index definition contains invalid attribute names');
+                fieldList = sprintf('`%s`,', indexDefs(iIndex).attributes{:});
+                fieldList(end)=[];
+                sql = sprintf(...
+                    '%s%s INDEX (%s),\n', ...
+                    sql, indexDefs(iIndex).unique, fieldList);
+            end
+            
             % close the declaration
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s$"', sql(1:end-2), tableInfo.comment);
             
@@ -633,6 +635,19 @@ classdef (Sealed) Table < handle
                 self.schema.conn.query(sql);
             end
             self.schema.reload
+        end
+                
+        function alter(self, alter_statement)
+            % dj.Table/alter
+            % alter(self, alter_statement)
+            % Executes an ALTER TABLE statement for this table.
+            % The schema is reloaded and syncDef is called.
+            sql = sprintf('ALTER TABLE  %s %s', ...
+                self.fullTableName, alter_statement);
+            self.schema.conn.query(sql);
+            disp 'table updated'
+            self.schema.reload
+            self.syncDef
         end
     end
 end
@@ -697,10 +712,11 @@ end
 
 
 
-function [tableInfo, parents, references, fieldDefs] = parseDeclaration(declaration)
+function [tableInfo, parents, references, fieldDefs, indexDefs] = parseDeclaration(declaration)
 parents = {};
 references = {};
 fieldDefs = [];
+indexDefs = [];
 
 if ischar(declaration)
     declaration = str2cell(declaration);
@@ -739,11 +755,14 @@ assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
 if nargout > 1
     % parse field declarations and references
     inKey = true;
+    inIndexSection = false;
     for iLine = 2:length(declaration)
         line = strtrim(declaration{iLine});
         switch true
             case strncmp(line,'---',3)
                 inKey = false;
+            case strncmp(line, '+++',3)
+                inIndexSection = true;
             case strncmp(line,'->',2)
                 % foreign key
                 p = eval(line(3:end));
@@ -755,9 +774,15 @@ if nargout > 1
                     references{end+1} = p;   %#ok:<AGROW>
                 end
             otherwise
-                % parse field definition
-                fieldInfo = parseAttrDef(line, inKey);
-                fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
+                if ~inIndexSection
+                    % parse field definition
+                    fieldInfo = parseAttrDef(line, inKey);
+                    fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
+                else
+                    % parse index definition
+                    indexInfo = parseIndexDef(line);
+                    indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
+                end
         end
     end
 end
@@ -785,6 +810,26 @@ assert(~any(fieldInfo.comment=='"'), ...
 assert(numel(fieldInfo)==1, ...
     'Invalid field declaration "%s"', line);
 fieldInfo.iskey = inKey;
+end
+
+
+function indexInfo = parseIndexDef(line)
+pat = [
+    '^\s*(?<unique>UNIQUE)?\s*' ...         % [UNIQUE]
+    '(?:INDEX\s*\()' ...                    % INDEX ( 
+    '(?<attributes>[^\)]+)' ...             % attr1, attr2, ...
+    '\)'                                    % )
+    ];
+indexInfo = regexpi(line, pat, 'names');
+assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
+    'Invalid index declaration "%s"', line);
+% Parse out and trim individual field names
+attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
+attributes = cellfun(@strtrim, attributes{1}, 'UniformOutput', false);
+assert(numel(unique(attributes)) == numel(attributes), ...
+    'Index declaration "%s" mentions an attribute more than once', ...
+    line);
+indexInfo.attributes = attributes;
 end
 
 
