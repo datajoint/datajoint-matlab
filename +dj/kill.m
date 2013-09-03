@@ -1,10 +1,23 @@
-% dj.kill - show MySQL all connections and prompt to kill a connection.
+% Show MySQL all connections and prompt to kill a connection.
+%   dj.kill() lists all connections and prompts the user to enter an id to
+%   kill.
+%   
+%   dj.kill(restriction) lists all connections satisfying the specified
+%   restriction. Restrictions are specified as strings and can involve any
+%   of the attributes of information_schema.processlist: ID, USER, HOST,
+%   DB, COMMAND, TIME, STATE, INFO.
+%
+%   Examples:
+%       dj.kill('HOST LIKE "%at-compute%"') lists only connections from
+%       at-compute.
+%
+%       dj.kill('TIME > 600') lists only connections older than 10 minutes.
 
 function kill(restriction)
 
 qstr = 'SELECT * FROM information_schema.processlist WHERE id <> CONNECTION_ID()';
 if nargin && ~isempty(restriction)
-    qstr = sprintf('%s AND %s', qstr, restriction);
+    qstr = sprintf('%s AND (%s)', qstr, restriction);
 end
     
 while true
