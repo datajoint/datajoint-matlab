@@ -386,6 +386,7 @@ classdef (Sealed) Table < handle
                 self.plainTableName, self.schema.dbname)));
             
             [indexNames, ~, indexId] = unique({indexes.Key_name});
+            indexToDrop = [];
             for iIndex=1:numel(indexNames)
                 % Sort attributes by position in index
                 thisIndex = indexes(indexId == iIndex);
@@ -393,11 +394,15 @@ classdef (Sealed) Table < handle
                 thisIndex = thisIndex(sortPerm);
                 if isequal(indexAttributes, {thisIndex.Column_name}) && ...
                         (isUniqueIndex ~= thisIndex(1).Non_unique)
-                    self.alter(sprintf('DROP INDEX `%s`', indexNames{iIndex}));
-                    return
+                    indexToDrop = indexNames{iIndex};
+                    break
                 end
             end
-            error('Could not locate specfied index in database.')
+            if ~isempty(indexToDrop)
+                self.alter(sprintf('DROP INDEX `%s`', indexToDrop));
+            else
+                error('Could not locate specfied index in database.')
+            end
         end
         
         function syncDef(self)
