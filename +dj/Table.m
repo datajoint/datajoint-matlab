@@ -231,25 +231,19 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s\n', str);
             
-            % list secondary indexes
-            indexes = dj.struct.fromFields( ...
-                self.schema.conn.query(sprintf(...
-                ['SHOW INDEX FROM `%s` IN `%s` ' ...
-                 'WHERE NOT `Key_name`="PRIMARY"'], ...
-                self.plainTableName, self.schema.dbname)));
-            if ~isempty(indexes)
-                str = sprintf('%s+++\n', str);
-            end
-            [indexNames, ~, indexId] = unique({indexes.Key_name});
-            for iIndex=1:numel(indexNames)
-                % Get attribute names and sort by position in index
-                thisIndex = indexes(indexId == iIndex);
-                [~, sortPerm] = sort([thisIndex.Seq_in_index]);
-                thisIndex = thisIndex(sortPerm);
-                attributeNames = {thisIndex.Column_name};
-                attributeList = sprintf('%s,', attributeNames{:});
+            % list user-defined econdary indexes
+            allIndexes = self.getDatabaseIndexes();
+            implicitIndexes = self.getImplicitIndexes();
+            for thisIndex=allIndexes
+                % Skip implicit indexes
+                if any(arrayfun( ...
+                        @(x) isequal(x.attributes, thisIndex.attributes), ...
+                        implicitIndexes))
+                    continue
+                end
+                attributeList = sprintf('%s,', thisIndex.attributes{:});
                 attributeList = attributeList(1:end-1);
-                if ~thisIndex(1).Non_unique
+                if thisIndex.unique
                     keyModifier = 'UNIQUE ';
                 else
                     keyModifier = '';
@@ -355,51 +349,60 @@ classdef (Sealed) Table < handle
             assert(~isempty(indexAttributes) && ...
                 all(ismember(indexAttributes, {self.header.name})), ...
                 'Index definition contains invalid attribute names');
-
+            % Don't allow indexes that may conflict with foreign keys
+            implicitIndexes = self.getImplicitIndexes();
+            assert( ~any(arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), ...
+                implicitIndexes)), ...
+                ['The specified set of attributes is implicitly ' ...
+                 'indexed because of a foreign key constraint.']);
+            % Prevent interference with existing indexes
+            allIndexes = self.getDatabaseIndexes();
+            assert( ~any(arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), ...
+                allIndexes)), ...
+                ['Only one index can be specified for any tuple ' ...
+                 'of attributes. To change the index type, drop ' ...
+                 'the exsiting index first.']);
+            % Create a new index
             fieldList = sprintf('`%s`,', indexAttributes{:});
             fieldList(end)=[];
             if isUniqueIndex
-                indexModifier = 'UNIQUE';
+                indexModifier = 'UNIQUE ';
             else
                 indexModifier = '';
             end
-            self.alter(sprintf('ADD %s INDEX (%s)', ...
+            self.alter(sprintf('ADD %sINDEX (%s)', ...
                 indexModifier, fieldList));
         end
         
-        function dropIndex(self, isUniqueIndex, indexAttributes)
+        function dropIndex(self, indexAttributes)
             % dj.Table/dropIndex - Drops a secondary index from the
             % table. 
-            % isUniqueIndex   - Set true if the index you want to drop
-            %                   is a unique index
             % indexAttributes - cell array of attribute names that define
             %                   the index. The order of attributes
             %                   matters!
             if ischar(indexAttributes)
                 indexAttributes = {indexAttributes};
             end
-            % Figure out the index name
-            indexes = dj.struct.fromFields( ...
-                self.schema.conn.query(sprintf(...
-                ['SHOW INDEX FROM `%s` IN `%s` ' ...
-                 'WHERE NOT `Key_name`="PRIMARY"'], ...
-                self.plainTableName, self.schema.dbname)));
             
-            [indexNames, ~, indexId] = unique({indexes.Key_name});
-            indexToDrop = [];
-            for iIndex=1:numel(indexNames)
-                % Sort attributes by position in index
-                thisIndex = indexes(indexId == iIndex);
-                [~, sortPerm] = sort([thisIndex.Seq_in_index]);
-                thisIndex = thisIndex(sortPerm);
-                if isequal(indexAttributes, {thisIndex.Column_name}) && ...
-                        (isUniqueIndex ~= thisIndex(1).Non_unique)
-                    indexToDrop = indexNames{iIndex};
-                    break
-                end
-            end
-            if ~isempty(indexToDrop)
-                self.alter(sprintf('DROP INDEX `%s`', indexToDrop));
+            % Don't touch indexes introduced by foreign keys
+            implicitIndexes = self.getImplicitIndexes();
+            assert( ~any(arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), ...
+                implicitIndexes)), ...
+                ['The specified set of attributes is indexed ' ...
+                 'because of a foreign key constraint. This index ' ...
+                 'cannot be dropped.']);
+            
+             % Drop specified index(es). There should only be one unless
+             % they were redundantly created outside of DataJoint.
+            allIndexes = self.getDatabaseIndexes();
+            selIndexToDrop = arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), allIndexes);
+            if any(selIndexToDrop)
+                arrayfun(@(x) self.alter(sprintf('DROP INDEX `%s`', x.name)), ...
+                    allIndexes(selIndexToDrop));
             else
                 error('Could not locate specfied index in database.')
             end
@@ -700,10 +703,23 @@ classdef (Sealed) Table < handle
             end
             
             % add secondary index declarations
+            % gather implicit indexes due to foreign keys first
+            implicitIndexes = {};
+            for fkSource = [parents references]
+                isKey = [fkSource{1}.table.header.iskey];
+                implicitIndexes{end+1} = {fkSource{1}.table.header(isKey).name}; %#ok<AGROW>
+            end
+                
             for iIndex = 1:numel(indexDefs)
                 assert(all(ismember(indexDefs(iIndex).attributes, ...
                     [primaryKeyFields, nonKeyFields])), ...
                     'Index definition contains invalid attribute names');
+                assert(~any(cellfun( ...
+                    @(x) isequal(x, indexDefs(iIndex).attributes), ...
+                    implicitIndexes)), ...
+                    ['The specified set of attributes is implicitly ' ...
+                     'indexed because of a foreign key constraint. '...
+                     'Cannot create additional index.']);
                 fieldList = sprintf('`%s`,', indexDefs(iIndex).attributes{:});
                 fieldList(end)=[];
                 sql = sprintf(...
@@ -737,8 +753,44 @@ classdef (Sealed) Table < handle
             self.schema.reload
             self.syncDef
         end
+        
+        function indexInfo = getDatabaseIndexes(self)
+            % dj.Table/getDatabaseIndexes
+            % Returns all secondary database indexes,
+            % as given by the "SHOW INDEX" query
+            indexInfo = struct('attributes', {}, ...
+                'unique', {}, 'name', {});
+            indexes = dj.struct.fromFields( ...
+                self.schema.conn.query(sprintf(...
+                ['SHOW INDEX FROM `%s` IN `%s` ' ...
+                 'WHERE NOT `Key_name`="PRIMARY"'], ...
+                self.plainTableName, self.schema.dbname)));
+            [indexNames, ~, indexId] = unique({indexes.Key_name});
+            for iIndex=1:numel(indexNames)
+                % Get attribute names and sort by position in index
+                thisIndex = indexes(indexId == iIndex);
+                [~, sortPerm] = sort([thisIndex.Seq_in_index]);
+                thisIndex = thisIndex(sortPerm);
+                indexInfo(end+1).attributes = {thisIndex.Column_name};  %#ok<AGROW>
+                indexInfo(end).unique = ~thisIndex(1).Non_unique;
+                indexInfo(end).name = indexNames{iIndex};
+            end
+        end
+        
+        function indexInfo = getImplicitIndexes(self)
+            % dj.Table/getImplicitIndexes()
+            % Returns database indexes that are implied by
+            % table relationships and should not be shown to the user
+            % or modified by the user
+            indexInfo = struct('attributes', {}, 'unique', {});
+            for refClassName = self.schema.getParents(self.className)
+                refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                indexInfo(end+1).attributes = ...
+                    {refObj.header([refObj.header.iskey]).name};  %#ok<AGROW>
+            end
+        end
     end
-end
+end 
 
 
 
@@ -843,14 +895,11 @@ assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
 if nargout > 1
     % parse field declarations and references
     inKey = true;
-    inIndexSection = false;
     for iLine = 2:length(declaration)
         line = strtrim(declaration{iLine});
         switch true
             case strncmp(line,'---',3)
                 inKey = false;
-            case strncmp(line, '+++',3)
-                inIndexSection = true;
             case strncmp(line,'->',2)
                 % foreign key
                 p = eval(line(3:end));
@@ -862,7 +911,7 @@ if nargout > 1
                     references{end+1} = p;   %#ok:<AGROW>
                 end
             otherwise
-                if ~inIndexSection
+                if ~isempty(strfind(line, ':'))
                     % parse field definition
                     fieldInfo = parseAttrDef(line, inKey);
                     fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
