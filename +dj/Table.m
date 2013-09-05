@@ -231,6 +231,27 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s\n', str);
             
+            % list user-defined econdary indexes
+            allIndexes = self.getDatabaseIndexes();
+            implicitIndexes = self.getImplicitIndexes();
+            for thisIndex=allIndexes
+                % Skip implicit indexes
+                if any(arrayfun( ...
+                        @(x) isequal(x.attributes, thisIndex.attributes), ...
+                        implicitIndexes))
+                    continue
+                end
+                attributeList = sprintf('%s,', thisIndex.attributes{:});
+                attributeList = attributeList(1:end-1);
+                if thisIndex.unique
+                    keyModifier = 'UNIQUE ';
+                else
+                    keyModifier = '';
+                end
+                str = sprintf('%s%sINDEX(%s)\n', ...
+                    str, keyModifier, attributeList);
+            end
+            
             if ~expandForeignKeys
                 str = sprintf('%s%%}\n', str);
             end
@@ -249,47 +270,34 @@ classdef (Sealed) Table < handle
         
         
         
-        
-        
         %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
         function setTableComment(self, newComment)
             % dj.Table/setTableComment - update the table comment
             % in the table declaration
-            self.schema.conn.query(...
-                sprintf('ALTER TABLE %s COMMENT="%s"', ...
-                self.fullTableName, newComment));
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            self.alter(sprintf('COMMENT="%s"', newComment));
         end
         
         function addAttribute(self, definition)
+            % dj.Table/addAttribute - add a new attribute to the
+            % table. A full line from the table definition is
+            % passed in as "definition".
             sql = fieldToSQL(parseAttrDef(definition, false));
-            sql = sprintf('ALTER TABLE %s ADD COLUMN %s', ...
-                self.fullTableName, sql(1:end-2));
-            self.schema.conn.query(sql)
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            self.alter(sprintf('ADD COLUMN %s', sql(1:end-2)));
         end
         
         function dropAttribute(self, attrName)
-            sql = sprintf('ALTER TABLE %s DROP COLUMN `%s`', ...
-                self.fullTableName, attrName);
-            self.schema.conn.query(sql)
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            % dj.Table/dropAttribute - drop the attribute attrName
+            % from the table definition
+            self.alter(sprintf('DROP COLUMN `%s`', attrName));
         end
         
         function alterAttribute(self, attrName, newDefinition)
+            % dj.Table/alterAttribute - Modify the definition of attribute
+            % attrName using its new line from the table definition
+            % "newDefinition"
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
-            sql = sprintf('ALTER TABLE %s CHANGE COLUMN `%s` %s', ...
-                self.fullTableName, attrName, sql(1:end-2));
-            self.schema.conn.query(sql)
-            disp 'table updated'
-            self.schema.reload
-            self.syncDef
+            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, ...
+                sql(1:end-2)));
         end
         
         function addForeignKey(self, target)
@@ -303,13 +311,10 @@ classdef (Sealed) Table < handle
             
             fieldList = sprintf('%s,', target.primaryKey{:});
             fieldList(end)=[];  % drop trailing comma
-            sql = sprintf(...
-                'ALTER TABLE %s ADD FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT\n', ...
-                self.fullTableName, fieldList, ...
-                target.fullTableName, fieldList);
-            self.schema.conn.query(sql)
-            self.schema.reload
-            self.syncDef
+            self.alter( sprintf(...
+                ['ADD FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
+                 'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
+                fieldList, target.fullTableName, fieldList));
         end
         
         function dropForeignKey(self, target)
@@ -317,20 +322,89 @@ classdef (Sealed) Table < handle
             % The target must be a dj.Relvar object.
             
             % get constraint name
-            sql = 'SELECT distinct constraint_name AS name FROM information_schema.key_column_usage';
-            sql = sprintf('%s WHERE table_schema="%s" and table_name="%s"', ...
-                sql, self.table.schema.dbname, self.plainTableName);
-            sql = sprintf('%s AND referenced_table_schema="%s" AND referenced_table_name="%s"', ...
-                sql, target.table.schema.dbname, target.table.plainTableName);
+            sql = sprintf( ...
+                ['SELECT distinct constraint_name AS name ' ...
+                 'FROM information_schema.key_column_usage ' ...
+                 'WHERE table_schema="%s" and table_name="%s"' ...
+                 'AND referenced_table_schema="%s" ' ...
+                 'AND referenced_table_name="%s"'], ...
+                self.table.schema.dbname, self.plainTableName, ...
+                target.table.schema.dbname, target.table.plainTableName);
             name = self.schema.conn.query(sql);
             if isempty(name.name)
                 disp 'No matching foreign key'
             else
-                sql = sprintf('ALTER TABLE % DROP FOREIGN KEY %s', ...
-                    self.fullTableName, name.name{1});
-                self.schema.conn.query(sql);
-                self.schema.reload
-                self.syncDef
+                self.alter(sprintf('DROP FOREIGN KEY %s', name.name{1}));
+            end
+        end
+        
+        function addIndex(self, isUniqueIndex, indexAttributes)
+            % dj.Table/addIndex - add a new secondary index to the
+            % table. 
+            % isUniqueIndex - Set true to add a unique index
+            % indexAttributes - cell array of attribute names to be indexed
+            if ischar(indexAttributes)
+                indexAttributes = {indexAttributes};
+            end
+            assert(~isempty(indexAttributes) && ...
+                all(ismember(indexAttributes, {self.header.name})), ...
+                'Index definition contains invalid attribute names');
+            % Don't allow indexes that may conflict with foreign keys
+            implicitIndexes = self.getImplicitIndexes();
+            assert( ~any(arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), ...
+                implicitIndexes)), ...
+                ['The specified set of attributes is implicitly ' ...
+                 'indexed because of a foreign key constraint.']);
+            % Prevent interference with existing indexes
+            allIndexes = self.getDatabaseIndexes();
+            assert( ~any(arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), ...
+                allIndexes)), ...
+                ['Only one index can be specified for any tuple ' ...
+                 'of attributes. To change the index type, drop ' ...
+                 'the exsiting index first.']);
+            % Create a new index
+            fieldList = sprintf('`%s`,', indexAttributes{:});
+            fieldList(end)=[];
+            if isUniqueIndex
+                indexModifier = 'UNIQUE ';
+            else
+                indexModifier = '';
+            end
+            self.alter(sprintf('ADD %sINDEX (%s)', ...
+                indexModifier, fieldList));
+        end
+        
+        function dropIndex(self, indexAttributes)
+            % dj.Table/dropIndex - Drops a secondary index from the
+            % table. 
+            % indexAttributes - cell array of attribute names that define
+            %                   the index. The order of attributes
+            %                   matters!
+            if ischar(indexAttributes)
+                indexAttributes = {indexAttributes};
+            end
+            
+            % Don't touch indexes introduced by foreign keys
+            implicitIndexes = self.getImplicitIndexes();
+            assert( ~any(arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), ...
+                implicitIndexes)), ...
+                ['The specified set of attributes is indexed ' ...
+                 'because of a foreign key constraint. This index ' ...
+                 'cannot be dropped.']);
+            
+             % Drop specified index(es). There should only be one unless
+             % they were redundantly created outside of DataJoint.
+            allIndexes = self.getDatabaseIndexes();
+            selIndexToDrop = arrayfun( ...
+                @(x) isequal(x.attributes, indexAttributes), allIndexes);
+            if any(selIndexToDrop)
+                arrayfun(@(x) self.alter(sprintf('DROP INDEX `%s`', x.name)), ...
+                    allIndexes(selIndexToDrop));
+            else
+                error('Could not locate specfied index in database.')
             end
         end
         
@@ -552,7 +626,7 @@ classdef (Sealed) Table < handle
         
         
         function create(self)
-            [tableInfo, parents, references, fieldDefs] = ...
+            [tableInfo, parents, references, fieldDefs, indexDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
@@ -570,6 +644,7 @@ classdef (Sealed) Table < handle
             
             % add inherited primary key attributes
             primaryKeyFields = {};
+            nonKeyFields = {};
             for iRef = 1:length(parents)
                 for iField = find([parents{iRef}.table.header.iskey])
                     field = parents{iRef}.table.header(iField);
@@ -597,6 +672,7 @@ classdef (Sealed) Table < handle
                 for iField = find([references{iRef}.table.header.iskey])
                     field = references{iRef}.table.header(iField);
                     if ~ismember(field.name, primaryKeyFields)
+                        nonKeyFields{end+1} = field.name; %#ok<AGROW>
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
@@ -606,6 +682,7 @@ classdef (Sealed) Table < handle
             if ~isempty(fieldDefs)
                 for iField = find(~[fieldDefs.iskey])
                     field = fieldDefs(iField);
+                    nonKeyFields{end+1} = field.name; %#ok<AGROW>
                     sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
             end
@@ -625,6 +702,31 @@ classdef (Sealed) Table < handle
                     sql, fieldList, ref{1}.table.fullTableName, fieldList);
             end
             
+            % add secondary index declarations
+            % gather implicit indexes due to foreign keys first
+            implicitIndexes = {};
+            for fkSource = [parents references]
+                isKey = [fkSource{1}.table.header.iskey];
+                implicitIndexes{end+1} = {fkSource{1}.table.header(isKey).name}; %#ok<AGROW>
+            end
+                
+            for iIndex = 1:numel(indexDefs)
+                assert(all(ismember(indexDefs(iIndex).attributes, ...
+                    [primaryKeyFields, nonKeyFields])), ...
+                    'Index definition contains invalid attribute names');
+                assert(~any(cellfun( ...
+                    @(x) isequal(x, indexDefs(iIndex).attributes), ...
+                    implicitIndexes)), ...
+                    ['The specified set of attributes is implicitly ' ...
+                     'indexed because of a foreign key constraint. '...
+                     'Cannot create additional index.']);
+                fieldList = sprintf('`%s`,', indexDefs(iIndex).attributes{:});
+                fieldList(end)=[];
+                sql = sprintf(...
+                    '%s%s INDEX (%s),\n', ...
+                    sql, indexDefs(iIndex).unique, fieldList);
+            end
+            
             % close the declaration
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s$"', sql(1:end-2), tableInfo.comment);
             
@@ -638,8 +740,57 @@ classdef (Sealed) Table < handle
             end
             self.schema.reload
         end
+                
+        function alter(self, alterStatement)
+            % dj.Table/alter
+            % alter(self, alterStatement)
+            % Executes an ALTER TABLE statement for this table.
+            % The schema is reloaded and syncDef is called.
+            sql = sprintf('ALTER TABLE  %s %s', ...
+                self.fullTableName, alterStatement);
+            self.schema.conn.query(sql);
+            disp 'table updated'
+            self.schema.reload
+            self.syncDef
+        end
+        
+        function indexInfo = getDatabaseIndexes(self)
+            % dj.Table/getDatabaseIndexes
+            % Returns all secondary database indexes,
+            % as given by the "SHOW INDEX" query
+            indexInfo = struct('attributes', {}, ...
+                'unique', {}, 'name', {});
+            indexes = dj.struct.fromFields( ...
+                self.schema.conn.query(sprintf(...
+                ['SHOW INDEX FROM `%s` IN `%s` ' ...
+                 'WHERE NOT `Key_name`="PRIMARY"'], ...
+                self.plainTableName, self.schema.dbname)));
+            [indexNames, ~, indexId] = unique({indexes.Key_name});
+            for iIndex=1:numel(indexNames)
+                % Get attribute names and sort by position in index
+                thisIndex = indexes(indexId == iIndex);
+                [~, sortPerm] = sort([thisIndex.Seq_in_index]);
+                thisIndex = thisIndex(sortPerm);
+                indexInfo(end+1).attributes = {thisIndex.Column_name};  %#ok<AGROW>
+                indexInfo(end).unique = ~thisIndex(1).Non_unique;
+                indexInfo(end).name = indexNames{iIndex};
+            end
+        end
+        
+        function indexInfo = getImplicitIndexes(self)
+            % dj.Table/getImplicitIndexes()
+            % Returns database indexes that are implied by
+            % table relationships and should not be shown to the user
+            % or modified by the user
+            indexInfo = struct('attributes', {}, 'unique', {});
+            for refClassName = self.schema.getParents(self.className)
+                refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                indexInfo(end+1).attributes = ...
+                    {refObj.header([refObj.header.iskey]).name};  %#ok<AGROW>
+            end
+        end
     end
-end
+end 
 
 
 
@@ -701,10 +852,11 @@ end
 
 
 
-function [tableInfo, parents, references, fieldDefs] = parseDeclaration(declaration)
+function [tableInfo, parents, references, fieldDefs, indexDefs] = parseDeclaration(declaration)
 parents = {};
 references = {};
 fieldDefs = [];
+indexDefs = [];
 
 if ischar(declaration)
     declaration = str2cell(declaration);
@@ -759,9 +911,15 @@ if nargout > 1
                     references{end+1} = p;   %#ok:<AGROW>
                 end
             otherwise
-                % parse field definition
-                fieldInfo = parseAttrDef(line, inKey);
-                fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
+                if ~isempty(strfind(line, ':'))
+                    % parse field definition
+                    fieldInfo = parseAttrDef(line, inKey);
+                    fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
+                else
+                    % parse index definition
+                    indexInfo = parseIndexDef(line);
+                    indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
+                end
         end
     end
 end
@@ -789,6 +947,26 @@ assert(~any(fieldInfo.comment=='"'), ...
 assert(numel(fieldInfo)==1, ...
     'Invalid field declaration "%s"', line);
 fieldInfo.iskey = inKey;
+end
+
+
+function indexInfo = parseIndexDef(line)
+pat = [
+    '^\s*(?<unique>UNIQUE)?\s*' ...         % [UNIQUE]
+    '(?:INDEX\s*\()' ...                    % INDEX ( 
+    '(?<attributes>[^\)]+)' ...             % attr1, attr2, ...
+    '\)'                                    % )
+    ];
+indexInfo = regexpi(line, pat, 'names');
+assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
+    'Invalid index declaration "%s"', line);
+% Parse out and trim individual field names
+attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
+attributes = cellfun(@strtrim, attributes{1}, 'UniformOutput', false);
+assert(numel(unique(attributes)) == numel(attributes), ...
+    'Index declaration "%s" mentions an attribute more than once', ...
+    line);
+indexInfo.attributes = attributes;
 end
 
 

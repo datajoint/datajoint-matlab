@@ -10,7 +10,7 @@ classdef struct
             % >> s = structSort(s, 'c');
             % >> s = structSort(s, {'b','a'})
             
-            assert(isstruct(s) && ndim(s)==2 && size(s,2)==1, ...
+            assert(isstruct(s) && ndims(s)==2 && size(s,2)==1, ...
                 'first input must be a column array of structures.')
             if ischar(fieldNames)
                 fieldNames = {fieldNames};
