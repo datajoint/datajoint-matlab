@@ -88,21 +88,17 @@ classdef (Sealed) Table < handle
         
         
         function name = get.fullTableName(self)
-            if isempty(self.schema.prefix)
-                name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
-            else
-                name = sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name);
-            end
+            name = ifelse(isempty(self.schema.prefix), ...
+                sprintf('`%s`.`%s`', self.schema.dbname, self.info.name), ...
+                sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name));
         end
         
         
         function name = get.plainTableName(self)
             % just the table name, no database and no backquotes
-            if isempty(self.schema.prefix)
-                name = self.info.name;
-            else
-                name = sprintf('%s/%s', self.schema.prefix, self.info.name);
-            end
+            name = self.info.name;
+            name = ifelse(isempty(self.schema.prefix), ...
+                name, sprintf('%s/%s', self.schema.prefix, name));
         end
         
         
@@ -168,11 +164,7 @@ classdef (Sealed) Table < handle
             
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
-            if expandForeignKeys
-                str = '';
-            else
-                str = sprintf('%%{\n');
-            end
+            str = ifelse(expandForeignKeys, '', sprintf('%%{\n'));
             str = sprintf('%s%s (%s) # %s\n', ...
                 str, self.className, self.info.tier, self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
@@ -218,11 +210,13 @@ classdef (Sealed) Table < handle
                     default = '=null';
                 elseif strcmp(char(self.header(i).default(:)'), '<<<none>>>')
                     default = '';
-                elseif self.header(i).isNumeric || ...
-                        any(strcmp(self.header(i).default,self.mysql_constants))
-                    default = ['=' self.header(i).default];
                 else
-                    default = ['="' self.header(i).default '"'];
+                    default = self.header(i).default;
+                    if self.header(i).isNumeric || ...
+                            any(strcmp(self.header(i).default,self.mysql_constants))
+                        default = sprintf('"%s"',default);
+                    end
+                    default = ['=' default]; %#ok<AGROW>
                 end
                 comment = self.header(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
@@ -231,25 +225,18 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s\n', str);
             
-            % list user-defined econdary indexes
+            % list user-defined secondary indexes
             allIndexes = self.getDatabaseIndexes();
             implicitIndexes = self.getImplicitIndexes();
             for thisIndex=allIndexes
                 % Skip implicit indexes
-                if any(arrayfun( ...
+                if ~any(arrayfun( ...
                         @(x) isequal(x.attributes, thisIndex.attributes), ...
                         implicitIndexes))
-                    continue
+                    attributeList = sprintf('%s,', thisIndex.attributes{:});
+                    str = sprintf('%s%sINDEX(%s)\n', str, ...
+                        ifelse(thisIndex.unique, 'UNIQUE ',''), attributeList(1:end-1));
                 end
-                attributeList = sprintf('%s,', thisIndex.attributes{:});
-                attributeList = attributeList(1:end-1);
-                if thisIndex.unique
-                    keyModifier = 'UNIQUE ';
-                else
-                    keyModifier = '';
-                end
-                str = sprintf('%s%sINDEX(%s)\n', ...
-                    str, keyModifier, attributeList);
             end
             
             if ~expandForeignKeys
@@ -281,7 +268,7 @@ classdef (Sealed) Table < handle
             % dj.Table/addAttribute - add a new attribute to the
             % table. A full line from the table definition is
             % passed in as "definition".
-            sql = fieldToSQL(parseAttrDef(definition, false));
+            sql = fieldToSQL(parseAttrDef(strtrim(definition), false));
             self.alter(sprintf('ADD COLUMN %s', sql(1:end-2)));
         end
         
@@ -295,7 +282,7 @@ classdef (Sealed) Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = fieldToSQL(parseAttrDef(newDefinition, false));
+            sql = fieldToSQL(parseAttrDef(strtrim(newDefinition), false));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, ...
                 sql(1:end-2)));
         end
@@ -313,7 +300,7 @@ classdef (Sealed) Table < handle
             fieldList(end)=[];  % drop trailing comma
             self.alter( sprintf(...
                 ['ADD FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                 'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
+                'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
                 fieldList, target.fullTableName, fieldList));
         end
         
@@ -324,10 +311,10 @@ classdef (Sealed) Table < handle
             % get constraint name
             sql = sprintf( ...
                 ['SELECT distinct constraint_name AS name ' ...
-                 'FROM information_schema.key_column_usage ' ...
-                 'WHERE table_schema="%s" and table_name="%s"' ...
-                 'AND referenced_table_schema="%s" ' ...
-                 'AND referenced_table_name="%s"'], ...
+                'FROM information_schema.key_column_usage ' ...
+                'WHERE table_schema="%s" and table_name="%s"' ...
+                'AND referenced_table_schema="%s" ' ...
+                'AND referenced_table_name="%s"'], ...
                 self.table.schema.dbname, self.plainTableName, ...
                 target.table.schema.dbname, target.table.plainTableName);
             name = self.schema.conn.query(sql);
@@ -340,7 +327,7 @@ classdef (Sealed) Table < handle
         
         function addIndex(self, isUniqueIndex, indexAttributes)
             % dj.Table/addIndex - add a new secondary index to the
-            % table. 
+            % table.
             % isUniqueIndex - Set true to add a unique index
             % indexAttributes - cell array of attribute names to be indexed
             if ischar(indexAttributes)
@@ -355,30 +342,24 @@ classdef (Sealed) Table < handle
                 @(x) isequal(x.attributes, indexAttributes), ...
                 implicitIndexes)), ...
                 ['The specified set of attributes is implicitly ' ...
-                 'indexed because of a foreign key constraint.']);
+                'indexed because of a foreign key constraint.']);
             % Prevent interference with existing indexes
             allIndexes = self.getDatabaseIndexes();
             assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
                 allIndexes)), ...
                 ['Only one index can be specified for any tuple ' ...
-                 'of attributes. To change the index type, drop ' ...
-                 'the exsiting index first.']);
+                'of attributes. To change the index type, drop ' ...
+                'the exsiting index first.']);
             % Create a new index
             fieldList = sprintf('`%s`,', indexAttributes{:});
-            fieldList(end)=[];
-            if isUniqueIndex
-                indexModifier = 'UNIQUE ';
-            else
-                indexModifier = '';
-            end
             self.alter(sprintf('ADD %sINDEX (%s)', ...
-                indexModifier, fieldList));
+                ifelse(isUniqueIndex, 'UNIQUE ', ''), fieldList(1:end-1)));
         end
         
         function dropIndex(self, indexAttributes)
             % dj.Table/dropIndex - Drops a secondary index from the
-            % table. 
+            % table.
             % indexAttributes - cell array of attribute names that define
             %                   the index. The order of attributes
             %                   matters!
@@ -392,11 +373,11 @@ classdef (Sealed) Table < handle
                 @(x) isequal(x.attributes, indexAttributes), ...
                 implicitIndexes)), ...
                 ['The specified set of attributes is indexed ' ...
-                 'because of a foreign key constraint. This index ' ...
-                 'cannot be dropped.']);
+                'because of a foreign key constraint. This index ' ...
+                'cannot be dropped.']);
             
-             % Drop specified index(es). There should only be one unless
-             % they were redundantly created outside of DataJoint.
+            % Drop specified index(es). There should only be one unless
+            % they were redundantly created outside of DataJoint.
             allIndexes = self.getDatabaseIndexes();
             selIndexToDrop = arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), allIndexes);
@@ -515,7 +496,7 @@ classdef (Sealed) Table < handle
             n = count(init(dj.BaseRelvar, self));
             fprintf('%s %s: %d tuples\n', self.info.tier, self.info.name, n);
             doDrop = doDrop && ~n;   % drop without prompt if empty
-                    
+            
             while ~isempty(new)
                 curr = new(1);
                 new(1) = [];
@@ -709,7 +690,7 @@ classdef (Sealed) Table < handle
                 isKey = [fkSource{1}.table.header.iskey];
                 implicitIndexes{end+1} = {fkSource{1}.table.header(isKey).name}; %#ok<AGROW>
             end
-                
+            
             for iIndex = 1:numel(indexDefs)
                 assert(all(ismember(indexDefs(iIndex).attributes, ...
                     [primaryKeyFields, nonKeyFields])), ...
@@ -718,8 +699,8 @@ classdef (Sealed) Table < handle
                     @(x) isequal(x, indexDefs(iIndex).attributes), ...
                     implicitIndexes)), ...
                     ['The specified set of attributes is implicitly ' ...
-                     'indexed because of a foreign key constraint. '...
-                     'Cannot create additional index.']);
+                    'indexed because of a foreign key constraint. '...
+                    'Cannot create additional index.']);
                 fieldList = sprintf('`%s`,', indexDefs(iIndex).attributes{:});
                 fieldList(end)=[];
                 sql = sprintf(...
@@ -740,7 +721,7 @@ classdef (Sealed) Table < handle
             end
             self.schema.reload
         end
-                
+        
         function alter(self, alterStatement)
             % dj.Table/alter
             % alter(self, alterStatement)
@@ -763,7 +744,7 @@ classdef (Sealed) Table < handle
             indexes = dj.struct.fromFields( ...
                 self.schema.conn.query(sprintf(...
                 ['SHOW INDEX FROM `%s` IN `%s` ' ...
-                 'WHERE NOT `Key_name`="PRIMARY"'], ...
+                'WHERE NOT `Key_name`="PRIMARY"'], ...
                 self.plainTableName, self.schema.dbname)));
             [indexNames, ~, indexId] = unique({indexes.Key_name});
             for iIndex=1:numel(indexNames)
@@ -790,12 +771,24 @@ classdef (Sealed) Table < handle
             end
         end
     end
-end 
+end
 
 
 
 
 %          LOCAL FUNCTIONS
+
+function c = ifelse(cond,a,b)
+% ifelse  operator equivalent to   c = cond ? a : b;    in C or C++
+% Caution: don't use when a and b are computationally expensive.
+if cond
+    c = a;
+else
+    c = b;
+end
+end
+
+
 
 function str = readPercentBraceComment(filename)
 % reads the initial comment block %{ ... %} in filename
@@ -830,23 +823,23 @@ function sql = fieldToSQL(field)
 % convert the structure field with header {'name' 'type' 'default' 'comment'}
 % to the SQL column declaration
 
-if strcmpi(field.default, 'NULL')
-    % all nullable header default to null
-    field.default = 'DEFAULT NULL';
+default = field.default;
+if strcmpi(default, 'NULL')   % all nullable header default to null
+    default = 'DEFAULT NULL';
 else
-    if strcmp(field.default,'<<<none>>>')
-        field.default = 'NOT NULL';
+    if strcmp(default,'<<<none>>>')  %DataJoint's special value string
+        default = 'NOT NULL';
     else
         % enclose value in quotes (even numeric), except special SQL values
-        if ~any(strcmpi(field.default, dj.Table.mysql_constants)) && ...
-                ~any(strcmp(field.default([1 end]), {'''''','""'}))
-            field.default = ['"' field.default '"'];
+        if ~any(strcmpi(default, dj.Table.mysql_constants)) && ...
+                ~any(strcmp(default([1 end]), {'''''','""'}))
+            default = sprintf('"%s"',default);
         end
-        field.default = sprintf('NOT NULL DEFAULT %s', field.default);
+        default = sprintf('NOT NULL DEFAULT %s', default);
     end
 end
 sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
-    field.name, field.type, field.default, field.comment);
+    field.name, field.type, default, field.comment);
 end
 
 
@@ -910,16 +903,15 @@ if nargout > 1
                 else
                     references{end+1} = p;   %#ok:<AGROW>
                 end
+            case regexpi(line, '^(unique)?\s+index[^:]*$')
+                % parse index definition
+                indexInfo = parseIndexDef(line);
+                indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
+            case regexp(line, '^[a-z][a-z\d_]*\s*(=\s*\S+\s*)?:\s*\w[^#]*\S\s*#.*$') 
+                fieldInfo = parseAttrDef(line, inKey);
+                fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
             otherwise
-                if ~isempty(strfind(line, ':'))
-                    % parse field definition
-                    fieldInfo = parseAttrDef(line, inKey);
-                    fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
-                else
-                    % parse index definition
-                    indexInfo = parseIndexDef(line);
-                    indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
-                end
+                error('Invalid table declaration line "%s"', line)
         end
     end
 end
@@ -928,34 +920,31 @@ end
 
 
 function fieldInfo = parseAttrDef(line, inKey)
+line = strtrim(line);
 pat = {
-    '^\s*(?<name>[a-z][a-z\d_]*)\s*'  % field name
+    '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
     '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
     ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-    '#\s*(?<comment>\S||\S.*\S)\s*$'  % comment
+    '#\s*(?<comment>\S||\S.*\S)$'     % comment
     };
 fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
     % try no default value
     fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    assert(~isempty(fieldInfo), ...
-        'invalid field declaration line: %s', line);
+    assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
     fieldInfo.default = '<<<none>>>';
 end
-assert(~any(fieldInfo.comment=='"'), ...
-    'comments must not contain double quotes')
-assert(numel(fieldInfo)==1, ...
-    'Invalid field declaration "%s"', line);
+assert(~any(fieldInfo.comment=='"'), 'comments must not contain double quotes')
+assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line);
 fieldInfo.iskey = inKey;
 end
 
 
 function indexInfo = parseIndexDef(line)
+line = strtrim(line);
 pat = [
-    '^\s*(?<unique>UNIQUE)?\s*' ...         % [UNIQUE]
-    '(?:INDEX\s*\()' ...                    % INDEX ( 
-    '(?<attributes>[^\)]+)' ...             % attr1, attr2, ...
-    '\)'                                    % )
+    '^(?<unique>UNIQUE)?\s*INDEX\s*' ...  % [UNIQUE] INDEX
+    '\((?<attributes>[^\)]+)\)$'          % (attr1, attr2)
     ];
 indexInfo = regexpi(line, pat, 'names');
 assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
