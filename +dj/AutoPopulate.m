@@ -253,6 +253,13 @@ classdef AutoPopulate < handle
                     success = true;
                 end
             else
+                [~,host] = system('hostname');
+                jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
+                if all(ismember({'host','pid'},{self.jobs.header.name}))
+                    jobKey.host = strtrim(host);
+                    jobKey.pid = feature('getpid');
+                end
+                
                 jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
                 switch status
                 case 'completed'
@@ -305,6 +312,8 @@ classdef AutoPopulate < handle
             fprintf(f, 'error_key=null     : blob                              # non-hashed key for errors only\n');
             fprintf(f, 'error_message=""   : varchar(1023)                     # error message returned if failed\n');
             fprintf(f, 'error_stack=null   : blob                              # error stack if failed\n');
+            fprintf(f, 'host=""            : varchar(255)                      # system hostname\n');
+            fprintf(f, 'pid                : int unsigned                      # system process id\n');
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp                # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
             fprintf(f, 'classdef Jobs < dj.Relvar\n');
