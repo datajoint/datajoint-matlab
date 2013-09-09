@@ -895,7 +895,7 @@ if nargout > 1
                 inKey = false;
             case strncmp(line,'->',2)
                 % foreign key
-                p = eval(line(3:end));
+                p = feval(strtrim(line(3:end)));
                 assert(isa(p, 'dj.Relvar'), ...
                     'foreign keys must be base relvars')
                 if inKey
