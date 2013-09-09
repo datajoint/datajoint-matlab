@@ -88,7 +88,7 @@ classdef (Sealed) Table < handle
         
         
         function name = get.fullTableName(self)
-            name = ifelse(isempty(self.schema.prefix), ...
+            name = condAssign(isempty(self.schema.prefix), ...
                 sprintf('`%s`.`%s`', self.schema.dbname, self.info.name), ...
                 sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name));
         end
@@ -97,7 +97,7 @@ classdef (Sealed) Table < handle
         function name = get.plainTableName(self)
             % just the table name, no database and no backquotes
             name = self.info.name;
-            name = ifelse(isempty(self.schema.prefix), ...
+            name = condAssign(isempty(self.schema.prefix), ...
                 name, sprintf('%s/%s', self.schema.prefix, name));
         end
         
@@ -164,7 +164,7 @@ classdef (Sealed) Table < handle
             
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
-            str = ifelse(expandForeignKeys, '', sprintf('%%{\n'));
+            str = condAssign(expandForeignKeys, '', sprintf('%%{\n'));
             str = sprintf('%s%s (%s) # %s\n', ...
                 str, self.className, self.info.tier, self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
@@ -235,7 +235,7 @@ classdef (Sealed) Table < handle
                         implicitIndexes))
                     attributeList = sprintf('%s,', thisIndex.attributes{:});
                     str = sprintf('%s%sINDEX(%s)\n', str, ...
-                        ifelse(thisIndex.unique, 'UNIQUE ',''), attributeList(1:end-1));
+                        condAssign(thisIndex.unique, 'UNIQUE ',''), attributeList(1:end-1));
                 end
             end
             
@@ -354,7 +354,7 @@ classdef (Sealed) Table < handle
             % Create a new index
             fieldList = sprintf('`%s`,', indexAttributes{:});
             self.alter(sprintf('ADD %sINDEX (%s)', ...
-                ifelse(isUniqueIndex, 'UNIQUE ', ''), fieldList(1:end-1)));
+                condAssign(isUniqueIndex, 'UNIQUE ', ''), fieldList(1:end-1)));
         end
         
         function dropIndex(self, indexAttributes)
@@ -778,8 +778,8 @@ end
 
 %          LOCAL FUNCTIONS
 
-function c = ifelse(cond,a,b)
-% ifelse  operator equivalent to   c = cond ? a : b;    in C or C++
+function c = condAssign(cond,a,b)
+% condAssign  operator equivalent to   c = cond ? a : b;    in C or C++
 % Caution: don't use when a and b are computationally expensive.
 if cond
     c = a;
@@ -907,7 +907,7 @@ if nargout > 1
                 % parse index definition
                 indexInfo = parseIndexDef(line);
                 indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
-            case regexp(line, '^[a-z][a-z\d_]*\s*(=\s*\S+\s*)?:\s*\w[^#]*\S\s*#.*$') 
+            case regexp(line, '^[a-z][a-z\d_]*\s*(=\s*\S+\s*)?:\s*\w[^#]*\S\s*#.*$')
                 fieldInfo = parseAttrDef(line, inKey);
                 fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
             otherwise
