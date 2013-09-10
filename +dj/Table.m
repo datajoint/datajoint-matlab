@@ -88,9 +88,9 @@ classdef (Sealed) Table < handle
         
         
         function name = get.fullTableName(self)
-            name = condAssign(isempty(self.schema.prefix), ...
-                sprintf('`%s`.`%s`', self.schema.dbname, self.info.name), ...
-                sprintf('`%s`.`%s/%s`', self.schema.dbname, self.schema.prefix, self.info.name));
+            name = sprintf('`%s`.`%s%s`', self.schema.dbname, ...
+                condAssign(isempty(self.schema.prefix), '', ['/' self.schema.prefix]), ...
+                self.info.name);
         end
         
         
@@ -268,7 +268,7 @@ classdef (Sealed) Table < handle
             % dj.Table/addAttribute - add a new attribute to the
             % table. A full line from the table definition is
             % passed in as "definition".
-            sql = fieldToSQL(parseAttrDef(strtrim(definition), false));
+            sql = fieldToSQL(parseAttrDef(definition, false));
             self.alter(sprintf('ADD COLUMN %s', sql(1:end-2)));
         end
         
@@ -282,7 +282,7 @@ classdef (Sealed) Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = fieldToSQL(parseAttrDef(strtrim(newDefinition), false));
+            sql = fieldToSQL(parseAttrDef(newDefinition, false));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, ...
                 sql(1:end-2)));
         end
@@ -838,10 +838,11 @@ else
         default = sprintf('NOT NULL DEFAULT %s', default);
     end
 end
+assert(~isany(ismember(field.comment, '"\')), ... % TODO: escape isntead
+    'illegal characters in attribute comment "%s"', field.comment) 
 sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
     field.name, field.type, default, field.comment);
 end
-
 
 
 
@@ -851,33 +852,23 @@ references = {};
 fieldDefs = [];
 indexDefs = [];
 
-if ischar(declaration)
-    declaration = str2cell(declaration);
+% split into a columnwise cell array
+declaration = [strtrim(regexp(declaration,'\n','split')'); ''];
+
+% append the next line to lines that end in a backslash
+for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', declaration'))
+    declaration{i} = [declaration{i}(1:end-1) ' ' declaration{i+1}];
+    declaration(i+1) = '';
 end
-assert(iscellstr(declaration), ...
-    'declaration must be a multiline string or a cellstr');
 
 % remove empty lines and comment lines
 declaration(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), declaration)) = [];
 
-% concatenate lines that end with a backslash to the next line
-i = 1;
-while i<length(declaration)
-    pos = regexp(declaration{i},  '\\\s*$', 'once');
-    if isempty(pos)
-        i = i + 1;
-    else
-        declaration{i} = [strtrim(declaration{i}(1:pos-1)) ' ' ...
-            strtrim(declaration{i+1})];
-        declaration(i+1) = [];
-    end
-end
-
 % parse table schema, name, type, and comment
 pat = {
-    '^\s*(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-    '\(\s*(?<tier>\w+)\s*\)\s*'                  % (tier)
-    '#\s*(?<comment>\S.*\S)\s*$'                 % # comment
+    '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+    '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
+    '#\s*(?<comment>\S.*\S)$'                 % # comment
     };
 tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
 assert(numel(tableInfo)==1, ...
@@ -889,15 +880,14 @@ if nargout > 1
     % parse field declarations and references
     inKey = true;
     for iLine = 2:length(declaration)
-        line = strtrim(declaration{iLine});
+        line = declaration{iLine};
         switch true
             case strncmp(line,'---',3)
                 inKey = false;
             case strncmp(line,'->',2)
                 % foreign key
                 p = feval(strtrim(line(3:end)));
-                assert(isa(p, 'dj.Relvar'), ...
-                    'foreign keys must be base relvars')
+                assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
                 if inKey
                     parents{end+1} = p;     %#ok:<AGROW>
                 else
@@ -925,7 +915,7 @@ pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
     '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
     ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-    '#\s*(?<comment>\S||\S.*\S)$'     % comment
+    '#\s*(?<comment>\S.*)$'           % comment
     };
 fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
@@ -934,10 +924,10 @@ if isempty(fieldInfo)
     assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
     fieldInfo.default = '<<<none>>>';
 end
-assert(~any(fieldInfo.comment=='"'), 'comments must not contain double quotes')
-assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line);
+assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
 fieldInfo.iskey = inKey;
 end
+
 
 
 function indexInfo = parseIndexDef(line)
@@ -948,19 +938,8 @@ pat = [
     ];
 indexInfo = regexpi(line, pat, 'names');
 assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
-    'Invalid index declaration "%s"', line);
-% Parse out and trim individual field names
-attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
-attributes = cellfun(@strtrim, attributes{1}, 'UniformOutput', false);
-assert(numel(unique(attributes)) == numel(attributes), ...
-    'Index declaration "%s" mentions an attribute more than once', ...
-    line);
-indexInfo.attributes = attributes;
-end
-
-
-function ret = str2cell(str)
-% convert a multi-line string into a cell array of one-line strings.
-ret = regexp(str,'\n','split')';
-ret = ret(~cellfun(@isempty, ret));  % remove empty strings
+    'Invalid index declaration "%s"', line)
+indexInfo.attributes = strtrim(textscan(indexInfo.attributes, '%s', 'delimiter',','));
+assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
+    'Duplicate attributes in index declaration "%s"', line)
 end
