@@ -838,7 +838,7 @@ else
         default = sprintf('NOT NULL DEFAULT %s', default);
     end
 end
-assert(~isany(ismember(field.comment, '"\')), ... % TODO: escape isntead
+assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
     'illegal characters in attribute comment "%s"', field.comment) 
 sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
     field.name, field.type, default, field.comment);
