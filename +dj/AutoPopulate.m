@@ -33,7 +33,7 @@ classdef AutoPopulate < handle
     
     properties(Access=protected)
         useReservations
-        execution_engine
+        executionEngine
     end
     
     properties (Access=protected, Dependent)
@@ -76,10 +76,10 @@ classdef AutoPopulate < handle
             % See also dj.AutoPopulate/parpopulate
             
             % perform error checks
-            self.populate_sanity_checks();
+            self.populateSanityChecks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = false;
-            self.execution_engine = @(key, fun, args) fun(args{:});
+            self.executionEngine = @(key, fun, args) fun(args{:});
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
         
@@ -121,15 +121,15 @@ classdef AutoPopulate < handle
             % See also dj.AutoPopulate/populate
 
             % perform error checks 
-            self.populate_sanity_checks();
+            self.populateSanityChecks
             
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = true;
-            self.execution_engine = @(key, fun, args) fun(args{:});
+            self.executionEngine = @(key, fun, args) fun(args{:});
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
 
-        function task_core(self, key)
+        function taskCore(self, key)
             % The work unit that is submitted to the cluster
             % or executed locally
             self.schema.conn.startTransaction();
@@ -163,7 +163,7 @@ classdef AutoPopulate < handle
             % on demand if necessary
             jobClassName = [self.schema.package '.Jobs'];
             if ~exist(jobClassName,'class')
-                self.create_job_table();
+                self.createJobTable();
                 rehash path
             end
             jobs = eval(jobClassName);  
@@ -225,7 +225,7 @@ classdef AutoPopulate < handle
                             disp(key)
                             try
                                 % Perform or schedule computation
-                                self.execution_engine(key, @task_core, {self, key});
+                                self.executionEngine(key, @taskCore, {self, key});
                             catch err
                                 fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
                                 fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line);
@@ -291,7 +291,7 @@ classdef AutoPopulate < handle
             end
         end
 
-        function create_job_table(self)
+        function createJobTable(self)
             % Create the Jobs class if it does not yet exist
             schemaPath = which([self.schema.package '.getSchema']);
             if isempty(schemaPath)
@@ -327,7 +327,7 @@ classdef AutoPopulate < handle
             fclose(f);
         end
 
-        function populate_sanity_checks(self)
+        function populateSanityChecks(self)
             % Performs sanity checks that are common to populate, parpopulate
             % and batch_populate
             if ~isempty(self.restrictions)

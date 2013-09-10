@@ -6,7 +6,7 @@
 
 classdef BatchPopulate < dj.AutoPopulate
     
-     methods
+    methods
         function varargout = batch_populate(self, varargin)
             % dj.BatchPopulate/batch_populate works identically to dj.AutoPopulate/parpopulate
             % except that it spools jobs to the cluster. It creates one job per key,
@@ -15,14 +15,14 @@ classdef BatchPopulate < dj.AutoPopulate
             % The job reservation table <package>.Jobs required by parpopulate is also
             % used by batch_populate.
             % See also dj.AutoPopulate/parpopulate
-
-            % perform error checks 
-            self.populate_sanity_checks();            
+            
+            % perform error checks
+            self.populateSanityChecks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = true;
-            self.execution_engine = @(key, fun, args) ...
-                batch_execution_engine(self, key, fun, args);
-
+            self.executionEngine = @(key, fun, args) ...
+                batchExecutionEngine(self, key, fun, args);
+            
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
     end
@@ -35,8 +35,8 @@ classdef BatchPopulate < dj.AutoPopulate
             % for example.
             user_data = struct();
         end
-
-        function batch_execution_engine(self, key, fun, args)
+        
+        function batchExecutionEngine(self, key, fun, args)
             % getDefaultScheduler returns an instance of the job scheduler we
             % use in the lab.
             % For general use, replace with
@@ -44,7 +44,7 @@ classdef BatchPopulate < dj.AutoPopulate
             % or
             %   sge = parcluster('profile_name')
             % for some appropriate profile that has been created.
-
+            
             sge = getDefaultScheduler();
             
             % setPath() returns a cell array with all aditional MATLAB
@@ -71,4 +71,5 @@ if verLessThan('matlab', '7.12')
     path_kw =  'PathDependencies';
 else
     path_kw = 'AdditionalPaths';
+end
 end
