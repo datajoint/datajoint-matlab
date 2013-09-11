@@ -939,7 +939,9 @@ pat = [
 indexInfo = regexpi(line, pat, 'names');
 assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
     'Invalid index declaration "%s"', line)
-indexInfo.attributes = strtrim(textscan(indexInfo.attributes, '%s', 'delimiter',','));
+attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
+attributes = strtrim(attributes{1});
+indexInfo.attributes = attributes;
 assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
     'Duplicate attributes in index declaration "%s"', line)
 end
