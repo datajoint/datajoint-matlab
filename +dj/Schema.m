@@ -153,7 +153,7 @@ classdef Schema < handle
             className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
             assert(~isempty(className), 'invalid class name')
             
-            % get the path to the scema package
+            % get the path to the schema package
             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
             assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
             filename = fullfile(filename, [className '.m']);
@@ -204,28 +204,12 @@ classdef Schema < handle
             else
                 fprintf(f, '%%{\n');
                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
-                schemaList = struct2cell(self.conn.packageDict);
-                parentSelection = {};
-                for iSchema=1:length(schemaList)
-                    schema = eval([schemaList{iSchema} '.getSchema']);
-                    parentSelection = [parentSelection schema.classNames(~strncmp(schema.classNames,'$',1))]; %#ok<AGROW>
-                end
-                if ~isempty(parentSelection)
-                    parentSelection = sort(parentSelection);
-                    selectionArgs = {'ListString', parentSelection, ...
-                            'PromptString','Select parent table(s)'};
-                    if useGUI
-                        disp 'Selecting parent table(s)'
-                        parentIndices = listdlg(selectionArgs{:});
-                    else
-                        parentIndices = cliListDialog(selectionArgs{:});
-                    end
-                    if ~isempty(parentIndices)
-                        fprintf(f, '-> %s\n', parentSelection{parentIndices});
-                    end
-                end
-                fprintf(f, '\n-----\n\n');
+                fprintf(f, '# add primary key here\n');
+                fprintf(f, '-----\n');
+                fprintf(f, '# add additional attributes\n');
                 fprintf(f, '%%}');
+                parentSelection = {};
+                parentIndices = [];
             end
             % class definition
             fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
@@ -678,69 +662,4 @@ classdef Schema < handle
             str = str(1+(str(1)=='_'):end);  % remove leading underscore
         end
     end
-end
-
-
-function [selection] = cliListDialog(varargin)
-% selection = cliListDialog('ListString', s, ...)
-% Command-line alternative to Matlab's listdlg. A subset of its options
-% is supported in parameter, value pairs:
-%   'ListString'    - cell array of strings for the selection list
-%   'SelectionMode' - string; can be 'single' or 'multiple'; defaults to
-%                     'multiple'.
-%   'PromptString'  - string matrix or cell array of strings which appears 
-%                     as text above the selection list, defaults to {}.
-
-ip = inputParser();
-ip.addParamValue('ListString', {}, @iscellstr);
-ip.addParamValue('SelectionMode', 'multiple', ...
-    @(x) any(strcmpi(x, {'multiple', 'single'})));
-ip.addParamValue('PromptString', {}, ...
-    @(x) ischar(x) || iscellstr(x));
-ip.parse(varargin{:});
-params = ip.Results;
-
-assert(~isempty(params.ListString));
-nbChoices = numel(params.ListString);
-
-if strcmp(params.SelectionMode, 'multiple')
-    selectionPrompt = 'multiple entries allowed';
-    cardinalityCheck = @isvector;
-else
-    selectionPrompt = 'single entry only';
-    cardinalityCheck = @isscalar;
-end
-
-% Print prompt and choices
-if ~iscell(params.PromptString)
-    params.PromptString = {params.PromptString};
-end
-fprintf('%s\n', params.PromptString{:})
-choiceList = [num2cell(1:nbChoices); params.ListString(:)'];
-fprintf('[%5d]: %s\n', choiceList{:})
-
-% Prompt user until selection is valid or cancelled
-validSelection = false;
-while ~validSelection
-    fprintf(['\nInstructions: Select entries using their numerical indices ' ...
-        'in common Matlab notation, e.g. "3", "4:10" or "[3, 7, 10]" ' ...
-        'or ":" to select all.\n\n'])
-    selection = strtrim(input(...
-        sprintf('Your selection (%s) or ENTER for empty: ', selectionPrompt),...
-        's'));
-    % Expand ':'
-    if strcmp(selection, ':')
-        selection = 1:nbChoices;
-    elseif ~isempty(selection)
-        selection = eval(selection);
-    end
-    % Validate selection
-    validSelection = isempty(selection) || ...
-        (isnumeric(selection) && cardinalityCheck(selection) && ...
-        all((selection >= 1) & (selection <= nbChoices)));
-    if ~validSelection
-        fprintf('Invalid selection.\n')
-    end
-end
-selection = double(unique(selection(:)'));
 end
