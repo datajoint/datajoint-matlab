@@ -147,15 +147,14 @@ classdef Schema < handle
             %    makeClass(v2p.getSchema, 'RegressionModel')
             
             useGUI = usejava('desktop') || usejava('awt') || usejava('swing');
-            if nargin<2
-                className = input('Enter class name >', 's');
-            end
             className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
             assert(~isempty(className), 'invalid class name')
             
             % get the path to the schema package
             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
             assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
+            
+            % if the file already exists, let the user edit it and exit
             filename = fullfile(filename, [className '.m']);
             if exist(filename,'file')
                 fprintf('%s already exists\n', filename)
@@ -165,9 +164,8 @@ classdef Schema < handle
                 return
             end
             
+            % if the table exists, create the file that matches its definition
             if ismember([self.package '.' className], self.classNames)
-                % Check if the table already exists and create the class to
-                % match the table definition
                 existingTable = dj.Table([self.package '.' className]);
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
@@ -176,19 +174,20 @@ classdef Schema < handle
                 existingTable = [];
                 choice = 'x';
                 while length(choice)~=1 || ~ismember(choice,'lmic')
-                    choice = lower(input('\nChoose table tier:\n    L=lookup\n    M=manual\n    I=imported\n    C=computed\n  > ', 's'));
+                    choice = lower(input('\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n  > ', 's'));
                 end
                 tier = struct('c','computed','l','lookup','m','manual','i','imported');
                 tier = tier.(choice);
                 isAuto = ismember(tier, {'computed','imported'});
             end
             
-            
+            % let the user decide if the table is a subtable, which means
+            % that it can only be populated together with its parent.
             isSubtable = false;
             if isAuto
                 choice = '';
                 while ~ismember(choice, {'yes','no'})
-                    choice = input('Is this a subtable? yes/no > ', 's');
+                    choice = lower(input('Is this a subtable? yes/no > ', 's'));
                 end
                 isSubtable = strcmp('yes',choice);
             end
@@ -208,7 +207,6 @@ classdef Schema < handle
                 fprintf(f, '-----\n');
                 fprintf(f, '# add additional attributes\n');
                 fprintf(f, '%%}');
-                parentSelection = {};
                 parentIndices = [];
             end
             % class definition
@@ -228,7 +226,7 @@ classdef Schema < handle
                     else
                         fprintf(f, ' = ');
                     end
-                    fprintf(f, '%s', parentSelection{parentIndices(i)});
+                    fprintf(f, '%s', self.classNames{parentIndices(i)});
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
             end

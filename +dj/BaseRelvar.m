@@ -72,9 +72,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                                
                 % compile the list of relvars to be deleted
                 disp 'ABOUT TO DELETE:'
-                fprintf('%s %s: %d tuples\n', ...
-                    self.tab.info.tier, ...
-                    self.tab.info.name, self.count);
+                fprintf('%4d tuples from %s (%s)\n', ...
+                    self.count, self.tab.fullTableName, self.tab.info.tier)
 
                 names = {self.tab.className};
                 rels = {self};
@@ -102,9 +101,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                             end
                             n = rel.count;
                             if n
-                                fprintf('%s %s: %d tuples\n', ...
-                                    rel.tab.info.tier, ...
-                                    rel.tab.info.name, n);
+                                fprintf('%4d tuples from %s (%s)\n', ...
+                                    n, rel.tab.fullTableName, rel.tab.info.tier)
                                 rels{end+1} = rel; %#ok<AGROW>
                                 new(end+1) = struct('rel', rel,'restrictByMe', ~primary(j)); %#ok<AGROW>
                             end
