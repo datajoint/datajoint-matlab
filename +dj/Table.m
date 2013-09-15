@@ -86,17 +86,13 @@ classdef (Sealed) Table < handle
         
         
         function name = get.fullTableName(self)
-            name = sprintf('`%s`.`%s%s`', self.schema.dbname, ...
-                condAssign(isempty(self.schema.prefix), '', ['/' self.schema.prefix]), ...
-                self.info.name);
+            name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
         end
         
         
         function name = get.plainTableName(self)
             % just the table name, no database and no backquotes
             name = self.info.name;
-            name = condAssign(isempty(self.schema.prefix), ...
-                name, sprintf('%s/%s', self.schema.prefix, name));
         end
         
         
@@ -162,7 +158,10 @@ classdef (Sealed) Table < handle
             
             expandForeignKeys = nargin>=2 && expandForeignKeys;
             
-            str = condAssign(expandForeignKeys, '', sprintf('%%{\n'));
+            str = '';
+            if ~expandForeignKeys
+                str = sprintf('%%{\n');
+            end
             str = sprintf('%s%s (%s) # %s\n', ...
                 str, self.className, self.info.tier, self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
@@ -173,7 +172,7 @@ classdef (Sealed) Table < handle
             if ~expandForeignKeys
                 % list parent references
                 for refClassName = self.schema.getParents(self.className, 1)
-                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
                     str = sprintf('%s\n-> %s',str, refObj.className);
                     excludeFields = {refObj.header([refObj.header.iskey]).name};
                     keyFields = keyFields(~ismember(keyFields, excludeFields));
@@ -195,7 +194,7 @@ classdef (Sealed) Table < handle
             % list other references
             if ~expandForeignKeys
                 for refClassName = self.schema.getParents(self.className, 2)
-                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
                     str = sprintf('%s\n-> %s',str, refObj.className);
                     excludeFields = {refObj.header([refObj.header.iskey]).name};
                     dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
@@ -232,8 +231,12 @@ classdef (Sealed) Table < handle
                         @(x) isequal(x.attributes, thisIndex.attributes), ...
                         implicitIndexes))
                     attributeList = sprintf('%s,', thisIndex.attributes{:});
-                    str = sprintf('%s%sINDEX(%s)\n', str, ...
-                        condAssign(thisIndex.unique, 'UNIQUE ',''), attributeList(1:end-1));
+                    if thisIndex.unique
+                        modifier = 'UNIQUE ';
+                    else
+                        modifier = '';
+                    end
+                    str = sprintf('%s%sINDEX(%s)\n', str, modifier, attributeList(1:end-1));
                 end
             end
             
@@ -251,7 +254,6 @@ classdef (Sealed) Table < handle
                 sprintf('OPTIMIZE LOCAL TABLE %s', self.fullTableName));
             disp(status.Msg_text{end})
         end
-        
         
         
         %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
@@ -350,8 +352,12 @@ classdef (Sealed) Table < handle
                 'the exsiting index first.']);
             % Create a new index
             fieldList = sprintf('`%s`,', indexAttributes{:});
-            self.alter(sprintf('ADD %sINDEX (%s)', ...
-                condAssign(isUniqueIndex, 'UNIQUE ', ''), fieldList(1:end-1)));
+            if isUniqueIndex
+                modifier = 'UNIQUE ';
+            else
+                modifier = '';
+            end
+            self.alter(sprintf('ADD %sINDEX (%s)', modifier, fieldList(1:end-1)));
         end
         
         function dropIndex(self, indexAttributes)
@@ -437,12 +443,12 @@ classdef (Sealed) Table < handle
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, {self.header.name});
             if ~any(ix)
-                throwAsCaller(MException('DataJoint:invalidAttributeName', ...
+                throw(MException('DataJoint:invalidAttributeName', ...
                     'attribute "%s" not found', attr))
             end
             list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
             if isempty(list)
-                throwAsCaller(MException('DataJoint:invalidAttributeName', ...
+                throw(MException('DataJoint:invalidAttributeName', ...
                     'attribute "%s" not of type ENUM', attr))
             end
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
@@ -491,7 +497,7 @@ classdef (Sealed) Table < handle
             tables = self;
             new = self;
             n = count(init(dj.BaseRelvar, self));
-            fprintf('%s %s: %d tuples\n', self.info.tier, self.info.name, n);
+            fprintf('%20s (%s,%5d tuples)\n', self.fullTableName, self.info.tier, n)
             doDrop = doDrop && ~n;   % drop without prompt if empty
             
             while ~isempty(new)
@@ -505,14 +511,14 @@ classdef (Sealed) Table < handle
                 children = sch.classNames(j);
                 names = [names children]; %#ok<AGROW>
                 for j=1:length(children)
-                    child = sch.conn.getPackage(children{j},false);
+                    child = sch.conn.getPackage(children{j});
                     if child(1) == '$'  % ignore unloaded schemas
-                        throwAsCaller(MException('DataJoint:dropTable', ...
+                        throw(MException('DataJoint:dropTable', ...
                             'cannot drop %s because its schema is not loaded', child))
                     else
                         table = dj.Table(child);
                         n = count(init(dj.BaseRelvar, table));
-                        fprintf('%s %s: %d tuples\n', table.info.tier, table.info.name, n);
+                        fprintf('%20s (%s,%5d tuples)\n', table.fullTableName, table.info.tier, n)
                         tables(end+1) = table; %#ok<AGROW>
                         new(end+1) = table; %#ok<AGROW>
                         doDrop = doDrop && ~n;   % drop without prompt if empty
@@ -611,12 +617,9 @@ classdef (Sealed) Table < handle
                 'Table name %s does not match in file %s', cname, self.className)
             
             % compile the CREATE TABLE statement
-            tableName = [...
+            tableName = [self.schema.prefix, ...
                 dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                 dj.Schema.fromCamelCase(tableInfo.className)];
-            if ~isempty(self.schema.prefix)
-                tableName = sprintf('%s/%s', self.schema.prefix, tableName);
-            end
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
@@ -761,7 +764,7 @@ classdef (Sealed) Table < handle
             % or modified by the user
             indexInfo = struct('attributes', {}, 'unique', {});
             for refClassName = self.schema.getParents(self.className)
-                refObj = dj.Table(self.schema.conn.getPackage(refClassName{1}));
+                refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
                 indexInfo(end+1).attributes = ...
                     {refObj.header([refObj.header.iskey]).name};  %#ok<AGROW>
             end
@@ -773,18 +776,6 @@ end
 
 
 %          LOCAL FUNCTIONS
-
-function c = condAssign(cond,a,b)
-% condAssign  operator equivalent to   c = cond ? a : b;    in C or C++
-% Caution: don't use when a and b are computationally expensive.
-if cond
-    c = a;
-else
-    c = b;
-end
-end
-
-
 
 function str = readPercentBraceComment(filename)
 % reads the initial comment block %{ ... %} in filename
@@ -836,7 +827,7 @@ else
     end
 end
 assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
-    'illegal characters in attribute comment "%s"', field.comment) 
+    'illegal characters in attribute comment "%s"', field.comment)
 sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
     field.name, field.type, default, field.comment);
 end

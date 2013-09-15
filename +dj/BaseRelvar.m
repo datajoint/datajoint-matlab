@@ -4,8 +4,6 @@
 % SYNTAX:
 %    obj = dj.BaseRelvar(table)  % table must be of class dj.Table
 
-% -- Dimitri Yatsenko, 2012
-
 classdef BaseRelvar < dj.GeneralRelvar
     
     properties(Dependent,Access=private)
@@ -118,8 +116,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                     try
                         for iRel = length(rels):-1:1
                             fprintf('Deleting from %s... ', rels{iRel}.tab.className)
-                            self.schema.conn.query(sprintf('DELETE FROM `%s`.`%s`%s', ...
-                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, rels{iRel}.whereClause))
+                            self.schema.conn.query(sprintf('DELETE FROM %s%s', ...
+                                rels{iRel}.tab.fullTableName, rels{iRel}.whereClause))
                             fprintf '(not committed)\n'
                         end
                         fprintf 'committing ...'
@@ -207,8 +205,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                 end
                 
                 % issue query
-                self.schema.conn.query( sprintf('%s `%s`.`%s` SET %s', ...
-                    command, self.schema.dbname, self.tab.info.name, ...
+                self.schema.conn.query( sprintf('%s %s SET %s', ...
+                    command, self.tab.fullTableName, ...
                     queryStr(1:end-1)), blobs{:})
             end
         end
@@ -284,8 +282,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                     error 'Invalid condition: please report to DataJoint developers'
             end
             
-            queryStr = sprintf('UPDATE `%s`.`%s` SET `%s`=%s %s', ...
-                self.schema.dbname, self.tab.info.name, attrname, queryStr, self.whereClause);
+            queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
+                self.tab.fullTableName, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
         end
     end

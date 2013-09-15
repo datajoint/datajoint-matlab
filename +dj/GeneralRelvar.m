@@ -579,7 +579,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 case 'table'  % terminal node
                     r = self.operands{1};
                     header = r.header;
-                    sql = sprintf('`%s`.`%s`', r.schema.dbname, r.info.name);
+                    sql = r.fullTableName;
                     
                 case 'pro'
                     [header, sql] = compile(self.operands{1},1);

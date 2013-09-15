@@ -6,7 +6,7 @@ classdef Connection < handle
         initQuery    % initializing function or query executed for each new session
         inTransaction = false
         connId        % connection handle
-        packageDict = struct  % maps database schemas to matlab packages
+        packageDict = cell(0,2) % n*2 cell matrix with database names in first column and package names in second
     end
     
     properties
@@ -40,27 +40,30 @@ classdef Connection < handle
         
         
         function addPackage(self, dbname, package)
-            self.packageDict.(dbname) = package;
+            ix = strcmp(package,self.packageDict(:,1));
+            if ~any(ix)
+                ix = size(self.packageDict,1)+1;
+            end
+            self.packageDict(ix,:) = {dbname,package};
         end
         
         
         
-        function name = getPackage(self, name, strict)
-            % replaces the schema name with its package name if necessary
-            % and possible.  If the schema is not loaded and strict=true,
-            % throws error.
-            strict = nargin<3 || strict;
-            assert(ischar(name), 'name must be a string');
-            if all(name~='.') || name(1)=='$'
-                s = regexp(name, '^\$?(\w+)','tokens');
-                assert(length(s)==1, 'invalid schema name in "%s"', name)
-                try
-                    name = regexprep(name, '^(\$?\w+)',self.packageDict.(s{1}{1}));
-                catch err   %#ok
-                    if strict
-                        error('Unknown package in "%s". Activate the schema first.', name)
-                    end
+        function className = getPackage(self, className, strict)
+            % convert '$database_name.ClassName' to 'package.ClassName'
+            % If strict, then throw an error if the database_name was not found.
+            strict = nargin>=3 && strict;
+            if className(1)=='$'                    
+                [schemaName,className] = strtok(className,'.');
+
+                ix = find(strcmpi(schemaName(2:end),self.packageDict(:,1)));
+                if ix
+                    schemaName = self.packageDict{ix(1),2};
+                elseif strict
+                    error('Unknown package for "%s.%s". Activate its schema first.', ...
+                        schemaName(2:end), className)
                 end
+                className = [schemaName className];
             end
         end
         
@@ -68,9 +71,8 @@ classdef Connection < handle
         
         function reload(self)
             % reload all schemas
-            schemaNames = struct2cell(self.packageDict);
-            for i=1:length(schemaNames)
-                reload(eval([schemaNames{i} '.getSchema']))
+            for i=1:size(self.packageDict,1)
+                reload(feval([self.packageDict{i,2} '.getSchema']))
             end
         end
         

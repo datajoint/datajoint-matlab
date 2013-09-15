@@ -5,10 +5,10 @@
 classdef Schema < handle
     
     properties(SetAccess = private)
-        package % the package (directory starting with a +) that stores schema classes, must be on path
-        dbname  % database (schema) name
+        package    % the package (directory starting with a +) that stores schema classes, must be on path
+        dbname     % database (schema) name
         prefix=''  % optional table prefix, allowing multiple schemas per database
-        conn    % handle to the dj.Connection object
+        conn       % handle to the dj.Connection object
         
         % table information loaded from the schema
         loaded = false
@@ -44,18 +44,16 @@ classdef Schema < handle
             assert(isa(conn, 'dj.Connection'), ...
                 'dj.Schema''s first input must be a dj.Connection')
             self.conn = conn;
-            if ~any(dbname=='/')
-                self.dbname = dbname;
-            else
-                [self.dbname, self.prefix] = fileparts(dbname);
-            end
             self.package = package;
-            addPackage(self.conn, dbname, package)
-            if isempty(self.prefix)
-                self.tableRegexp = '^(_|__|#|~)?[a-z][a-z0-9_]*$';
-            else
-                self.tableRegexp = sprintf('^%s/(_|__|#|~)?[a-z][a-z0-9_]*', self.prefix);
+            ix = find(dbname == '/');
+            self.dbname = dbname;
+            if ix
+                % support multiple DataJoint schemas per database by prefixing tables names
+                self.dbname = dbname(1:ix-1);
+                self.prefix = [dbname(ix+1:end) '/'];
             end
+            self.tableRegexp = ['^', self.prefix '(_|__|#|~)?[a-z][a-z0-9_]*$'];
+            self.conn.addPackage(dbname, package)
         end
         
         function val = get.classNames(self)
@@ -88,20 +86,26 @@ classdef Schema < handle
                     '    (SELECT table_schema, table_name, column_name'...
                     '    FROM information_schema.columns WHERE column_key="PRI")) as hierarchical '...
                     'FROM information_schema.key_column_usage '...
-                    'WHERE "%s" in (table_schema, referenced_table_schema)'...
-                    '   AND table_name REGEXP "{S}" AND referenced_table_name REGEXP "{S}" '...
+                    'WHERE "%s" in (table_schema, referenced_table_schema)' ...
+                    ' AND referenced_table_name IS NOT NULL' ...
+                    ' AND table_name IS NOT NULL ' ...
                     'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
-                    self.dbname),self.tableRegexp, self.tableRegexp));
+                    self.dbname)));
                 
-                % compile classNames for linked tables from outside the schema
-                toClassNames = arrayfun(@(x) self.makeClassName(x.to_schema, x.to_table), foreignKeys, 'uni', false)';
-                fromClassNames = arrayfun(@(x) self.makeClassName(x.from_schema, x.from_table), foreignKeys, 'uni', false)';
+                % keep only links to and from this schema 
+                ix = arrayfun(@(x) ...
+                    strcmp(x.to_schema,self.dbname)   && ~isempty(regexp(x.to_table  ,self.tableRegexp,'once')) || ...
+                    strcmp(x.from_schema,self.dbname) && ~isempty(regexp(x.from_table,self.tableRegexp,'once')), ...
+                    foreignKeys);
+                foreignKeys = foreignKeys(ix);
+                toClassNames = arrayfun(@(x) self.makeClassName(x.to_schema, x.to_table), foreignKeys, 'UniformOutput', false)';
+                fromClassNames = arrayfun(@(x) self.makeClassName(x.from_schema, x.from_table), foreignKeys, 'UniformOutput', false)';
                 self.classNames = [self.classNames, setdiff(unique([toClassNames fromClassNames]), self.classNames)];
                 
                 % create dependency matrix
                 ixFrom = cellfun(@(x) find(strcmp(x, self.classNames)), fromClassNames);
                 ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
-                nTables = length(self.classNames);
+                nTables = length(self.classNames); 
                 
                 self.dependencies = sparse(ixFrom, ixTo, 2-double([foreignKeys.hierarchical]), nTables, nTables);
                 
@@ -348,18 +352,14 @@ classdef Schema < handle
             
             for i=1:length(levels)
                 name = names{i};
-                isExternal = ~strncmp(name, self.package, length(self.package));
-                
-                edgeColor = [0.3 0.3 0.3];
-                fontSize = 9;
+                isExternal = ~strcmp(strtok(name,'.'), self.package);                
                 if isExternal
-                    name = getPackage(self.conn, name, false);
+                    edgeColor = [0.3 0.3 0.3];
+                    fontSize = 9;
+                    name = self.conn.getPackage(name);
                 else
-                    try
-                        if isSubtable(eval(name))
-                            name = [name '*'];  %#ok:AGROW
-                        end
-                    catch
+                    if isSubtable(eval(name))
+                        name = [name '*'];  %#ok:AGROW
                     end
                     name = name(length(self.package)+2:end);  %remove package name
                     edgeColor = 'none';
@@ -498,7 +498,7 @@ classdef Schema < handle
                 self.dbname),self.tableRegexp);
             
             % determine table tier (see dj.Table)
-            re = cellfun(@(x) sprintf('^%s[a-z][a-z0-9_]*$',x), ...
+            re = cellfun(@(x) sprintf('^%s%s[a-z][a-z0-9_]*$',self.prefix,x), ...
                 dj.Schema.tierPrefixes, 'UniformOutput', false); % regular expressions to determine table tier
             tierIdx = cellfun(@(x) ...
                 find(~cellfun(@isempty, regexp(x, re, 'once')),1,'first'), ...
@@ -610,12 +610,16 @@ classdef Schema < handle
     
     methods(Access = private)
         function str = makeClassName(self, db, tab)
-            if strcmp(db,self.dbname)
-                str = self.package;
-            else
-                str = ['$' db];
+            % produce class name from database and table.
+            
+            % support multiple schemas per database
+            ix = find(tab=='/');
+            if ix
+                db = [db '/' tab(1:ix(1)-1)];
+                tab = tab(ix(1)+1:end);
             end
-            str = sprintf('%s.%s', str, dj.Schema.toCamelCase(tab));
+
+            str = self.conn.getPackage(['$' db '.' dj.Schema.toCamelCase(tab)]);
         end
     end
     
@@ -661,3 +665,4 @@ classdef Schema < handle
         end
     end
 end
+
