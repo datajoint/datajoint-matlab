@@ -26,7 +26,7 @@ classdef struct
         
         
         function ret = join(s1, s2)
-            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2            
+            % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2
             assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
             ret = struct([]);
             commonFields = intersect(fieldnames(s1),fieldnames(s2));
@@ -86,5 +86,73 @@ classdef struct
             % convert into struct array
             s = struct(lst{:});
         end
+        
+        
+        function [tab,varargout] = tabulate(s,numField,varargin)
+            % dj.structu.tablulate - convert structure array into a multidimensional array
+            %
+            % [tab,v1,..,vn] = dj.struct.tabulate(struc, numField, dim1, ..., dimn)
+            % creates the n-dimensional array tab from the structure array
+            % where each dimension is indexed by the value of the fields
+            % dim1,...,dimn and stores the values of numField.
+            %
+            % v1,...,vn  will contain arrays of unique values for the index
+            % fields corresponding to each dimension.
+            
+            indexFields = varargin;
+            assert(isstruct(s) && ~isempty(s))
+            assert(isnumeric(s(1).(numField)))
+            n = length(indexFields);
+            assert(n>0)
+            ix = cell(n,1);
+            v  = cell(n,1);
+            
+            for i=1:n
+                if isnumeric(s(1).(indexFields{i}))
+                    [v{i},~,ix{i}] = unique([s.(indexFields{i})]);
+                else
+                    [v{i},~,ix{i}] = unique({s.(indexFields{i})});
+                end
+            end
+            sz = cellfun(@length,v)';
+            tab = nan(sz);
+            tab(sub2ind(sz, ix{:})) = [s.(numField)];
+            varargout = v';
+        end
+        
+        function str = makeCode(s)
+            % str = dj.struct.makeCode(s) 
+            % make matlab code to reproduce the structure array s
+              
+            str = 'cell2struct({...';
+            for i=1:length(s)
+                str = sprintf('%s\n   %s', str, cellArrayString(struct2cell(s(i))));
+            end
+            f = fieldnames(s);
+            str = sprintf('%s\n},{...\n%s\n},2);',str,sprintf(' ''%s''',f{:}));
+        end
     end
+end
+
+
+function str = cellArrayString(array)
+% convert a cell array
+assert(iscell(array) && size(array,2)==1,'invalid array type or size')
+str = '';
+for i=1:length(array)
+    v = array{i};
+    switch true
+        case isnumeric(v) && isscalar(v)
+            if ismember(class(v),{'double','single'})
+                s = sprintf('%1.16g', v);
+            else
+                s = sprintf('%d', v);
+            end
+        case ischar(v)
+            s = sprintf('''%s''', v);
+        otherwise
+            error 'cannot convert field value into string'
+    end
+    str = sprintf('%s %s', str, s);
+end
 end

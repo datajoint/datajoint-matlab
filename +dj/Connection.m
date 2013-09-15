@@ -6,12 +6,12 @@ classdef Connection < handle
         initQuery    % initializing function or query executed for each new session
         inTransaction = false
         connId        % connection handle
-        packageDict = struct  % maps database schemas to matlab packages
+        packageDict = cell(0,2) % n*2 cell matrix with database names in first column and package names in second
     end
     
     properties
-        reconnectTransaction = true   % if true, reconnect to the server even within a transaction. 
-                                      % set false to guarantee transaction automicity
+        reconnectTransaction = true   % if true, reconnect to the server even within a transaction.
+        % set false to guarantee transaction automicity
     end
     
     properties(Access = private)
@@ -40,26 +40,30 @@ classdef Connection < handle
         
         
         function addPackage(self, dbname, package)
-            self.packageDict.(dbname) = package;
+            ix = strcmp(package,self.packageDict(:,1));
+            if ~any(ix)
+                ix = size(self.packageDict,1)+1;
+            end
+            self.packageDict(ix,:) = {dbname,package};
         end
         
         
         
-        function name = getPackage(self, name, strict)
-            % replaces the schema name with its package name iff necessary
-            strict = nargin<3 || strict;
-            if iscellstr(name)
-                name = cellfun(@(x) self.getPackage(x, strict), name, 'uni', false);
-            elseif all(name~='.') || name(1)=='$'
-                s = regexp(name, '^\$?(\w+)','tokens');
-                assert(length(s)==1, 'invalid schema name in "%s"', name)
-                try
-                    name = regexprep(name, '^(\$?\w+)',self.packageDict.(s{1}{1}));
-                catch err   %#ok
-                    if strict
-                        error('Unknown package in "%s". Activate the schema first.', name)
-                    end
+        function className = getPackage(self, className, strict)
+            % convert '$database_name.ClassName' to 'package.ClassName'
+            % If strict, then throw an error if the database_name was not found.
+            strict = nargin>=3 && strict;
+            if className(1)=='$'                    
+                [schemaName,className] = strtok(className,'.');
+
+                ix = find(strcmpi(schemaName(2:end),self.packageDict(:,1)));
+                if ix
+                    schemaName = self.packageDict{ix(1),2};
+                elseif strict
+                    error('Unknown package for "%s.%s". Activate its schema first.', ...
+                        schemaName(2:end), className)
                 end
+                className = [schemaName className];
             end
         end
         
@@ -67,9 +71,8 @@ classdef Connection < handle
         
         function reload(self)
             % reload all schemas
-            schemaNames = struct2cell(self.packageDict);
-            for i=1:length(schemaNames)
-                reload(eval([schemaNames{i} '.getSchema']))
+            for i=1:size(self.packageDict,1)
+                reload(feval([self.packageDict{i,2} '.getSchema']))
             end
         end
         
@@ -80,9 +83,11 @@ classdef Connection < handle
             
             if ~ret && self.inTransaction
                 if self.reconnectTransaction
-                    warning('DataJoint:TransactionReconnect', 'reconnecting after server disconnected during a transaction')
+                    warning('DataJoint:TransactionReconnect', ...
+                        'reconnecting after server disconnected during a transaction')
                 else
-                    throwAsCaller(MException('DataJoint:TransactionReconnect', 'server disconnected during a transaction'))
+                    throwAsCaller(MException('DataJoint:TransactionReconnect', ...
+                        'server disconnected during a transaction'))
                 end
             end
         end
@@ -90,11 +95,9 @@ classdef Connection < handle
         
         
         function ret = query(self, queryStr, varargin)
-            % dj.Schema/query - query(dbname, queryStr, varargin) issue an
+            % dj.Connection/query - query(connection, queryStr, varargin) issue an
             % SQL query and return the result if any.
-            % Reuses the same connection, which limits connections to one
-            % database server at a time, but multiple schemas are okay.
-            %}
+            % The same connection is re-used by all DataJoint objects.
             if ~self.isConnected
                 self.connId=mym('open', self.host, self.user, self.password);
                 if ~isempty(self.initQuery)

@@ -4,8 +4,6 @@
 % SYNTAX:
 %    obj = dj.BaseRelvar(table)  % table must be of class dj.Table
 
-% -- Dimitri Yatsenko, 2012
-
 classdef BaseRelvar < dj.GeneralRelvar
     
     properties(Dependent,Access=private)
@@ -31,26 +29,26 @@ classdef BaseRelvar < dj.GeneralRelvar
         
         
         function delQuick(self)
-            % dj.BaseRelvar/delQuick - remove all tuples of relation self from its table.
+            % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.
             % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
-        
+      
         
         function del(self)
-            % dj.BaseRelvar/del - remove all tuples of relation self from its table
-            % as well as all dependent tuples in dependent tables.
+            % dj.BaseRelvar/del - remove all tuples of the relation from its table
+            % and, recursively, all matching tuples in dependent tables.
             %
             % A summary of the data to be removed will be provided followed by
             % an interactive confirmation before deleting the data.
             %
             % EXAMPLES:
-            %   del(Scans) % delete all tuples from table Scans and all tuples in dependent tables.
-            %   del(Scans('mouse_id=12')) % delete all Scans for mouse 12
-            %   del(Scans - Cells)  % delete all tuples from table Scans that do not have matching
-            %                       % tuples in table Cells
+            %   del(common.Scans) % delete all tuples from table Scans and all tuples in dependent tables.
+            %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
+            %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans 
+            %                                   that do not have matching tuples in table Cells
             %
             % See also dj.BaseRelvar/delQuick, dj.Table/drop
             
@@ -64,41 +62,51 @@ classdef BaseRelvar < dj.GeneralRelvar
                         && ~isa(self, 'dj.AutoPopulate')
                     fprintf(['!!! %s is a subtable. For referential integrity, ' ...
                         'delete from its parent instead.\n'], class(self))
-                    if ~strcmpi('yes', input('Prceed anyway? yes/no >','s'))
+                    if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
                         disp 'delete cancelled'
                         return
                     end
                 end
-                
-                % get the names of the dependent tables
-                names = self.tab.getNeighbors(0, +1000, false);
-                names = self.schema.conn.getPackage(names);
-                
-                % construct relvars to delete restricted by self
-                rels = {self};
-                for i=2:length(names)
-                    rels{end+1} = init(dj.BaseRelvar, dj.Table(names{i})) & self; %#ok:<AGROW>
-                end
-                clear names
-                
-                % exclude relvar with no matching tuples
-                counts = cellfun(@(x) count(x), rels);
-                include =  counts > 0;
-                counts = counts(include);
-                rels = rels(include);
-                
-                % inform the  user about what's being deleted
+                               
+                % compile the list of relvars to be deleted
                 disp 'ABOUT TO DELETE:'
-                for iRel = 1:length(rels)
-                    fprintf('%s %s: %d', ...
-                        rels{iRel}.tab.info.tier, ...
-                        rels{iRel}.tab.info.name, counts(iRel));
-                    if ismember(rels{iRel}.tab.info.tier, {'manual','lookup'})
-                        fprintf ' !!!'
+                fprintf('%4d tuples from %s (%s)\n', ...
+                    self.count, self.tab.fullTableName, self.tab.info.tier)
+
+                names = {self.tab.className};
+                rels = {self};
+                new = struct('rel',self,'restrictByMe',~isempty(self.restrictions));
+                while ~isempty(new)
+                    curr = new(1);
+                    new(1) = [];
+                    sch = curr.rel.schema;
+                    ixCurr = strcmp(sch.classNames, curr.rel.tab.className);
+                    j = find(sch.dependencies(:,ixCurr));
+                    j = j(~ismember(sch.classNames(j),names));  % remove duplicates
+                    j = j(:)';  
+                    primary = full(sch.dependencies(j,ixCurr))==1;
+                    children = sch.classNames(j);                
+                    names = [names children]; %#ok<AGROW>
+                    for j=1:length(children)
+                        child = sch.conn.getPackage(children{j},false);
+                        if child(1) == '$'  % ignore unloaded schemas
+                            warning('Ignoring %s because its schema is not loaded.', child)
+                        else
+                            if curr.restrictByMe
+                                rel = init(dj.BaseRelvar, dj.Table(child)) & curr.rel;
+                            else
+                                rel = init(dj.BaseRelvar, dj.Table(child)) & curr.rel.restrictions;
+                            end
+                            n = rel.count;
+                            if n
+                                fprintf('%4d tuples from %s (%s)\n', ...
+                                    n, rel.tab.fullTableName, rel.tab.info.tier)
+                                rels{end+1} = rel; %#ok<AGROW>
+                                new(end+1) = struct('rel', rel,'restrictByMe', ~primary(j)); %#ok<AGROW>
+                            end
+                        end
                     end
-                    fprintf \n
                 end
-                fprintf \n
                 
                 % confirm and delete
                 if ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
@@ -107,14 +115,14 @@ classdef BaseRelvar < dj.GeneralRelvar
                     self.schema.conn.startTransaction
                     try
                         for iRel = length(rels):-1:1
-                            fprintf('Deleting %d tuples from %s... ', ...
-                                counts(iRel), rels{iRel}.tab.className)
-                            self.schema.conn.query(sprintf('DELETE FROM `%s`.`%s`%s', ...
-                                rels{iRel}.schema.dbname, rels{iRel}.tab.info.name, rels{iRel}.whereClause))
-                            fprintf 'done (not committed)\n'
+                            fprintf('Deleting from %s... ', rels{iRel}.tab.className)
+                            self.schema.conn.query(sprintf('DELETE FROM %s%s', ...
+                                rels{iRel}.tab.fullTableName, rels{iRel}.whereClause))
+                            fprintf '(not committed)\n'
                         end
+                        fprintf 'committing ...'
                         self.schema.conn.commitTransaction
-                        fprintf ' ** delete committed\n'
+                        disp done
                     catch err
                         fprintf '\n ** delete rolled back due to to error\n'
                         self.schema.conn.cancelTransaction
@@ -197,8 +205,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                 end
                 
                 % issue query
-                self.schema.conn.query( sprintf('%s `%s`.`%s` SET %s', ...
-                    command, self.schema.dbname, self.tab.info.name, ...
+                self.schema.conn.query( sprintf('%s %s SET %s', ...
+                    command, self.tab.fullTableName, ...
                     queryStr(1:end-1)), blobs{:})
             end
         end
@@ -226,8 +234,8 @@ classdef BaseRelvar < dj.GeneralRelvar
             %    2. the update attribute must not be in primary key
             %
             % EXAMPLES:
-            %   update(v2p.Mice(key), 'mouse_dob',   '2011-01-01')
-            %   update(v2p.Scan(key), 'lens')   % set the value to NULL
+            %   update(v2p.Mice & key, 'mouse_dob',   '2011-01-01')
+            %   update(v2p.Scan & key, 'lens')   % set the value to NULL
             
             assert(count(self)==1, 'Update is only allowed on one tuple at a time')
             isNull = nargin<3;
@@ -258,7 +266,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                     end
                 case header(ix).isNumeric
                     if islogical(value)
-                        value = uint8(valuealue);
+                        value = uint8(value);
                     end
                     assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
                     if isnan(value)
@@ -274,8 +282,8 @@ classdef BaseRelvar < dj.GeneralRelvar
                     error 'Invalid condition: please report to DataJoint developers'
             end
             
-            queryStr = sprintf('UPDATE `%s`.`%s` SET `%s`=%s %s', ...
-                self.schema.dbname, self.tab.info.name, attrname, queryStr, self.whereClause);
+            queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
+                self.tab.fullTableName, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
         end
     end
