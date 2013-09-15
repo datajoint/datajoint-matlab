@@ -16,8 +16,6 @@
 % The syntax of the table definition can be found at
 % http://code.google.com/p/datajoint/wiki/TableDeclarationSyntax
 
-% -- Dimitri Yatsenko, 2009-2012.
-
 classdef (Sealed) Table < handle
     
     properties(SetAccess = private)
@@ -253,7 +251,6 @@ classdef (Sealed) Table < handle
                 sprintf('OPTIMIZE LOCAL TABLE %s', self.fullTableName));
             disp(status.Msg_text{end})
         end
-        
         
         
         
@@ -589,7 +586,6 @@ classdef (Sealed) Table < handle
         
         
         
-        
         function declaration = getDeclaration(self)
             % extract the table declaration with the first percent-brace comment
             % block of the matching .m file.
@@ -604,6 +600,7 @@ classdef (Sealed) Table < handle
                     'Could not find the table declaration in %s', file)
             end
         end
+        
         
         
         function create(self)
@@ -669,8 +666,7 @@ classdef (Sealed) Table < handle
             end
             
             % add primary key declaration
-            assert(~isempty(primaryKeyFields), ...
-                'table must have a primary key');
+            assert(~isempty(primaryKeyFields), 'table must have a primary key')
             str = sprintf(',`%s`', primaryKeyFields{:});
             sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
             
@@ -803,12 +799,13 @@ while ischar(l) && ~strcmp(strtrim(l),'%{')
     l = fgetl(f);
 end
 
+% read the contents of the comment
 if ischar(l)
     while true
         l = fgetl(f);
         assert(ischar(l), 'invalid verbatim string');
         if strcmp(strtrim(l),'%}')
-            break;
+            break
         end
         str = sprintf('%s%s\n', str, l);
     end

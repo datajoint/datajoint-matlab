@@ -31,7 +31,7 @@ classdef BaseRelvar < dj.GeneralRelvar
         
         
         function delQuick(self)
-            % dj.BaseRelvar/delQuick - remove all tuples of relation self from its table.
+            % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.
             % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             
@@ -40,17 +40,17 @@ classdef BaseRelvar < dj.GeneralRelvar
       
         
         function del(self)
-            % dj.BaseRelvar/del - remove all tuples of relation self from its table
-            % as well as all dependent tuples in dependent tables.
+            % dj.BaseRelvar/del - remove all tuples of the relation from its table
+            % and, recursively, all matching tuples in dependent tables.
             %
             % A summary of the data to be removed will be provided followed by
             % an interactive confirmation before deleting the data.
             %
             % EXAMPLES:
-            %   del(Scans) % delete all tuples from table Scans and all tuples in dependent tables.
-            %   del(Scans('mouse_id=12')) % delete all Scans for mouse 12
-            %   del(Scans - Cells)  % delete all tuples from table Scans that do not have matching
-            %                       % tuples in table Cells
+            %   del(common.Scans) % delete all tuples from table Scans and all tuples in dependent tables.
+            %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
+            %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans 
+            %                                   that do not have matching tuples in table Cells
             %
             % See also dj.BaseRelvar/delQuick, dj.Table/drop
             
@@ -64,7 +64,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                         && ~isa(self, 'dj.AutoPopulate')
                     fprintf(['!!! %s is a subtable. For referential integrity, ' ...
                         'delete from its parent instead.\n'], class(self))
-                    if ~strcmpi('yes', input('Prceed anyway? yes/no >','s'))
+                    if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
                         disp 'delete cancelled'
                         return
                     end
@@ -236,8 +236,8 @@ classdef BaseRelvar < dj.GeneralRelvar
             %    2. the update attribute must not be in primary key
             %
             % EXAMPLES:
-            %   update(v2p.Mice(key), 'mouse_dob',   '2011-01-01')
-            %   update(v2p.Scan(key), 'lens')   % set the value to NULL
+            %   update(v2p.Mice & key, 'mouse_dob',   '2011-01-01')
+            %   update(v2p.Scan & key, 'lens')   % set the value to NULL
             
             assert(count(self)==1, 'Update is only allowed on one tuple at a time')
             isNull = nargin<3;
