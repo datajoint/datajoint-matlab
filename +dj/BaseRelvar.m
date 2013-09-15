@@ -255,7 +255,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                     value = {value};
                 case header(ix).isBlob
                     if isempty(value) && header(ix).isnullable
-                        queryStr = NULL;
+                        queryStr = 'NULL';
                         value = {};
                     else
                         queryStr = '"{M}"';
