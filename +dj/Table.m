@@ -203,18 +203,18 @@ classdef (Sealed) Table < handle
             
             % list remaining header
             for i=find(ismember({self.header.name}, dependentFields))
+                
                 if self.header(i).isnullable
                     default = '=null';
                 elseif strcmp(char(self.header(i).default(:)'), '<<<none>>>')
                     default = '';
+                elseif self.header(i).isNumeric || ...
+                        any(strcmp(self.header(i).default,self.mysql_constants))
+                    default = ['=' self.header(i).default];
                 else
-                    default = self.header(i).default;
-                    if self.header(i).isNumeric || ...
-                            any(strcmp(self.header(i).default,self.mysql_constants))
-                        default = sprintf('"%s"',default);
-                    end
-                    default = ['=' default]; %#ok<AGROW>
+                    default = ['="' self.header(i).default '"'];
                 end
+                
                 comment = self.header(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
                     sprintf('%-28s: %s', [self.header(i).name default], self.header(i).type), ...
@@ -812,7 +812,7 @@ function sql = fieldToSQL(field)
 % to the SQL column declaration
 
 default = field.default;
-if strcmpi(default, 'NULL')   % all nullable header default to null
+if strcmpi(default, 'NULL')   % all nullable attributes default to null
     default = 'DEFAULT NULL';
 else
     if strcmp(default,'<<<none>>>')  %DataJoint's special value string
