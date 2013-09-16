@@ -119,8 +119,8 @@ classdef AutoPopulate < handle
             % key is saved in a separate field for errors for debugging
             % purposes.
             % See also dj.AutoPopulate/populate
-
-            % perform error checks 
+            
+            % perform error checks
             self.populateSanityChecks
             
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
@@ -128,34 +128,40 @@ classdef AutoPopulate < handle
             self.executionEngine = @(key, fun, args) fun(args{:});
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
-
+        
         function taskCore(self, key)
             % The work unit that is submitted to the cluster
             % or executed locally
-            self.schema.conn.startTransaction();
+            self.schema.conn.startTransaction()
             try
-                self.makeTuples(key);
-                self.schema.conn.commitTransaction();
-                self.setJobStatus(key, 'completed');
+                self.makeTuples(key)
+                self.schema.conn.commitTransaction
+                self.setJobStatus(key, 'completed')
             catch err
-                self.schema.conn.cancelTransaction();
-                self.setJobStatus(key, 'error', err.message, err.stack);
-                rethrow(err);   % Make error visible to DCT / caller
+                self.schema.conn.cancelTransaction
+                self.setJobStatus(key, 'error', err.message, err.stack)
+                rethrow(err)   % Make error visible to DCT / caller
             end
         end
-
-        function status = get_job_status(self, key)
-            pop_key = fetch(self.popRel & key);
-            assert(numel(pop_key) == 1);
-            key_hash = dj.DataHash(pop_key);
-            job_key = struct('key_hash', key_hash, ...
-                'table_name', self.table.className);
-            if exists(self & pop_key)
+        
+        
+        function status = getJobStatus(self, key)
+            % Check the status of a job.  
+            % Can also be ccomplished by viewing package.Jobs.  
+            % See also dj.AutoPopulate/progress
+            
+            popKey = fetch(self.popRel & key);
+            assert(isscalar(popKey), 'one job at a time please')
+            jobKey = self.makeJobKey(popKey);
+            if exists(self & popKey)
                 status = 'computed';
-            elseif exists(self.jobs & job_key)
-                status = fetch1(self.jobs & job_key, 'status');
+            elseif exists(self.jobs & jobKey)
+                status = fetch1(self.jobs & jobKey, 'status');
+            else
+                status = 'available';
             end
         end
+        
         
         function jobs = get.jobs(self)
             % Return the jobs table associated with this class
@@ -163,10 +169,10 @@ classdef AutoPopulate < handle
             % on demand if necessary
             jobClassName = [self.schema.package '.Jobs'];
             if ~exist(jobClassName,'class')
-                self.createJobTable();
+                self.createJobTable()
                 rehash path
             end
-            jobs = eval(jobClassName);  
+            jobs = eval(jobClassName);
         end
         
         
@@ -176,11 +182,11 @@ classdef AutoPopulate < handle
                 throwAsCaller(MException('DataJoint:invalidInput', ...
                     'Cannot populate a restricted relation. Correct syntax: progress(rel, restriction)'))
             end
-
+            
             remaining = count((self.popRel&varargin) - self);
             if nargout
-                % return remaning items if asking 
-                varargout{1} = remaining; 
+                % return remaning items if asking
+                varargout{1} = remaining;
             else
                 total = count(self.popRel&varargin);
                 if ~total
@@ -188,7 +194,7 @@ classdef AutoPopulate < handle
                 elseif remaining==0
                     disp 'Fully populated.'
                 else
-                    fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(total), remaining);
+                    fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(total), remaining)
                 end
             end
         end
@@ -225,10 +231,10 @@ classdef AutoPopulate < handle
                             disp(key)
                             try
                                 % Perform or schedule computation
-                                self.executionEngine(key, @taskCore, {self, key});
+                                self.executionEngine(key, @taskCore, {self, key})
                             catch err
                                 fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
-                                fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line);
+                                fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line)
                                 fprintf('"%s"\n\n',err.message)
                                 if nargout
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
@@ -246,51 +252,54 @@ classdef AutoPopulate < handle
             end
         end
         
+        
+        function jobKey = makeJobKey(self, key)
+            jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
+        end
+        
+        
         function success = setJobStatus(self, key, status, errMsg, errStack)
             % dj.AutoPopulate/setJobStatus - update job process for parallel execution.
-            if ~self.useReservations
-                if strcmp(status,'reserved')
-                    success = true;
-                end
-            else
-                [~,host] = system('hostname');
-                jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
-                tuple = jobKey;
-                if all(ismember({'host','pid'},{self.jobs.header.name})) 
+            success = ~self.useReservations;
+            if ~success
+                jobKey = self.makeJobKey(key);
+                if all(ismember({'host','pid'},{self.jobs.header.name}))
+                    [~,host] = system('hostname');
                     jobKey.host = strtrim(host);
                     jobKey.pid = feature('getpid');
                 end
                 
                 switch status
-                case 'completed'
-                    delQuick(self.jobs & jobKey)
-                case 'error'
-                    tuple.status = status;
-                    tuple.error_key = key;
-                    tuple.error_message = errMsg;
-                    tuple.error_stack = errStack;
-                    self.jobs.insert(tuple,'REPLACE')
-                case 'reserved'
-                    % this reservation process assumes that MySQL API
-                    % will throw an error when inserting a duplicate entry.
-                    success = ~exists(self.jobs & jobKey);
-                    if success
-                        tuple.status = status;
-                        try
-                            self.jobs.insert(tuple);
-                            success = true;
-                        catch %#ok<CTCH>
-                            success = false;
+                    case 'completed'
+                        delQuick(self.jobs & jobKey)
+                    case 'error'
+                        jobKey.status = status;
+                        jobKey.error_key = key;
+                        jobKey.error_message = errMsg;
+                        jobKey.error_stack = errStack;
+                        self.jobs.insert(jobKey,'REPLACE')
+                    case 'reserved'
+                        % this reservation process assumes that MySQL API
+                        % will throw an error when inserting a duplicate entry.
+                        success = ~exists(self.jobs & jobKey);
+                        if success
+                            jobKey.status = status;
+                            try
+                                self.jobs.insert(jobKey)
+                                success = true;
+                            catch %#ok<CTCH>
+                                success = false;
+                            end
                         end
-                    end
-                    if ~success
-                        fprintf('** %s: skipping already reserved', self.table.className)
-                        disp(key)
-                    end
+                        if ~success
+                            fprintf('** %s: skipping already reserved', self.table.className)
+                            disp(key)
+                        end
                 end
             end
         end
-
+        
+        
         function createJobTable(self)
             % Create the Jobs class if it does not yet exist
             schemaPath = which([self.schema.package '.getSchema']);
@@ -326,7 +335,8 @@ classdef AutoPopulate < handle
             fprintf(f, 'end\n');
             fclose(f);
         end
-
+        
+        
         function populateSanityChecks(self)
             % Performs sanity checks that are common to populate, parpopulate
             % and batch_populate
