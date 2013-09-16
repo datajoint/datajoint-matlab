@@ -92,7 +92,7 @@ classdef Schema < handle
                     'GROUP BY table_schema, table_name, referenced_table_schema, referenced_table_name'],...
                     self.dbname)));
                 
-                % keep only links to and from this schema 
+                % keep only links to and from this schema
                 ix = arrayfun(@(x) ...
                     strcmp(x.to_schema,self.dbname)   && ~isempty(regexp(x.to_table  ,self.tableRegexp,'once')) || ...
                     strcmp(x.from_schema,self.dbname) && ~isempty(regexp(x.from_table,self.tableRegexp,'once')), ...
@@ -105,7 +105,7 @@ classdef Schema < handle
                 % create dependency matrix
                 ixFrom = cellfun(@(x) find(strcmp(x, self.classNames)), fromClassNames);
                 ixTo   = cellfun(@(x) find(strcmp(x, self.classNames)), toClassNames);
-                nTables = length(self.classNames); 
+                nTables = length(self.classNames);
                 
                 self.dependencies = sparse(ixFrom, ixTo, 2-double([foreignKeys.hierarchical]), nTables, nTables);
                 
@@ -352,14 +352,18 @@ classdef Schema < handle
             
             for i=1:length(levels)
                 name = names{i};
-                isExternal = ~strcmp(strtok(name,'.'), self.package);                
+                isExternal = ~strcmp(strtok(name,'.'), self.package);
                 if isExternal
                     edgeColor = [0.3 0.3 0.3];
                     fontSize = 9;
                     name = self.conn.getPackage(name);
                 else
-                    if isSubtable(eval(name))
-                        name = [name '*'];  %#ok:AGROW
+                    if exist(name,'class')
+                        rel = feval(name);
+                        assert(isa(rel, 'dj.Relvar'))
+                        if rel.isSubtable
+                            name = [name '*'];  %#ok:AGROW
+                        end
                     end
                     name = name(length(self.package)+2:end);  %remove package name
                     edgeColor = 'none';
@@ -618,7 +622,7 @@ classdef Schema < handle
                 db = [db '/' tab(1:ix(1)-1)];
                 tab = tab(ix(1)+1:end);
             end
-
+            
             str = self.conn.getPackage(['$' db '.' dj.Schema.toCamelCase(tab)]);
         end
     end
