@@ -136,10 +136,10 @@ classdef AutoPopulate < handle
             try
                 self.makeTuples(key)
                 self.schema.conn.commitTransaction
-                self.setJobStatus(key, 'completed')
+                self.setJobStatus(key, 'completed');
             catch err
                 self.schema.conn.cancelTransaction
-                self.setJobStatus(key, 'error', err.message, err.stack)
+                self.setJobStatus(key, 'error', err.message, err.stack);
                 rethrow(err)   % Make error visible to DCT / caller
             end
         end
@@ -225,7 +225,7 @@ classdef AutoPopulate < handle
                     if self.setJobStatus(key, 'reserved')
                         if exists(self & key)
                             % already populated
-                            self.setJobStatus(key, 'completed')
+                            self.setJobStatus(key, 'completed');
                         else
                             fprintf('Populating %s for:\n', self.table.className)
                             disp(key)
@@ -263,7 +263,7 @@ classdef AutoPopulate < handle
             success = ~self.useReservations;
             if ~success
                 jobKey = self.makeJobKey(key);
-                if all(ismember({'host','pid'},{self.jobs.header.name}))
+                if ~strcmp(status, 'completed') && all(ismember({'host','pid'},{self.jobs.header.name}))
                     [~,host] = system('hostname');
                     jobKey.host = strtrim(host);
                     jobKey.pid = feature('getpid');
