@@ -34,12 +34,9 @@ classdef AutoPopulate < handle
     properties(Access=protected)
         useReservations
         executionEngine
+        jobs    % the jobs table
     end
-    
-    properties (Access=protected, Dependent)
-        jobs
-    end
-    
+        
     methods(Abstract,Access=protected)
         makeTuples(self, key)
         % makeTuples(self, key) must be defined by each automatically
@@ -75,7 +72,6 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/parpopulate
             
-            % perform error checks
             self.populateSanityChecks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = false;
@@ -91,17 +87,19 @@ classdef AutoPopulate < handle
             %
             % To enable parpopulate, create the job reservation table
             % <package>.Jobs which must have the following declaration:
-            %   %{
-            %   package.Jobs (job)        # the job reservation table
-            %   table_name : varchar(255) # className of the table
-            %   key_hash   : char(32)     # key hash
-            %   -----
-            %   status                      : enum('reserved','error','ignore') # if tuple is missing, the job is available
-            %   error_key=null              : blob                              # non-hashed key for errors only
-            %   error_message=""            : varchar(1023)                     # error message returned if failed
-            %   error_stack=null            : blob                              # error stack if failed
-            %   timestamp=CURRENT_TIMESTAMP : timestamp                         # automatic timestamp
-            %   %}
+            %
+            %   <package>.Jobs (job) # the job reservation table
+            %
+            %   table_name      : varchar(255)          # className of the table
+            %   key_hash        : char(32)              # key hash
+            %   ---
+            %   status            : enum('reserved','error','ignore')# if tuple is missing, the job is available
+            %   key=null          : blob                  # structure containing the key
+            %   error_message=""  : varchar(1023)         # error message returned if failed
+            %   error_stack=null  : blob                  # error stack if failed
+            %   host=""           : varchar(255)          # system hostname
+            %   pid=0             : int unsigned          # system process id
+            %   timestamp=CURRENT_TIMESTAMP : timestamp    # automatic timestamp
             %
             % A job is considered to be available when <package>.Jobs contains
             % no matching entry.
@@ -120,9 +118,7 @@ classdef AutoPopulate < handle
             % purposes.
             % See also dj.AutoPopulate/populate
             
-            % perform error checks
             self.populateSanityChecks
-            
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = true;
             self.executionEngine = @(key, fun, args) fun(args{:});
@@ -146,15 +142,17 @@ classdef AutoPopulate < handle
         
         
         function jobs = get.jobs(self)
-            % Return the jobs table associated with this class
-            % The handle is cached and we create the table
-            % on demand if necessary
-            jobClassName = [self.schema.package '.Jobs'];
-            if ~exist(jobClassName,'class')
-                self.createJobTable()
-                rehash path
+            % Return the jobs table associated with this current schema.
+            % Create the jobs table if it does not yet exist.
+            if isempty(self.jobs)
+                jobClassName = [self.schema.package '.Jobs'];
+                if ~exist(jobClassName,'class')
+                    self.createJobTable
+                    rehash path
+                end
+                self.jobs = feval(jobClassName);
             end
-            jobs = eval(jobClassName);
+            jobs = self.jobs;
         end
         
         
@@ -254,8 +252,6 @@ classdef AutoPopulate < handle
                         jobKey.error_stack = errStack;
                         self.jobs.insert(addHostInfo(jobKey),'REPLACE')
                     case 'reserved'
-                        % this reservation process assumes that MySQL API
-                        % will throw an error when inserting a duplicate entry.
                         success = ~exists(self.jobs & jobKey);
                         if success
                             jobKey.status = status;
@@ -281,6 +277,7 @@ classdef AutoPopulate < handle
                     jobKey.pid = feature('getpid');
                 end
                 if ismember('error_key', {self.jobs.header.name})
+                    % for backward compatibility with versions prior to 2.6.3
                     jobKey.error_key = key;
                 end
                 if ismember('key', {self.jobs.header.name})
