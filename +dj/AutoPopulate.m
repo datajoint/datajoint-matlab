@@ -145,24 +145,6 @@ classdef AutoPopulate < handle
         end
         
         
-        function status = getJobStatus(self, key)
-            % Check the status of a job.
-            % Can also be ccomplished by viewing package.Jobs.
-            % See also dj.AutoPopulate/progress
-            
-            popKey = fetch(self.popRel & key);
-            assert(isscalar(popKey), 'one job at a time please')
-            jobKey = self.makeJobKey(popKey);
-            if exists(self & popKey)
-                status = 'computed';
-            elseif exists(self.jobs & jobKey)
-                status = fetch1(self.jobs & jobKey, 'status');
-            else
-                status = 'available';
-            end
-        end
-        
-        
         function jobs = get.jobs(self)
             % Return the jobs table associated with this class
             % The handle is cached and we create the table
@@ -268,7 +250,6 @@ classdef AutoPopulate < handle
                         delQuick(self.jobs & jobKey)
                     case 'error'
                         jobKey.status = status;
-                        jobKey.error_key = key;
                         jobKey.error_message = errMsg;
                         jobKey.error_stack = errStack;
                         self.jobs.insert(addHostInfo(jobKey),'REPLACE')
@@ -293,12 +274,19 @@ classdef AutoPopulate < handle
             end
             
             
-            function key = addHostInfo(key)
+            function jobKey = addHostInfo(jobKey)
                 if all(ismember({'host','pid'},{self.jobs.header.name}))
                     [~,host] = system('hostname');
-                    key.host = strtrim(host);
-                    key.pid = feature('getpid');
+                    jobKey.host = strtrim(host);
+                    jobKey.pid = feature('getpid');
                 end
+                if ismember('error_key', {self.jobs.header.name})
+                    jobKey.error_key = key;
+                end
+                if ismember('key', {self.jobs.header.name})
+                    jobKey.key = key;
+                end
+                
             end
         end
         
@@ -319,7 +307,7 @@ classdef AutoPopulate < handle
             fprintf(f, 'key_hash   : char(32)     # key hash\n');
             fprintf(f, '-----\n');
             fprintf(f, 'status    : enum("reserved","error","ignore") # if tuple is missing, the job is available\n');
-            fprintf(f, 'error_key=null     : blob                              # non-hashed key for errors only\n');
+            fprintf(f, 'key=null           : blob                              # structure containing the key\n');
             fprintf(f, 'error_message=""   : varchar(1023)                     # error message returned if failed\n');
             fprintf(f, 'error_stack=null   : blob                              # error stack if failed\n');
             fprintf(f, 'host=""            : varchar(255)                      # system hostname\n');
