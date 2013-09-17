@@ -8,4 +8,3 @@ if nargout
 else
     fprintf('\nDataJoint version %d.%d.%d\n\n', v.major, v.minor, v.bugfix)
 end
-end
