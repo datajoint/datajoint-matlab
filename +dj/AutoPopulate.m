@@ -146,8 +146,8 @@ classdef AutoPopulate < handle
         
         
         function status = getJobStatus(self, key)
-            % Check the status of a job.  
-            % Can also be ccomplished by viewing package.Jobs.  
+            % Check the status of a job.
+            % Can also be ccomplished by viewing package.Jobs.
             % See also dj.AutoPopulate/progress
             
             popKey = fetch(self.popRel & key);
@@ -263,12 +263,6 @@ classdef AutoPopulate < handle
             success = ~self.useReservations;
             if ~success
                 jobKey = self.makeJobKey(key);
-                if ~strcmp(status, 'completed') && all(ismember({'host','pid'},{self.jobs.header.name}))
-                    [~,host] = system('hostname');
-                    jobKey.host = strtrim(host);
-                    jobKey.pid = feature('getpid');
-                end
-                
                 switch status
                     case 'completed'
                         delQuick(self.jobs & jobKey)
@@ -277,7 +271,7 @@ classdef AutoPopulate < handle
                         jobKey.error_key = key;
                         jobKey.error_message = errMsg;
                         jobKey.error_stack = errStack;
-                        self.jobs.insert(jobKey,'REPLACE')
+                        self.jobs.insert(addHostInfo(jobKey),'REPLACE')
                     case 'reserved'
                         % this reservation process assumes that MySQL API
                         % will throw an error when inserting a duplicate entry.
@@ -285,7 +279,7 @@ classdef AutoPopulate < handle
                         if success
                             jobKey.status = status;
                             try
-                                self.jobs.insert(jobKey)
+                                self.jobs.insert(addHostInfo(jobKey))
                                 success = true;
                             catch %#ok<CTCH>
                                 success = false;
@@ -295,6 +289,15 @@ classdef AutoPopulate < handle
                             fprintf('** %s: skipping already reserved', self.table.className)
                             disp(key)
                         end
+                end
+            end
+            
+            
+            function key = addHostInfo(key)
+                if all(ismember({'host','pid'},{self.jobs.header.name}))
+                    [~,host] = system('hostname');
+                    key.host = strtrim(host);
+                    key.pid = feature('getpid');
                 end
             end
         end
