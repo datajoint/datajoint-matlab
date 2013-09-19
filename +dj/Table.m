@@ -547,7 +547,7 @@ classdef (Sealed) Table < handle
         function yes = exists(self)
             yes = any(strcmp(self.className, self.schema.classNames));
         end
-
+        
         
         function neighbors = getNeighbors(self, depth1, depth2, crossSchemas)
             % dj.Table/getNeighbors -- get the class names of tables that are
@@ -653,7 +653,7 @@ classdef (Sealed) Table < handle
             for iRef = 1:length(references)
                 for iField = find([references{iRef}.table.header.iskey])
                     field = references{iRef}.table.header(iField);
-                    if ~ismember(field.name, primaryKeyFields)
+                    if ~ismember(field.name, [primaryKeyFields nonKeyFields])
                         nonKeyFields{end+1} = field.name; %#ok<AGROW>
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
