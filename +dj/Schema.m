@@ -528,14 +528,14 @@ classdef Schema < handle
                     self.dbname),self.tableRegexp);
                 self.header.isnullable = logical(self.header.isnullable);
                 self.header.iskey = logical(self.header.iskey);
-                self.header.isNumeric = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                self.header.isNumeric = ~cellfun(@(x) isempty(regexp(sprintf('%s',x), ...
                     '^((tiny|small|medium|big)?int|decimal|double|float)', 'once')), self.header.type);
-                self.header.isString = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                self.header.isString = ~cellfun(@(x) isempty(regexp(sprintf('%s',x), ...
                     '^((var)?char|enum|date|time|timestamp)','once')), self.header.type);
-                self.header.isBlob = ~cellfun(@(x) isempty(regexp(char(x'), ...
+                self.header.isBlob = ~cellfun(@(x) isempty(regexp(sprintf('%s',x), ...
                     '^(tiny|medium|long)?blob', 'once')), self.header.type);
                 % strip field lengths off integer types
-                self.header.type = cellfun(@(x) regexprep(char(x'), ...
+                self.header.type = cellfun(@(x) regexprep(sprintf('%s',x), ...
                     '((tiny|small|medium|big)?int)\(\d+\)','$1'), self.header.type, 'UniformOutput', false);
                 self.header.alias = repmat({''}, length(self.header.name),1);
                 self.header = dj.struct.fromFields(self.header);
@@ -548,8 +548,6 @@ classdef Schema < handle
                 end
                 fprintf('%.3g\n',toc)
             end
-            
-            
         end
         
         
@@ -621,8 +619,7 @@ classdef Schema < handle
             if ix
                 db = [db '/' tab(1:ix(1)-1)];
                 tab = tab(ix(1)+1:end);
-            end
-            
+            end            
             str = self.conn.getPackage(['$' db '.' dj.Schema.toCamelCase(tab)]);
         end
     end
