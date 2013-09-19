@@ -19,8 +19,9 @@
 % The method parpopulate works similarly to populate but it uses the job reservation
 % table <package>.Jobs to enable execution by multiple processes in parallel.
 %
-% The job reservation table must be declated as <package>.Jobs in the same
-% schema package as this computed table. You may query the job reservation.
+% The job reservation table <package>.Jobs and its class are created automatically
+% upon the first invocation of parpopulate(). You may query the job reservation
+% to monitor the progression of execution.
 % While the job is executing, the job status is set to "reserved". When the
 % job is completed, the entry is removed. When the job ends in error, the
 % status is set to "error" and the error stack is saved.
@@ -172,8 +173,6 @@ classdef AutoPopulate < handle
                 total = count(self.popRel&varargin);
                 if ~total
                     disp 'Nothing to populate'
-                elseif ~remaining
-                    disp 'Fully populated.'
                 else
                     fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(total), remaining)
                 end
@@ -214,17 +213,16 @@ classdef AutoPopulate < handle
                                 % Perform or schedule computation
                                 self.executionEngine(key, @taskCore, {self, key})
                             catch err
+                                if ~nargout && ~self.useReservations
+                                    rethrow(err)
+                                end
+                                % suppress the error if it is handled by other means
                                 fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
                                 fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line)
                                 fprintf('"%s"\n\n',err.message)
                                 if nargout
                                     failedKeys = [failedKeys; key]; %#ok<AGROW>
                                     errors = [errors; err];         %#ok<AGROW>
-                                else
-                                    if ~self.useReservations
-                                        % rethrow error only if not returned
-                                        rethrow(err)
-                                    end
                                 end
                             end
                         end
@@ -251,13 +249,13 @@ classdef AutoPopulate < handle
                         jobKey.status = status;
                         jobKey.error_message = errMsg;
                         jobKey.error_stack = errStack;
-                        self.jobs.insert(addHostInfo(jobKey),'REPLACE')
+                        self.jobs.insert(addJobInfo(jobKey),'REPLACE')
                     case 'reserved'
                         success = ~exists(self.jobs & jobKey);
                         if success
                             jobKey.status = status;
                             try
-                                self.jobs.insert(addHostInfo(jobKey))
+                                self.jobs.insert(addJobInfo(jobKey))
                             catch %#ok<CTCH>
                                 success = false;
                             end
@@ -270,7 +268,7 @@ classdef AutoPopulate < handle
             end
             
             
-            function jobKey = addHostInfo(jobKey)
+            function jobKey = addJobInfo(jobKey)
                 if all(ismember({'host','pid'},{self.jobs.header.name}))
                     [~,host] = system('hostname');
                     jobKey.host = strtrim(host);
