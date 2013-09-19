@@ -81,7 +81,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 % print header
                 header = self.header;
                 ix = find( ~[header.isBlob] );  % header to display
-                fprintf('\n  %16.16s\n', header(ix).name)
+                fprintf \n
+                fprintf('  %16.16s', header(ix).name)
+                fprintf \n
                 maxRows = 12;
                 tuples = self.fetch(header(ix).name, sprintf('LIMIT %d', maxRows+1));
                 nTuples = max(self.count, length(tuples));
@@ -95,7 +97,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                                 fprintf('  %16g',v)
                             else
                                 fprintf('  %16d',v)
-                            end 
+                            end
                         else
                             fprintf('  %16.16s',v)
                         end
@@ -150,10 +152,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         function clip(self)
-            % dj.GeneralRelvar/clip - copy into clipboard the matlab code to re-generate 
+            % dj.GeneralRelvar/clip - copy into clipboard the matlab code to re-generate
             % the contents of the relation. Only scalar numeric or string values are allowed.
             % This function may be useful for creating matlab code that fills a table with values.
-            % 
+            %
             % USAGE:
             %    r.clip
             
@@ -207,13 +209,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % For example:
             %    s = R.fetch('*', 'ORDER BY field1,field2');    % sort the result by field1
             %    s = R.fetch('*', 'LIMIT 100 OFFSET 200')  % read tuples 200-299
-            %    s = R.fetch('*', 'ORDER BY field1 DESC, field 2  LIMIT 100');    
+            %    s = R.fetch('*', 'ORDER BY field1 DESC, field 2  LIMIT 100');
             %
             % The numerical indexing into a relvar is a deviation from
             % relational theory and should be reserved for special cases
             % only since the order of tuples in a relation is not
             % guaranteed.
-            % 
+            %
             % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
             
             [limit, args] = makeLimitClause(varargin{:});
@@ -522,7 +524,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         function ret = plus(self, arg)
             ret = self | arg;
-        end        
+        end
     end
     
     
@@ -693,7 +695,7 @@ for arg = restrictions
             cond = dj.struct.pro(cond, selfAttrs.name); % project onto common attributes
             if isempty(fieldnames(cond))
                 % restrictor has no common attributes:
-                %    semijoin leaves relation unchanged. 
+                %    semijoin leaves relation unchanged.
                 %    antijoin returns the empty relation.
                 if ~isempty(not)
                     clause = ' AND FALSE';

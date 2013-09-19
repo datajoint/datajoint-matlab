@@ -93,6 +93,7 @@ classdef (Sealed) Table < handle
         
         function display(self)
             display@handle(self)
+            fprintf \n\n
             for i=1:numel(self)
                 disp(self(i).re(true))
                 fprintf \n
@@ -157,7 +158,7 @@ classdef (Sealed) Table < handle
             if ~expandForeignKeys
                 str = sprintf('%%{\n');
             end
-            str = sprintf('%s%s (%s) # %s\n', ...
+            str = sprintf('%s%s (%s) # %s', ...
                 str, self.className, self.info.tier, self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
