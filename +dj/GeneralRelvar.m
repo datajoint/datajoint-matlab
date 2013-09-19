@@ -33,15 +33,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         function header = get.header(self)
-            header = self.compile();
+            header = self.compile;
         end
         
         function s = get.sql(self)
-            [~, s] = self.compile();
+            [~, s] = self.compile;
         end
         
         function schema = get.schema(self)
-            schema = self.getSchema();
+            schema = self.getSchema;
         end
         
         function names = get.primaryKey(self)
@@ -81,9 +81,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 % print header
                 header = self.header;
                 ix = find( ~[header.isBlob] );  % header to display
-                fprintf \n
-                fprintf('  %16.16s', header(ix).name)
-                fprintf \n
+                fprintf('\n  %16.16s\n', header(ix).name)
                 maxRows = 12;
                 tuples = self.fetch(header(ix).name, sprintf('LIMIT %d', maxRows+1));
                 nTuples = max(self.count, length(tuples));
@@ -102,13 +100,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                             fprintf('  %16.16s',v)
                         end
                     end
-                    fprintf '\n'
+                    fprintf \n
                 end
                 if nTuples > maxRows
                     for iField = ix
                         fprintf('  %16s','...')
                     end
-                    fprintf '\n'
+                    fprintf \n
                 end
             end
             
@@ -354,9 +352,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % expression.
             %
             % Examples:
-            %   Scans & struct('mouse_id',3, 'scannum', 4);
-            %   Scans & 'lens=10'
-            %   Mice & (Scans & 'lens=10')
+            %   tp.Scans & struct('mouse_id',3, 'scannum', 4);
+            %   tp.Scans & 'lens=10'
+            %   tp.Mice & (tp.Scans & 'lens=10')
             if ~iscell(arg)
                 arg = {arg};
             end
@@ -533,11 +531,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function schema = getSchema(self)
             % get reference to the schema from the first base relvar
-            schema = self.operands{1};
+            op = self.operands{1};
             if strcmp(self.operator, 'table')
-                schema = schema.schema;
+                schema = op.schema;
             else
-                schema = schema.getSchema();
+                schema = op.getSchema;
             end
         end
         
@@ -884,8 +882,7 @@ end
 
 function str = escapeString(str)
 % Escapes strings that are used in SQL clauses by struct2cond.
-% We use ' to enclose strings, so we need to replace all instances
-% of ' with ''.
+% We use ' to enclose strings, so we need to replace all instances of ' with ''.
 % To prevent the expansion of MySQL escape characters, all instances
 % of \ have to be replaced with \\.
 str = strrep(str, '''', '''''');

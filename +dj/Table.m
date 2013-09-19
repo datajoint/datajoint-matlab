@@ -26,7 +26,7 @@ classdef (Sealed) Table < handle
     properties(Dependent, SetAccess = private)
         info     % name, tier, comment.  See dj.Schema
         header    % structure array describing header
-        fullTableName  % table name with database, escaped in backquotes
+        fullTableName  % `database`.`plain_table_name`
         plainTableName  % just the table name
     end
     
@@ -58,16 +58,11 @@ classdef (Sealed) Table < handle
             if isempty(self.schema)
                 schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
                 assert(~isempty(which(schemaFunction)), ['Not found: ' schemaFunction])
-                self.schema = eval(schemaFunction);
+                self.schema = feval(schemaFunction);
                 assert(isa(self.schema, 'dj.Schema'), ...
                     [schemaFunction ' must return an instance of dj.Schema'])
             end
             ret = self.schema;
-        end
-        
-        
-        function yes = exists(self)
-            yes = any(strcmp(self.className, self.schema.classNames));
         end
         
         
@@ -206,7 +201,7 @@ classdef (Sealed) Table < handle
                 
                 if self.header(i).isnullable
                     default = '=null';
-                elseif strcmp(char(self.header(i).default(:)'), '<<<none>>>')
+                elseif strcmp(char(self.header(i).default(:)'), '<<<no default>>>')
                     default = '';
                 elseif self.header(i).isNumeric || ...
                         any(strcmp(self.header(i).default,self.mysql_constants))
@@ -548,6 +543,11 @@ classdef (Sealed) Table < handle
     
     methods(Access=private)
         
+        function yes = exists(self)
+            yes = any(strcmp(self.className, self.schema.classNames));
+        end
+
+        
         function neighbors = getNeighbors(self, depth1, depth2, crossSchemas)
             % dj.Table/getNeighbors -- get the class names of tables that are
             % directly related to the given table.
@@ -794,7 +794,6 @@ end
 if ischar(l)
     while true
         l = fgetl(f);
-        assert(ischar(l), 'invalid verbatim string');
         if strcmp(strtrim(l),'%}')
             break
         end
@@ -815,7 +814,7 @@ default = field.default;
 if strcmpi(default, 'NULL')   % all nullable attributes default to null
     default = 'DEFAULT NULL';
 else
-    if strcmp(default,'<<<none>>>')  %DataJoint's special value string
+    if strcmp(default,'<<<no default>>>')  %DataJoint's special value to indicate no default
         default = 'NOT NULL';
     else
         % enclose value in quotes (even numeric), except special SQL values
@@ -909,10 +908,15 @@ fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
     % try no default value
     fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line);
-    fieldInfo.default = '<<<none>>>';
+    assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line)
+    fieldInfo.default = '<<<no default>>>';  % special value indicating no default
 end
 assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
+if ~isempty(regexp(fieldInfo.datatype,'^(tiny|small|medium|big)?int', 'once')) ...
+        && strcmp(fieldInfo.default,'null')
+    throw(MException('DataJoint:invalidDeclaration', ...
+        'Integer attributes cannot be nullable in "%s"', line))
+end
 fieldInfo.iskey = inKey;
 end
 
