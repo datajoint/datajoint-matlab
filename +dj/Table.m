@@ -881,7 +881,7 @@ if nargout > 1
                 else
                     references{end+1} = p;   %#ok:<AGROW>
                 end
-            case regexpi(line, '^(unique)?\s+index[^:]*$')
+            case regexpi(line, '^(unique\s+)?index[^:]*$')
                 % parse index definition
                 indexInfo = parseIndexDef(line);
                 indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
