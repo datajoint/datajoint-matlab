@@ -205,7 +205,6 @@ classdef AutoPopulate < handle
                 errors = struct([]);
             end
             unpopulated = self.popRel;
-            self.timedOut = [];
             
             % if the last argument is a function handle, apply it to popRel.
             if ~isempty(varargin) && isa(varargin{end}, 'function_handle')
@@ -221,6 +220,7 @@ classdef AutoPopulate < handle
                 
                 self.timeoutAttempt = 1;
                 while ~isempty(unpopulated)
+                    self.timedOut = [];
                     for key = unpopulated'
                         if self.setJobStatus(key, 'reserved')
                             if exists(self & key)
