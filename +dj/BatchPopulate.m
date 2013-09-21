@@ -17,9 +17,9 @@ classdef BatchPopulate < dj.AutoPopulate
             % See also dj.AutoPopulate/parpopulate
             
             % perform error checks
-            self.populateSanityChecks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = true;
+            self.populateSanityChecks
             self.executionEngine = @(key, fun, args) ...
                 batchExecutionEngine(self, key, fun, args);
             
