@@ -163,43 +163,48 @@ classdef (Sealed) Table < handle
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
+            % list primary key fields
             keyFields = {self.header([self.header.iskey]).name};
             
             if ~expandForeignKeys
                 % list parent references
-                for refClassName = self.schema.getParents(self.className, 1)
-                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
-                    str = sprintf('%s\n-> %s',str, refObj.className);
-                    excludeFields = {refObj.header([refObj.header.iskey]).name};
-                    keyFields = keyFields(~ismember(keyFields, excludeFields));
+                [classNames,tables] = getSortedForeignKeys(self, self.schema.getParents(self.className, 1));
+                if ~isempty(classNames)
+                    str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
+                    for t = tables
+                        % exclude primary key fields of referenced tables from the primary attribute list
+                        keyFields = keyFields(~ismember(keyFields, {t.header([t.header.iskey]).name}));
+                    end
                 end
             end
             
+            % additional primary attributes
             for i=find(ismember({self.header.name}, keyFields))
                 comment = self.header(i).comment;
                 str = sprintf('%s\n%-40s# %s', str, ...
-                    sprintf('%-16s: %s', self.header(i).name, self.header(i).type), ...
-                    comment);
+                    sprintf('%-16s: %s', self.header(i).name, self.header(i).type), comment);
             end
             
             % dividing line
             str = sprintf('%s\n---', str);
             
+            % list dependent attributes
             dependentFields = {self.header(~[self.header.iskey]).name};
             
             % list other references
             if ~expandForeignKeys
-                for refClassName = self.schema.getParents(self.className, 2)
-                    refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
-                    str = sprintf('%s\n-> %s',str, refObj.className);
-                    excludeFields = {refObj.header([refObj.header.iskey]).name};
-                    dependentFields = dependentFields(~ismember(dependentFields, excludeFields));
+                [classNames,tables] = getSortedForeignKeys(self, self.schema.getParents(self.className, 2));
+                if ~isempty(classNames)
+                    str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
+                    for t = tables
+                        % exclude primary key fields of referenced tables from header
+                        dependentFields = dependentFields(~ismember(keyFields, {t.header([t.header.iskey]).name}));
+                    end
                 end
             end
             
-            % list remaining header
+            % list remaining attributes
             for i=find(ismember({self.header.name}, dependentFields))
-                
                 if self.header(i).isnullable
                     default = '=null';
                 elseif strcmp(char(self.header(i).default(:)'), '<<<no default>>>')
@@ -210,7 +215,6 @@ classdef (Sealed) Table < handle
                 else
                     default = ['="' self.header(i).default '"'];
                 end
-                
                 comment = self.header(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
                     sprintf('%-28s: %s', [self.header(i).name default], self.header(i).type), ...
@@ -238,6 +242,25 @@ classdef (Sealed) Table < handle
             
             if ~expandForeignKeys
                 str = sprintf('%s%%}\n', str);
+            end
+            
+            
+            function [classNames,tables] = getSortedForeignKeys(self, classNames)
+                % sort referenced tables so that they reproduce the correct
+                % order of primary key attributes
+                tables = cellfun(@(x) dj.Table(self.schema.conn.getPackage(x,true)), classNames,'uni',false);
+                tables = [tables{:}];
+                if isempty(tables)
+                    classNames = {};
+                else
+                    fkFields = arrayfun(@(x) {x.header([x.header.iskey]).name}, tables,'uni',false);
+                    fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.header.name})), s), fkFields, 'uni', false);
+                    n = max(cellfun(@length, fkOrder));
+                    m = max(cellfun(@max, fkOrder));
+                    [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^(n-1-(1:length(x)))), fkOrder));
+                    tables = tables(fkOrder);
+                    classNames ={tables.className};
+                end
             end
         end
         
@@ -711,15 +734,15 @@ classdef (Sealed) Table < handle
             % close the declaration
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s$"', sql(1:end-2), tableInfo.comment);
             
-            fprintf \n<SQL>\n
-            disp(sql)
-            fprintf </SQL>\n\n
-            
-            % execute declaration
-            if nargout==0
+            self.schema.reload   % again, ensure that the table does not already exist
+            if ~self.exists
+                % execute declaration
+                fprintf \n<SQL>\n
+                disp(sql)
+                fprintf </SQL>\n\n
                 self.schema.conn.query(sql);
+                self.schema.reload
             end
-            self.schema.reload
         end
         
         function alter(self, alterStatement)
