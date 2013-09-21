@@ -35,8 +35,16 @@ classdef AutoPopulate < handle
     properties(Access=protected)
         useReservations
         executionEngine
-        jobs    % the jobs table
+        jobs     % the jobs table
+        timedOut % list of timedout transactions
+        timeoutAttempt
     end
+    
+    properties(Constant, Access=protected)
+        timeoutMessage = 'Lock wait timeout exceeded'
+        maxTimeouts = 3
+    end
+    
     
     methods(Abstract,Access=protected)
         makeTuples(self, key)
@@ -73,9 +81,9 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/parpopulate
             
-            self.populateSanityChecks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = false;
+            self.populateSanityChecks
             self.executionEngine = @(key, fun, args) fun(args{:});
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
@@ -120,9 +128,9 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/populate
             
-            self.populateSanityChecks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = true;
+            self.populateSanityChecks
             self.executionEngine = @(key, fun, args) fun(args{:});
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
@@ -137,8 +145,15 @@ classdef AutoPopulate < handle
                 self.setJobStatus(key, 'completed');
             catch err
                 self.schema.conn.cancelTransaction
-                self.setJobStatus(key, 'error', err.message, err.stack);
-                rethrow(err)   % Make error visible to DCT / caller
+                if strncmpi(err.message, self.timeoutMessage, length(self.timeoutMessage)) && ...
+                        self.timeoutAttempt<=self.maxTimeouts
+                    fprintf 'Transaction timed out. Will attempt again later.\n'
+                    self.setJobStatus(key, 'complete');
+                    self.timedOut = [self.timedOut; key];
+                else
+                    self.setJobStatus(key, 'error', err.message, err.stack);
+                    rethrow(err)   % Make error visible to DCT / caller
+                end
             end
         end
         
@@ -183,11 +198,14 @@ classdef AutoPopulate < handle
     
     methods(Access = protected)
         function [failedKeys, errors] = populate_(self, varargin)
+            % common functionality to all populate method
+            
             if nargout
                 failedKeys = struct([]);
                 errors = struct([]);
             end
             unpopulated = self.popRel;
+            self.timedOut = [];
             
             % if the last argument is a function handle, apply it to popRel.
             if ~isempty(varargin) && isa(varargin{end}, 'function_handle')
@@ -201,32 +219,37 @@ classdef AutoPopulate < handle
             else
                 fprintf('\n**%s: Found %d unpopulated keys\n\n', self.table.className, length(unpopulated))
                 
-                for key = unpopulated'
-                    if self.setJobStatus(key, 'reserved')
-                        if exists(self & key)
-                            % already populated
-                            self.setJobStatus(key, 'completed');
-                        else
-                            fprintf('Populating %s for:\n', self.table.className)
-                            disp(key)
-                            try
-                                % Perform or schedule computation
-                                self.executionEngine(key, @taskCore, {self, key})
-                            catch err
-                                if ~nargout && ~self.useReservations
-                                    rethrow(err)
-                                end
-                                % suppress the error if it is handled by other means
-                                fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
-                                fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line)
-                                fprintf('"%s"\n\n',err.message)
-                                if nargout
-                                    failedKeys = [failedKeys; key]; %#ok<AGROW>
-                                    errors = [errors; err];         %#ok<AGROW>
+                self.timeoutAttempt = 1;
+                while ~isempty(unpopulated)
+                    for key = unpopulated'
+                        if self.setJobStatus(key, 'reserved')
+                            if exists(self & key)
+                                % already populated
+                                self.setJobStatus(key, 'completed');
+                            else
+                                fprintf('Populating %s for:\n', self.table.className)
+                                disp(key)
+                                try
+                                    % Perform or schedule computation
+                                    self.executionEngine(key, @taskCore, {self, key})
+                                catch err
+                                    if ~nargout && ~self.useReservations
+                                        rethrow(err)
+                                    end
+                                    % suppress the error if it is handled by other means
+                                    fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
+                                    fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line)
+                                    fprintf('"%s"\n\n',err.message)
+                                    if nargout
+                                        failedKeys = [failedKeys; key]; %#ok<AGROW>
+                                        errors = [errors; err];         %#ok<AGROW>
+                                    end
                                 end
                             end
                         end
                     end
+                    unpopulated = self.timedOut;
+                    self.timeoutAttempt = self.timeoutAttempt + 1;
                 end
             end
         end
@@ -337,6 +360,14 @@ classdef AutoPopulate < handle
             if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
                 throwAsCaller(MException('DataJoint:invalidPopRel', ...
                     sprintf('%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))))
+            end
+            if self.useReservations
+                abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
+                if ~isempty(abovePopRel)
+                    warning('DataJoint:likelyTimeouts', ...
+                        ['Attribute %s not provided in popRel appears above other primary key attributes. '...
+                        'Transaction timeouts are likely. See DataJoint tutorial and issue #6'], abovePopRel{1})
+                end
             end
         end
     end
