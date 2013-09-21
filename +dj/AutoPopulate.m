@@ -148,7 +148,7 @@ classdef AutoPopulate < handle
                 if strncmpi(err.message, self.timeoutMessage, length(self.timeoutMessage)) && ...
                         self.timeoutAttempt<=self.maxTimeouts
                     fprintf 'Transaction timed out. Will attempt again later.\n'
-                    self.setJobStatus(key, 'complete');
+                    self.setJobStatus(key, 'completed');
                     self.timedOut = [self.timedOut; key];
                 else
                     self.setJobStatus(key, 'error', err.message, err.stack);
