@@ -365,8 +365,8 @@ classdef AutoPopulate < handle
                 abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
                 if ~isempty(abovePopRel)
                     warning('DataJoint:likelyTimeouts', ...
-                        ['Attribute %s not provided in popRel appears above other primary key attributes. '...
-                        'Transaction timeouts are likely. See DataJoint tutorial and issue #6'], abovePopRel{1})
+                        ['Primarky key attribute %s is above popRel''s primary key attributes. '...
+                        'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                 end
             end
         end

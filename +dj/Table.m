@@ -255,9 +255,8 @@ classdef (Sealed) Table < handle
                 else
                     fkFields = arrayfun(@(x) {x.header([x.header.iskey]).name}, tables,'uni',false);
                     fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.header.name})), s), fkFields, 'uni', false);
-                    n = max(cellfun(@length, fkOrder));
                     m = max(cellfun(@max, fkOrder));
-                    [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^(n-1-(1:length(x)))), fkOrder));
+                    [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
                     tables = tables(fkOrder);
                     classNames ={tables.className};
                 end

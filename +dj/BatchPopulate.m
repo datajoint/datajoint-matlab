@@ -16,7 +16,6 @@ classdef BatchPopulate < dj.AutoPopulate
             % used by batch_populate.
             % See also dj.AutoPopulate/parpopulate
             
-            % perform error checks
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
             self.useReservations = true;
             self.populateSanityChecks
@@ -29,7 +28,7 @@ classdef BatchPopulate < dj.AutoPopulate
     
     
     methods(Access = protected)
-        function user_data = get_job_user_data(self, key) %#ok<MANU,INUSD>
+        function user_data = get_job_user_data(self, key) %#ok<INUSD>
             % Override this function in order to customize the UserData argument
             % for job creation. This can be used to supply the io_resource field
             % for example.
