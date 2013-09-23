@@ -336,11 +336,6 @@ classdef AutoPopulate < handle
             fprintf(f, '    properties(Constant)\n');
             fprintf(f, '        table = dj.Table(''%s.Jobs'')\n', self.schema.package);
             fprintf(f, '    end\n');
-            fprintf(f, '    methods\n');
-            fprintf(f, '        function self = Jobs(varargin)\n');
-            fprintf(f, '            self.restrict(varargin)\n');
-            fprintf(f, '        end\n');
-            fprintf(f, '    end\n');
             fprintf(f, 'end\n');
             fclose(f);
         end
@@ -365,7 +360,7 @@ classdef AutoPopulate < handle
                 abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
                 if ~isempty(abovePopRel)
                     warning('DataJoint:likelyTimeouts', ...
-                        ['Primarky key attribute %s is above popRel''s primary key attributes. '...
+                        ['Primary key attribute %s is above popRel''s primary key attributes. '...
                         'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                 end
             end
