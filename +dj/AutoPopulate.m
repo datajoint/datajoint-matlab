@@ -236,7 +236,7 @@ classdef AutoPopulate < handle
                                     if ~nargout && ~self.useReservations
                                         rethrow(err)
                                     end
-                                    % suppress the error if it is handled by other means
+                                    % suppress error if it is handled by other means
                                     fprintf('\n** Error while executing %s.makeTuples:\n', class(self))
                                     fprintf('%s: line %d\n', err.stack(1).file, err.stack(1).line)
                                     fprintf('"%s"\n\n',err.message)

@@ -60,7 +60,7 @@ classdef Connection < handle
                 if ix
                     schemaName = self.packageDict{ix(1),2};
                 elseif strict
-                    error('Unknown package for "%s.%s". Activate its schema first.', ...
+                    error('Unknown package for "%s%s". Activate its schema first.', ...
                         schemaName(2:end), className)
                 end
                 className = [schemaName className];

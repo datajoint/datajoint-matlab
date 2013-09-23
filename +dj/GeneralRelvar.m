@@ -75,7 +75,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             tic
-            display@handle(self)
             nTuples = 0;
             if self.exists
                 % print header

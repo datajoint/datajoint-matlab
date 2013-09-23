@@ -92,12 +92,15 @@ classdef (Sealed) Table < handle
         
         
         function display(self)
-            display@handle(self)
-            fprintf \n\n
+            fprintf \n
             for i=1:numel(self)
                 disp(self(i).re(true))
-                fprintf \n
+                s = self(i).schema.conn.query(sprintf([...
+                    'SELECT (data_length+index_length)/1024/1024 table_size_mb ' ...
+                    'FROM information_schema.tables WHERE table_schema="%s" and table_name="%s"'],...
+                    self(i).schema.dbname, self(i).plainTableName));
             end
+            fprintf('Size on disk %1.3g MB\n\n', s.table_size_mb);
         end
         
         
@@ -146,9 +149,9 @@ classdef (Sealed) Table < handle
             % str will contain the table declaration string that can be used
             % to create the table using dj.Table.
             %
-            % When the second input expandForeignKeys is true, then references
-            % to other tables are not displayed and foreign key header are shown
-            % as regular header.
+            % When the second input expandForeignKeys is false, references
+            % to other tables are not displayed and foreign key attributes
+            % are shown as regular attributes.
             %
             % See also dj.Table
             
@@ -222,14 +225,14 @@ classdef (Sealed) Table < handle
             end
             str = sprintf('%s\n', str);
             
-            % list user-defined secondary indexes
-            allIndexes = self.getDatabaseIndexes();
-            implicitIndexes = self.getImplicitIndexes();
-            for thisIndex=allIndexes
-                % Skip implicit indexes
+            % list user-defined secondary indices
+            allIndices = self.getDatabaseIndices;
+            implicitIndices = self.getImplicitIndices;
+            for thisIndex=allIndices
+                % Skip implicit indices
                 if ~any(arrayfun( ...
                         @(x) isequal(x.attributes, thisIndex.attributes), ...
-                        implicitIndexes))
+                        implicitIndices))
                     attributeList = sprintf('%s,', thisIndex.attributes{:});
                     if thisIndex.unique
                         modifier = 'UNIQUE ';
@@ -353,18 +356,18 @@ classdef (Sealed) Table < handle
             assert(~isempty(indexAttributes) && ...
                 all(ismember(indexAttributes, {self.header.name})), ...
                 'Index definition contains invalid attribute names');
-            % Don't allow indexes that may conflict with foreign keys
-            implicitIndexes = self.getImplicitIndexes();
+            % Don't allow indices that may conflict with foreign keys
+            implicitIndices = self.getImplicitIndices;
             assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
-                implicitIndexes)), ...
+                implicitIndices)), ...
                 ['The specified set of attributes is implicitly ' ...
                 'indexed because of a foreign key constraint.']);
-            % Prevent interference with existing indexes
-            allIndexes = self.getDatabaseIndexes();
+            % Prevent interference with existing indices
+            allIndices = self.getDatabaseIndices;
             assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
-                allIndexes)), ...
+                allIndices)), ...
                 ['Only one index can be specified for any tuple ' ...
                 'of attributes. To change the index type, drop ' ...
                 'the exsiting index first.']);
@@ -388,23 +391,23 @@ classdef (Sealed) Table < handle
                 indexAttributes = {indexAttributes};
             end
             
-            % Don't touch indexes introduced by foreign keys
-            implicitIndexes = self.getImplicitIndexes();
+            % Don't touch indices introduced by foreign keys
+            implicitIndices = self.getImplicitIndices;
             assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
-                implicitIndexes)), ...
+                implicitIndices)), ...
                 ['The specified set of attributes is indexed ' ...
                 'because of a foreign key constraint. This index ' ...
                 'cannot be dropped.']);
             
             % Drop specified index(es). There should only be one unless
             % they were redundantly created outside of DataJoint.
-            allIndexes = self.getDatabaseIndexes();
+            allIndices = self.getDatabaseIndices;
             selIndexToDrop = arrayfun( ...
-                @(x) isequal(x.attributes, indexAttributes), allIndexes);
+                @(x) isequal(x.attributes, indexAttributes), allIndices);
             if any(selIndexToDrop)
                 arrayfun(@(x) self.alter(sprintf('DROP INDEX `%s`', x.name)), ...
-                    allIndexes(selIndexToDrop));
+                    allIndices(selIndexToDrop));
             else
                 error('Could not locate specfied index in database.')
             end
@@ -706,11 +709,11 @@ classdef (Sealed) Table < handle
             end
             
             % add secondary index declarations
-            % gather implicit indexes due to foreign keys first
-            implicitIndexes = {};
+            % gather implicit indices due to foreign keys first
+            implicitIndices = {};
             for fkSource = [parents references]
                 isKey = [fkSource{1}.table.header.iskey];
-                implicitIndexes{end+1} = {fkSource{1}.table.header(isKey).name}; %#ok<AGROW>
+                implicitIndices{end+1} = {fkSource{1}.table.header(isKey).name}; %#ok<AGROW>
             end
             
             for iIndex = 1:numel(indexDefs)
@@ -719,7 +722,7 @@ classdef (Sealed) Table < handle
                     'Index definition contains invalid attribute names');
                 assert(~any(cellfun( ...
                     @(x) isequal(x, indexDefs(iIndex).attributes), ...
-                    implicitIndexes)), ...
+                    implicitIndices)), ...
                     ['The specified set of attributes is implicitly ' ...
                     'indexed because of a foreign key constraint. '...
                     'Cannot create additional index.']);
@@ -757,21 +760,21 @@ classdef (Sealed) Table < handle
             self.syncDef
         end
         
-        function indexInfo = getDatabaseIndexes(self)
-            % dj.Table/getDatabaseIndexes
-            % Returns all secondary database indexes,
+        function indexInfo = getDatabaseIndices(self)
+            % dj.Table/getDatabaseIndices
+            % Returns all secondary database indices,
             % as given by the "SHOW INDEX" query
             indexInfo = struct('attributes', {}, ...
                 'unique', {}, 'name', {});
-            indexes = dj.struct.fromFields( ...
+            indices = dj.struct.fromFields( ...
                 self.schema.conn.query(sprintf(...
                 ['SHOW INDEX FROM `%s` IN `%s` ' ...
                 'WHERE NOT `Key_name`="PRIMARY"'], ...
                 self.plainTableName, self.schema.dbname)));
-            [indexNames, ~, indexId] = unique({indexes.Key_name});
+            [indexNames, ~, indexId] = unique({indices.Key_name});
             for iIndex=1:numel(indexNames)
                 % Get attribute names and sort by position in index
-                thisIndex = indexes(indexId == iIndex);
+                thisIndex = indices(indexId == iIndex);
                 [~, sortPerm] = sort([thisIndex.Seq_in_index]);
                 thisIndex = thisIndex(sortPerm);
                 indexInfo(end+1).attributes = {thisIndex.Column_name};  %#ok<AGROW>
@@ -780,9 +783,9 @@ classdef (Sealed) Table < handle
             end
         end
         
-        function indexInfo = getImplicitIndexes(self)
-            % dj.Table/getImplicitIndexes()
-            % Returns database indexes that are implied by
+        function indexInfo = getImplicitIndices(self)
+            % dj.Table/getImplicitIndices
+            % Returns database indices that are implied by
             % table relationships and should not be shown to the user
             % or modified by the user
             indexInfo = struct('attributes', {}, 'unique', {});
