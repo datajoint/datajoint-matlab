@@ -197,15 +197,17 @@ classdef BaseRelvar < dj.GeneralRelvar
                         assert(isscalar(v) && isnumeric(v),...
                             'The field %s must be a numeric scalar value', ...
                             header(i).name)
-                        if strcmp(header(i).type, 'bigint')
-                            queryStr = sprintf('%s`%s`=%d,',...
-                                queryStr, header(i).name, v);
-                        elseif strcmp(header(i).type, 'bigint unsigned')
-                            queryStr = sprintf('%s`%s`=%u,',...
-                                queryStr, header(i).name, v);
-                        elseif ~isnan(v)  % nans are not passed: assumed missing.
-                            queryStr = sprintf('%s`%s`=%1.16g,',...
-                                queryStr, header(i).name, v);
+                        if ~isnan(v)  % nans are not passed: assumed missing.
+                            if strcmp(header(i).type, 'bigint')
+                                queryStr = sprintf('%s`%s`=%d,',...
+                                    queryStr, header(i).name, v);
+                            elseif strcmp(header(i).type, 'bigint unsigned')
+                                queryStr = sprintf('%s`%s`=%u,',...
+                                    queryStr, header(i).name, v);
+                            else
+                                queryStr = sprintf('%s`%s`=%1.16g,',...
+                                    queryStr, header(i).name, v);
+                            end
                         end
                     end
                 end
