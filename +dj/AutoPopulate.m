@@ -189,7 +189,8 @@ classdef AutoPopulate < handle
                 if ~total
                     disp 'Nothing to populate'
                 else
-                    fprintf('%2.2f%% complete (%d remaining)\n', 100-100*double(remaining)/double(total), remaining)
+                    fprintf('%2.2f%% complete (%d remaining)        Time %s\n', ...
+                        100-100*double(remaining)/double(total), remaining, datestr(now,'HH:MM:SS'))
                 end
             end
         end
@@ -284,7 +285,7 @@ classdef AutoPopulate < handle
                             end
                         end
                         if ~success
-                            fprintf('** %s: skipping already reserved', self.table.className)
+                            fprintf('** %s: skipping already reserved\n', self.table.className)
                             disp(key)
                         end
                 end

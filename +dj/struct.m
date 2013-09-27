@@ -89,12 +89,15 @@ classdef struct
         
         
         function [tab,varargout] = tabulate(s,numField,varargin)
-            % dj.structu.tablulate - convert structure array into a multidimensional array
+            % dj.struct.tablulate - convert structure array into a multidimensional array
             %
             % [tab,v1,..,vn] = dj.struct.tabulate(struc, numField, dim1, ..., dimn)
-            % creates the n-dimensional array tab from the structure array
+            % creates the (n+1)-dimensional array tab from the structure array
             % where each dimension is indexed by the value of the fields
-            % dim1,...,dimn and stores the values of numField.
+            % dim1,...,dimn and stores the values of numField. If multiple
+            % values of numField are present for some combinations of
+            % indexes, an additional dimension is added to store the
+            % repeats.
             %
             % v1,...,vn  will contain arrays of unique values for the index
             % fields corresponding to each dimension.
@@ -114,16 +117,28 @@ classdef struct
                     [v{i},~,ix{i}] = unique({s.(indexFields{i})});
                 end
             end
-            sz = cellfun(@length,v)';
+            sz = [cellfun(@length,v)' 1];
             tab = nan(sz);
-            tab(sub2ind(sz, ix{:})) = [s.(numField)];
+            m = zeros(sz);
+            for i=1:length(s)
+                ixx = cellfun(@(ix) ix(i), ix, 'uni', false);
+                j = m(ixx{:})+1;
+                m(ixx{:})=j;
+                if j>sz(end)
+                    % extend the additional dimension
+                    tab = cat(length(sz), tab, nan(sz(1:end-1)));
+                    sz(end)=sz(end)+1;
+                end
+                tab(ixx{:},j)=s(i).(numField);
+            end
             varargout = v';
         end
         
+        
         function str = makeCode(s)
-            % str = dj.struct.makeCode(s) 
+            % str = dj.struct.makeCode(s)
             % make matlab code to reproduce the structure array s
-              
+            
             str = 'cell2struct({...';
             for i=1:length(s)
                 str = sprintf('%s\n   %s', str, cellArrayString(struct2cell(s(i))));
