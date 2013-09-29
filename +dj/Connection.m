@@ -6,7 +6,7 @@ classdef Connection < handle
         initQuery    % initializing function or query executed for each new session
         inTransaction = false
         connId        % connection handle
-        packageDict = cell(0,2) % n*2 cell matrix with database names in first column and package names in second
+        packageDict = containers.Map    % Map database names to package names
     end
     
     properties
@@ -40,11 +40,7 @@ classdef Connection < handle
         
         
         function addPackage(self, dbname, package)
-            ix = strcmp(package,self.packageDict(:,1));
-            if ~any(ix)
-                ix = size(self.packageDict,1)+1;
-            end
-            self.packageDict(ix,:) = {dbname,package};
+            self.packageDict(dbname) = package;
         end
         
         
@@ -56,9 +52,8 @@ classdef Connection < handle
             if className(1)=='$'                    
                 [schemaName,className] = strtok(className,'.');
 
-                ix = find(strcmpi(schemaName(2:end),self.packageDict(:,1)));
-                if ix
-                    schemaName = self.packageDict{ix(1),2};
+                if self.packageDict.isKey(schemaName(2:end))
+                    schemaName = self.packageDict(schemaName(2:end));
                 elseif strict
                     error('Unknown package for "%s%s". Activate its schema first.', ...
                         schemaName(2:end), className)
@@ -71,8 +66,9 @@ classdef Connection < handle
         
         function reload(self)
             % reload all schemas
-            for i=1:size(self.packageDict,1)
-                reload(feval([self.packageDict{i,2} '.getSchema']))
+            schemas = self.packageDict.values;
+            for s=schemas(:)'
+                reload(feval([s{1} '.getSchema']))
             end
         end
         
