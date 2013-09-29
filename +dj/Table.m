@@ -94,13 +94,16 @@ classdef (Sealed) Table < handle
         function display(self)
             fprintf \n
             for i=1:numel(self)
+                disp(['DataJoint table <a href="matlab:help(''' ...
+                    self(i).className ''')">' self(i).className '</a>'])
+                fprintf \n
                 disp(self(i).re(true))
                 s = self(i).schema.conn.query(sprintf([...
                     'SELECT (data_length+index_length)/1024/1024 table_size_mb ' ...
                     'FROM information_schema.tables WHERE table_schema="%s" and table_name="%s"'],...
                     self(i).schema.dbname, self(i).plainTableName));
             end
-            fprintf('Size on disk %1.3g MB\n\n', s.table_size_mb);
+            fprintf('Size on disk %u MB\n\n', ceil(s.table_size_mb));
         end
         
         
