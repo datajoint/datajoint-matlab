@@ -608,6 +608,33 @@ classdef Schema < handle
                 end
             end
         end
+        
+        
+        function display(self)
+            for i=1:numel(self)
+                fprintf('\nDataJoint schema %s, stored in MySQL database %s', ...
+                    self(i).package, self(i).dbname)
+                if ~isempty(self(i).prefix)
+                    fprintf(' with table prefix %s\n\n', self(i).prefix)
+                else
+                    fprintf \n\n
+                end
+                fprintf('%-25s%-16s%s\n%s\n', 'Table name', 'Tier', 'Comment', ...
+                    repmat('#', 1, 80))
+                for j=1:numel(self(i).tables)
+                    tableName = dj.Schema.toCamelCase(self(i).tables(j).name);
+                    fprintf('<a href="matlab:display(%s)">%s</a>%s%-16s%s\n', ...
+                        [self(i).classNames{j} '().table'], ...
+                        tableName, ...
+                        repmat(' ', 1, max(0, 25-numel(tableName))), ...
+                        self(i).tables(j).tier, ...
+                        self(i).tables(j).comment)
+                end
+                fprintf('\n<a href="matlab:erd(''%s'')">%s</a>\n', ...
+                    self(i).package, ...
+                    'Show entity relationship diagram')
+            end
+        end
     end
     
     
