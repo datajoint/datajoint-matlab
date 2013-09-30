@@ -94,16 +94,16 @@ classdef (Sealed) Table < handle
         function display(self)
             fprintf \n
             for i=1:numel(self)
-                disp(['DataJoint table <a href="matlab:help(''' ...
-                    self(i).className ''')">' self(i).className '</a>'])
-                fprintf \n
+                fprintf('DataJoint table\n\n')
                 disp(self(i).re(true))
                 s = self(i).schema.conn.query(sprintf([...
                     'SELECT (data_length+index_length)/1024/1024 table_size_mb ' ...
                     'FROM information_schema.tables WHERE table_schema="%s" and table_name="%s"'],...
                     self(i).schema.dbname, self(i).plainTableName));
             end
-            fprintf('Size on disk %u MB\n\n', ceil(s.table_size_mb));
+            fprintf('Size on disk %u MB\n', ceil(s.table_size_mb));
+            fprintf('\n<a href="matlab:disp(%s.table.re)">Display declaration</a>. <a href="matlab:%s.table.erd">Plot ERD</a>\n\n',...
+                self.className, self.className)
         end
         
         

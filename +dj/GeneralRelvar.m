@@ -74,26 +74,22 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/display - display the contents of the relation.
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
-            tic
             nTuples = 0;
+            fprintf('\nObject %s\n\n',class(self))
+            s = sprintf(', %s', self.primaryKey{:});
+            fprintf('Primary key: %s\n', s(2:end))
+            if isempty(self.nonKeyFields)
+                fprintf 'No dependent attributes'
+            else
+                s = sprintf(', %s',self.nonKeyFields{:});
+                fprintf('Dependent attributes: %s', s(2:end))
+            end
+            fprintf '\n\n Contents: \n'
             if self.exists
-                % provide hyperlinks to more advanced information
-                disp(['Show <a href="matlab:disp(''' ...
-                    sprintf('%-22s', 'Primary key:') ...
-                    sprintf('''''%s'''' ', self.primaryKey{:}) ...
-                    ''')">primary key</a> and ' ...
-                    '<a href="matlab:disp(''' ...
-                    sprintf('%-22s', 'Dependent attributes:'), ...
-                    sprintf('''''%s'''' ', self.nonKeyFields{:}) ...
-                    ''')">dependent attributes</a>'])
-                if ~isempty(self.restrictions)
-                    fprintf('Restrictions: ')
-                    disp(self.restrictions)
-                end
+                tic
                 % print header
                 header = self.header;
                 ix = find( ~[header.isBlob] );  % header to display
-                fprintf \n
                 fprintf('  %16.16s', header(ix).name)
                 fprintf \n
                 maxRows = 12;
