@@ -301,13 +301,13 @@ classdef (Sealed) Table < handle
             self.alter(sprintf('DROP COLUMN `%s`', attrName));
         end
         
-        function alterAttribute(self, attrName, newDefinition)
+        function alterAttribute(self, attrName, newDefinition, doPrompt)
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
+            doPrompt = nargin < 4 || doPrompt;
             sql = fieldToSQL(parseAttrDef(newDefinition, false));
-            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, ...
-                sql(1:end-2)));
+            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)),doPrompt);
         end
         
         function addForeignKey(self, target)
@@ -416,20 +416,19 @@ classdef (Sealed) Table < handle
             end
         end
         
-        function syncDef(self)
+        function syncDef(self, doPrompt)
             % dj.Table/syncDef replace the table declaration in the file
             % <package>.<className>.m with the actual definition from the database.
             %
             % This method is useful if the table definition has been
             % changed by other means than the regular datajoint definition
             % process.
-            
+            doPrompt = nargin<2 || doPrompt;
             path = which(self.className);
             if isempty(path)
                 fprintf('File %s.m is not found\n', self.className);
             else
-                s = input(sprintf('Update table declaration in %s? yes/no > ',path), 's');
-                if ~strcmpi(s,'yes')
+                if doPrompt && ~strcmpi('yes', input(sprintf('Update table declaration in %s? yes/no > ',path), 's'))
                     disp 'No? Table declaration left unpdated.'
                 else
                     % read old file
@@ -750,17 +749,18 @@ classdef (Sealed) Table < handle
             end
         end
         
-        function alter(self, alterStatement)
+        function alter(self, alterStatement, doPrompt)
             % dj.Table/alter
             % alter(self, alterStatement)
             % Executes an ALTER TABLE statement for this table.
             % The schema is reloaded and syncDef is called.
+            doPrompt = nargin<3 || doPrompt;
             sql = sprintf('ALTER TABLE  %s %s', ...
                 self.fullTableName, alterStatement);
             self.schema.conn.query(sql);
             disp 'table updated'
             self.schema.reload
-            self.syncDef
+            self.syncDef(doPrompt)
         end
         
         function indexInfo = getDatabaseIndexes(self)
