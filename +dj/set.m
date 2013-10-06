@@ -1,0 +1,35 @@
+function out = set(name, value)
+% dj.set  - display, get, or set a DataJoint setting
+%
+% USAGE:
+%    dj.set  - view current settings
+%    v = dj.set('settingName')  - get the value of a setting
+%    dj.set('settingName', value) - set the value of a setting
+%    dj.set('restore') - restore defaults
+
+persistent STATE
+if isempty(STATE) || (nargin>=1 && strcmpi(name,'restore'))
+    STATE = struct(...
+        'promptBeforeDelete', true, ...
+        'promptBeforeDrop', true, ...
+        'promptBeforeSyncMfile', true, ...
+        'reconnectTimedoutTransaction', true, ...
+        'populateCheck', true ...
+        );
+end
+if ~nargin && ~nargout
+    disp(STATE)
+end
+if nargout
+    out = STATE;
+end
+if nargin
+    dj.assert(ischar(name), 'Parameter name must be a string')
+    dj.assert(isfield(STATE,name), 'Parameter name does not exist')
+end
+if nargin==1
+    out = STATE.(name);
+end
+if nargin==2
+    STATE.(name) = value;
+end

@@ -45,12 +45,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         function names = get.primaryKey(self)
-            if isempty(self.header)
-                warning('DataJoint:emptyPrimaryKey', 'empty primary key?')
-                names = {};
-            else
-                names = {self.header([self.header.iskey]).name};
-            end
+            dj.assert(~isempty(self.header),'emptyPrimaryKey:empty primary key.')
+            names = {self.header([self.header.iskey]).name};
         end
         
         function names = get.nonKeyFields(self)
@@ -132,7 +128,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 columns = {self.header.name};
                 sel = 1:length(columns);
                 if any([self.header.isBlob])
-                    warning('DataJoint:viewblobs', 'excluding blobs from the view');
+                    dj.assert(false, '!viewblobs:excluding blobs from the view')
                     columns = columns(~[self.header.isBlob]);
                 end
                 
@@ -252,25 +248,14 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % validate input
             [~, args] = makeLimitClause(varargin{:});
             args = args(cellfun(@ischar, args)); % attribute specifiers
-            if nargout~=length(args) && (nargout~=0 || length(args)~=1), ...
-                    throwAsCaller(MException('DataJoint:invalidOperator', ...
-                    'The number of fetch1() outputs must match the number of requested attributes'))
-            end
-            if isempty(args)
-                throwAsCaller(MException('DataJoint:invalidOperator',...
-                    'insufficient inputs'))
-            end
-            if any(strcmp(args,'*'))
-                throwAsCaller(MException('DataJoint:invalidOpeator', ...
-                    '"*" is not allwed in fetch1()'))
-            end
             
-            s = self.fetch(varargin{:});
+            dj.assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
+                'The number of fetch1() outputs must match the number of requested attributes')
+            dj.assert(~isempty(args), 'insufficient inputs')
+            dj.assert(~any(strcmp(args,'*'), '"*" is not allwed in fetch1()'))
             
-            if ~isscalar(s)
-                throwAsCaller(MException('DataJoint:invalidOperator', ...
-                    'fetch1 can only retrieve a single existing tuple.'))
-            end
+            s = self.fetch(varargin{:});            
+            dj.assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
             
             % copy into output arguments
             varargout = cell(length(args));
@@ -298,18 +283,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [limit, args] = makeLimitClause(varargin{:});
             specs = args(cellfun(@ischar, args)); % attribute specifiers
             returnKey = nargout==length(specs)+1;
-            if ~returnKey && nargout~=length(specs) && (nargout~=0 || length(specs)~=1), ...
-                    throwAsCaller(MException('DataJoint:invalidOperator', ...
-                    'The number of fetchn() outputs must match the number of requested attributes'))
-            end
-            if isempty(specs)
-                throwAsCaller(MException('DataJoint:invalidOperator',...
-                    'insufficient inputs'))
-            end
-            if any(strcmp(specs,'*'))
-                throwAsCaller(MException('DataJoint:invalidOpeator', ...
-                    '"*" is not allwed in fetchn()'))
-            end
+            dj.assert(returnKey || (nargout==length(specs) || (nargout==0 && length(specs)==1)), ...
+                'The number of fetchn() outputs must match the number of requested attributes')
+            dj.assert(~isempty(specs),'insufficient inputs')
+            dj.assert(~any(strcmp(specs,'*')), '"*" is not allwed in fetchn()')
             
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
@@ -609,10 +586,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                         sql, sql2, pkeyAttrs(2:end));
                     header = projectHeader(header, self.operands(3:end));
                     
-                    if all(arrayfun(@(x) isempty(x.alias), header))
-                        throw(MException('DataJoint:invalidRelation', ...
-                            'Aggregate opeators must define at least one computation'))
-                    end
+                    dj.assert(~all(arrayfun(@(x) isempty(x.alias), header)),...
+                        'Aggregate opeators must define at least one computation')
                     
                 case 'join'
                     [header1, sql] = compile(self.operands{1},2);
@@ -627,7 +602,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     clear header1 header2 sql2
                     
                 otherwise
-                    error 'unknown relational operator'
+                    dj.assert(false, 'unknown relational operator')
             end
             
             haveAliasedAttrs = ~all(arrayfun(@(x) isempty(x.alias), header));
@@ -669,7 +644,7 @@ else
     aliasCount = aliasCount + 1;
 end
 
-assert(all(arrayfun(@(x) isempty(x.alias), selfAttrs)), ...
+dj.assert(all(arrayfun(@(x) isempty(x.alias), selfAttrs)), ...
     'aliases must be resolved before restriction')
 
 clause = '';
@@ -681,7 +656,7 @@ for arg = restrictions
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
             % union
             s = cellfun(@(x) makeWhereClause(selfAttrs, {x}), cond.operands, 'UniformOutput', false);
-            assert(~isempty(s));
+            dj.assert(~isempty(s));
             s = sprintf('(%s) OR ', s{:});
             clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
             
@@ -763,10 +738,8 @@ function cond = struct2cond(keys, header)
 % convert the structure array into an SQL condition
 n = length(keys);
 assert(n>=1)
-if n>512
-    warning('DataJoint:longCondition', ...
-        'consider replacing the long array of keys with a more succinct condition')
-end
+dj.assert(n<=512, ...
+    '!longCondition:consider replacing the long array of keys with a more succinct condition')
 cond = '';
 for key = keys(:)'
     cond = sprintf('%s OR (%s)', cond, makeCond(key));
@@ -778,14 +751,14 @@ cond = cond(min(end,5):end);  % strip " OR "
         for field = fieldnames(key)'
             value = key.(field{1});
             iField = find(strcmp(field{1}, {header.name}));
-            assert(~header(iField).isBlob,...
+            dj.assert(~header(iField).isBlob,...
                 'The key must not include blob header.');
             if header(iField).isString
-                assert(ischar(value), ...
+                dj.assert(ischar(value), ...
                     'Value for key.%s must be a string', field{1})
                 value = sprintf('''%s''', escapeString(value));
             else
-                assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
+                dj.assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                     'Value for key.%s must be a numeric scalar', field{1});
                 value=sprintf('%1.16g', value);
             end
@@ -830,11 +803,9 @@ for iAttr=1:length(params)
             '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
         if ~isempty(toks)
             ix = find(strcmp(toks{1}{1},{header.name}));
-            assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
-            if ismember(toks{1}{2},union({header.alias},{header.name}))
-                throw(MException('DataJoint:invalidOperator',  ...
-                    sprintf('Duplicate attribute alias `%s`',toks{1}{2})))
-            end
+            dj.assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
+            dj.assert(~ismember(toks{1}{2},union({header.alias},{header.name})),...
+                'Duplicate attribute alias `%s`',toks{1}{2})
             header(ix).name = toks{1}{2};
             header(ix).alias = toks{1}{1};
         else
@@ -859,10 +830,7 @@ for iAttr=1:length(params)
             else
                 % process a regular attribute
                 ix = find(strcmp(params{iAttr},{header.name}));
-                if isempty(ix)
-                    throw(MException('DataJoint:invalidOperator', ...
-                        sprintf('Attribute `%s` does not exist', params{iAttr})));
-                end
+                dj.asssert(~isempty(ix), 'Attribute `%s` does not exist', params{iAttr})
             end
         end
         include(ix)=true;

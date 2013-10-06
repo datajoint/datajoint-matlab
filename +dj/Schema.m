@@ -41,7 +41,7 @@ classdef Schema < handle
     
     methods
         function self = Schema(conn, package, dbname)
-            assert(isa(conn, 'dj.Connection'), ...
+            dj.assert(isa(conn, 'dj.Connection'), ...
                 'dj.Schema''s first input must be a dj.Connection')
             self.conn = conn;
             self.package = package;
@@ -152,11 +152,11 @@ classdef Schema < handle
             
             useGUI = usejava('desktop') || usejava('awt') || usejava('swing');
             className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
-            assert(~isempty(className), 'invalid class name')
+            dj.assert(~isempty(className), 'invalid class name')
             
             % get the path to the schema package
             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
-            assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
+            dj.assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
             
             % if the file already exists, let the user edit it and exit
             filename = fullfile(filename, [className '.m']);
@@ -197,7 +197,7 @@ classdef Schema < handle
             end
             
             f = fopen(filename,'wt');
-            assert(-1 ~= f, 'Could not open %s', filename)
+            dj.assert(-1 ~= f, 'Could not open %s', filename)
             
             % table declaration
             if numel(existingTable)
@@ -276,9 +276,7 @@ classdef Schema < handle
             else
                 % limit the diagram to the specified subset of tables
                 ix = find(~ismember(subset,self.classNames));
-                if ~isempty(ix)
-                    error('Unknown table %d', subset(ix(1)));
-                end
+                dj.assert(isempty(ix),'Unknown table %d', subset(ix(1)))
             end
             subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
             levels = levels(subset);
@@ -360,7 +358,7 @@ classdef Schema < handle
                 else
                     if exist(name,'class')
                         rel = feval(name);
-                        assert(isa(rel, 'dj.Relvar'))
+                        dj.assert(isa(rel, 'dj.Relvar'))
                         if rel.isSubtable
                             name = [name '*'];  %#ok:AGROW
                         end
@@ -383,7 +381,7 @@ classdef Schema < handle
                 'Interpreter', 'none', 'fontsize', 14,'FontWeight','bold', 'FontName', 'Ariel')
             
             function connectNodes(x, y, lineStyle)
-                assert(length(x)==2 && length(y)==2)
+                dj.assert(length(x)==2 && length(y)==2)
                 plot(x, y, 'k.')
                 t = 0:0.05:1;
                 x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
@@ -414,16 +412,14 @@ classdef Schema < handle
             if nargin<4
                 restrictor = {};
             end
-            assert(all(ismember(tiers, dj.Schema.allowedTiers)))
+            dj.assert(all(ismember(tiers, dj.Schema.allowedTiers)))
             backupDir = fullfile(backupDir, self.dbname);
             if ~exist(backupDir, 'dir')
-                assert(mkdir(backupDir), ...
-                    'Could not create directory %s', backupDir)
+                dj.assert(mkdir(backupDir), 'Could not create directory %s', backupDir)
             end
             backupDir = fullfile(backupDir, datestr(now,'yyyy-mm-dd'));
             if ~exist(backupDir,'dir')
-                assert(mkdir(backupDir), ...
-                    'Could not create directory %s', backupDir)
+                dj.assert(mkdir(backupDir), 'Could not create directory %s', backupDir)
             end
             ix = find(ismember({self.tables.tier}, tiers));
             % save in hiearchical order
@@ -455,7 +451,7 @@ classdef Schema < handle
                     objects{i} = eval(classes{i});
                     objects{i}.header;  % this will trigger the creation of a table if missing.
                 catch err
-                    warning('DataJoint:invalidClass', err.message)
+                    dj.assert(false,['!invalidClass:;' err.message])
                     continue
                 end
             end
@@ -478,7 +474,7 @@ classdef Schema < handle
                     fprintf('inserting %d tuples into %s\n', length(s.contents), classes{i})
                     objects{i}.insert(s.contents, 'INSERT IGNORE');
                 catch err
-                    warning('DataJoint:TableDeclarationMismatch', err.message)
+                    dj.assert(false,['!TableDeclarationMismatch:' err.message])
                 end
             end
         end
@@ -544,7 +540,7 @@ classdef Schema < handle
                 validFields = [self.header.isNumeric] | [self.header.isString] | [self.header.isBlob];
                 if ~all(validFields)
                     ix = find(~validFields, 1, 'first');
-                    error('unsupported field type "%s" in %s.%s', ...
+                    dj.assert(false,'unsupported field type "%s" in %s.%s', ...
                         self.header(ix).type, self.header.table(ix), self.header.name(ix));
                 end
                 fprintf('%.3g\n',toc)
@@ -666,9 +662,9 @@ classdef Schema < handle
             %   toCamelCase('One_Two_Three')  --> !error! upper case only mixes with alphanumericals
             %   toCamelCase('5_two_three')    --> !error! cannot start with a digit
             
-            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
-            assert(isempty(regexp(str, '[A-Z]', 'once')), ...
+            dj.assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
+            dj.assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
+            dj.assert(isempty(regexp(str, '[A-Z]', 'once')), ...
                 'underscore_compound_words must not contain uppercase characters')
             str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
         end
@@ -684,10 +680,10 @@ classdef Schema < handle
             %   fromCamelCase('one two three')  --> !error! white space is not allowed
             %   fromCamelCase('ABC')            --> 'a_b_c'
             
-            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
+            dj.assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
+            dj.assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
             
-            assert(~isempty(regexp(str, '^[a-zA-Z0-9]*$', 'once')), ...
+            dj.assert(~isempty(regexp(str, '^[a-zA-Z0-9]*$', 'once')), ...
                 'fromCamelCase string can only contain alphanumeric characters');
             str = regexprep(str, '([A-Z])', '_${lower($1)}');
             str = str(1+(str(1)=='_'):end);  % remove leading underscore
