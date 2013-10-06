@@ -28,7 +28,6 @@ classdef (Sealed) Table < handle
         header    % structure array describing header
         fullTableName  % `database`.`plain_table_name`
         plainTableName  % just the table name
-        level    % level in the hierarchy
     end
     
     properties(Constant)
@@ -64,9 +63,9 @@ classdef (Sealed) Table < handle
                     [schemaFunction ' must return an instance of dj.Schema'])
             end
             ret = self.schema;
-        end        
+        end
         
-                
+        
         function info = get.info(self)
             if ~self.exists   % table does not exist. Create it.
                 self.create
@@ -517,7 +516,6 @@ classdef (Sealed) Table < handle
             fprintf('%20s (%s,%5d tuples)\n', self.fullTableName, self.info.tier, n)
             doDrop = doDrop && ~n;   % drop without prompt if empty
             
-            level = 0;
             while ~isempty(new)
                 curr = new(1);
                 new(1) = [];

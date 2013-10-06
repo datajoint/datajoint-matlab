@@ -354,9 +354,11 @@ classdef AutoPopulate < handle
                     '%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))
                 if self.useReservations
                     abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
-                    dj.assert(isempty(abovePopRel), ...
-                        ['!Primary key attribute %s is above popRel''s primary key attributes. '...
-                        'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
+                    if ~isempty(abovePopRel)
+                        dj.assert(false, ...
+                            ['!Primary key attribute %s is above popRel''s primary key attributes. '...
+                            'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
+                    end
                 end
             end
         end
