@@ -252,7 +252,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             dj.assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
                 'The number of fetch1() outputs must match the number of requested attributes')
             dj.assert(~isempty(args), 'insufficient inputs')
-            dj.assert(~any(strcmp(args,'*'), '"*" is not allwed in fetch1()'))
+            dj.assert(~any(strcmp(args,'*')), '"*" is not allwed in fetch1()')
             
             s = self.fetch(varargin{:});            
             dj.assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
@@ -830,7 +830,7 @@ for iAttr=1:length(params)
             else
                 % process a regular attribute
                 ix = find(strcmp(params{iAttr},{header.name}));
-                dj.asssert(~isempty(ix), 'Attribute `%s` does not exist', params{iAttr})
+                dj.assert(~isempty(ix), 'Attribute `%s` does not exist', params{iAttr})
             end
         end
         include(ix)=true;

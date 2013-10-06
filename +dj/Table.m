@@ -28,6 +28,7 @@ classdef (Sealed) Table < handle
         header    % structure array describing header
         fullTableName  % `database`.`plain_table_name`
         plainTableName  % just the table name
+        level    % level in the hierarchy
     end
     
     properties(Constant)
@@ -63,9 +64,9 @@ classdef (Sealed) Table < handle
                     [schemaFunction ' must return an instance of dj.Schema'])
             end
             ret = self.schema;
-        end
+        end        
         
-        
+                
         function info = get.info(self)
             if ~self.exists   % table does not exist. Create it.
                 self.create
@@ -464,7 +465,7 @@ classdef (Sealed) Table < handle
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, {self.header.name});
-            dj.assert(any(x), 'Attribute "%s" not found', attr))
+            dj.assert(any(x), 'Attribute "%s" not found', attr)
             list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
             dj.assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
@@ -516,6 +517,7 @@ classdef (Sealed) Table < handle
             fprintf('%20s (%s,%5d tuples)\n', self.fullTableName, self.info.tier, n)
             doDrop = doDrop && ~n;   % drop without prompt if empty
             
+            level = 0;
             while ~isempty(new)
                 curr = new(1);
                 new(1) = [];

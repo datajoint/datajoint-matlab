@@ -276,7 +276,9 @@ classdef Schema < handle
             else
                 % limit the diagram to the specified subset of tables
                 ix = find(~ismember(subset,self.classNames));
-                dj.assert(isempty(ix),'Unknown table %d', subset(ix(1)))
+                if ~isempty(ix)
+                    dj.assert(false,'Unknown table %d', subset(ix(1)))
+                end
             end
             subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
             levels = levels(subset);
