@@ -9,11 +9,6 @@ classdef Connection < handle
         packageDict = containers.Map    % Map database names to package names
     end
     
-    properties
-        reconnectTransaction = true   % if true, reconnect to the server even within a transaction.
-        % set false to guarantee transaction automicity
-    end
-    
     properties(Access = private)
         password
     end
@@ -49,9 +44,9 @@ classdef Connection < handle
             % convert '$database_name.ClassName' to 'package.ClassName'
             % If strict, then throw an error if the database_name was not found.
             strict = nargin>=3 && strict;
-            if className(1)=='$'                    
+            if className(1)=='$'
                 [schemaName,className] = strtok(className,'.');
-
+                
                 if self.packageDict.isKey(schemaName(2:end))
                     schemaName = self.packageDict(schemaName(2:end));
                 elseif strict
@@ -78,12 +73,10 @@ classdef Connection < handle
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             if ~ret && self.inTransaction
-                if self.reconnectTransaction
-                    warning('DataJoint:TransactionReconnect', ...
-                        'reconnecting after server disconnected during a transaction')
+                if dj.set('reconnectTimeoutTransaction')
+                    dj.assert(false, '!disconnectedTransaction:Reconnected after server disconnected during a transaction')
                 else
-                    throwAsCaller(MException('DataJoint:TransactionReconnect', ...
-                        'server disconnected during a transaction'))
+                    dj.assert(false, 'disconnectedTransaction:Server disconnected during a transaction')
                 end
             end
         end

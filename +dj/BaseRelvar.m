@@ -109,7 +109,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                 end
                 
                 % confirm and delete
-                if ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
+                if ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
