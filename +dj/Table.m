@@ -540,7 +540,7 @@ classdef (Sealed) Table < handle
             end
             
             % if any table has data, give option to cancel
-            if ~doDrop && ~strcmpi('yes', input('Proceed to drop? yes/no >', 's'));
+            if ~doDrop && ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed to drop? yes/no >', 's'));
                 disp 'User cancelled table drop'
             else
                 try
