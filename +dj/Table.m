@@ -464,15 +464,9 @@ classdef (Sealed) Table < handle
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, {self.header.name});
-            if ~any(ix)
-                throw(MException('DataJoint:invalidAttributeName', ...
-                    'attribute "%s" not found', attr))
-            end
+            dj.assert(any(x), 'Attribute "%s" not found', attr))
             list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
-            if isempty(list)
-                throw(MException('DataJoint:invalidAttributeName', ...
-                    'attribute "%s" not of type ENUM', attr))
-            end
+            dj.assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
             list = {list.item};
         end
@@ -534,17 +528,14 @@ classdef (Sealed) Table < handle
                 names = [names children]; %#ok<AGROW>
                 for j=1:length(children)
                     child = sch.conn.getPackage(children{j});
-                    if child(1) == '$'  % ignore unloaded schemas
-                        throw(MException('DataJoint:dropTable', ...
-                            'cannot drop %s because its schema is not loaded', child))
-                    else
-                        table = dj.Table(child);
-                        n = count(init(dj.BaseRelvar, table));
-                        fprintf('%20s (%s,%5d tuples)\n', table.fullTableName, table.info.tier, n)
-                        tables(end+1) = table; %#ok<AGROW>
-                        new(end+1) = table; %#ok<AGROW>
-                        doDrop = doDrop && ~n;   % drop without prompt if empty
-                    end
+                    % ignore unloaded schemas
+                    dj.assert(child(1)~='$', 'Cannot drop %s because its schema is not loaded', child)
+                    table = dj.Table(child);
+                    n = count(init(dj.BaseRelvar, table));
+                    fprintf('%20s (%s,%5d tuples)\n', table.fullTableName, table.info.tier, n)
+                    tables(end+1) = table; %#ok<AGROW>
+                    new(end+1) = table; %#ok<AGROW>
+                    doDrop = doDrop && ~n;   % drop without prompt if empty
                 end
             end
             
@@ -626,11 +617,11 @@ classdef (Sealed) Table < handle
                 declaration = self.declaration;
             else
                 file = which(self.className);
-                assert(~isempty(file), 'DataJoint:MissingTableDefnition', ...
-                    'Could not find table definition file %s', file)
+                dj.assert(~isempty(file), ...
+                    'MissingTableDefinition:Could not find table definition file %s', file)
                 declaration = readPercentBraceComment(file);
-                assert(~isempty(declaration), 'DataJoint:MissingTableDefnition', ...
-                    'Could not find the table declaration in %s', file)
+                dj.assert(~isempty(declaration), ...
+                    'MissingTableDefnition:Could not find the table declaration in %s', file)
             end
         end
         
@@ -640,7 +631,7 @@ classdef (Sealed) Table < handle
             [tableInfo, parents, references, fieldDefs, indexDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
-            assert(strcmp(cname, self.className), ...
+            dj.assert(strcmp(cname, self.className), ...
                 'Table name %s does not match in file %s', cname, self.className)
             
             % compile the CREATE TABLE statement
@@ -658,7 +649,7 @@ classdef (Sealed) Table < handle
                     field = parents{iRef}.table.header(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        assert(~field.isnullable, 'primary key header cannot be nullable')
+                        dj.assert(~field.isnullable, 'primary key header cannot be nullable')
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
@@ -669,7 +660,7 @@ classdef (Sealed) Table < handle
                 for iField = find([fieldDefs.iskey])
                     field = fieldDefs(iField);
                     primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
-                    assert(~strcmpi(field.default,'NULL'), ...
+                    dj.assert(~strcmpi(field.default,'NULL'), ...
                         'primary key header cannot be nullable')
                     sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
@@ -696,7 +687,7 @@ classdef (Sealed) Table < handle
             end
             
             % add primary key declaration
-            assert(~isempty(primaryKeyFields), 'table must have a primary key')
+            dj.assert(~isempty(primaryKeyFields), 'table must have a primary key')
             str = sprintf(',`%s`', primaryKeyFields{:});
             sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
             
@@ -718,10 +709,10 @@ classdef (Sealed) Table < handle
             end
             
             for iIndex = 1:numel(indexDefs)
-                assert(all(ismember(indexDefs(iIndex).attributes, ...
+                dj.assert(all(ismember(indexDefs(iIndex).attributes, ...
                     [primaryKeyFields, nonKeyFields])), ...
                     'Index definition contains invalid attribute names');
-                assert(~any(cellfun( ...
+                dj.assert(~any(cellfun( ...
                     @(x) isequal(x, indexDefs(iIndex).attributes), ...
                     implicitIndexes)), ...
                     ['The specified set of attributes is implicitly ' ...
@@ -808,7 +799,7 @@ function str = readPercentBraceComment(filename)
 % reads the initial comment block %{ ... %} in filename
 
 f = fopen(filename, 'rt');
-assert(f~=-1, 'Could not open %s', filename)
+dj.assert(f~=-1, 'Could not open %s', filename)
 str = '';
 
 % skip all lines that do not begin with a %{
@@ -852,7 +843,7 @@ else
         default = sprintf('NOT NULL DEFAULT %s', default);
     end
 end
-assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
+dj.assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
     'illegal characters in attribute comment "%s"', field.comment)
 sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
     field.name, field.type, default, field.comment);
@@ -901,7 +892,7 @@ if nargout > 1
             case strncmp(line,'->',2)
                 % foreign key
                 p = feval(strtrim(line(3:end)));
-                assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
+                dj.assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
                 if inKey
                     parents{end+1} = p;     %#ok:<AGROW>
                 else
@@ -935,15 +926,13 @@ fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
     % try no default value
     fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line)
+    dj.assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line)
     fieldInfo.default = '<<<no default>>>';  % special value indicating no default
 end
-assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
-if ~isempty(regexp(fieldInfo.type,'^(tiny|small|medium|big)?int', 'once')) ...
-        && strcmp(fieldInfo.default,'null')
-    throw(MException('DataJoint:invalidDeclaration', ...
-        'Integer attributes cannot be nullable in "%s"', line))
-end
+dj.assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
+dj.assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
+    || ~strcmp(fieldInfo.default,'null'), ...
+    'invalidDeclaration:BIGINT attributes cannot be nullable in "%s"', line)
 fieldInfo.iskey = inKey;
 end
 
@@ -956,10 +945,10 @@ pat = [
     '\((?<attributes>[^\)]+)\)$'          % (attr1, attr2)
     ];
 indexInfo = regexpi(line, pat, 'names');
-assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
+dj.assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
     'Invalid index declaration "%s"', line)
 attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
 indexInfo.attributes = strtrim(attributes{1});
-assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
+dj.assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
     'Duplicate attributes in index declaration "%s"', line)
 end
