@@ -38,7 +38,7 @@ if ~ok
     
     
     if isWarning
-        warning(identifier,messages,varargin{:})
+        warning(identifier,message,varargin{:})
     else
         throwAsCaller(MException(identifier,message,varargin{:}))
     end

@@ -120,7 +120,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
         end
         
-        function h = view(self)
+        function view(self)
             % dj.Relvar/view - view the data in speadsheet form. Blobs are omitted.
             if ~self.exists
                 disp 'empty relation'
@@ -149,7 +149,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 data = fetch(self, columns{:});
                 hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
                     'MenuBar', 'none');
-                h = uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
+                uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
                     'ColumnName', columnName, 'ColumnEditable', false(1,length(columns)), ...
                     'ColumnFormat', format, 'Data', struct2cell(data)');
             end
@@ -254,7 +254,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             dj.assert(~isempty(args), 'insufficient inputs')
             dj.assert(~any(strcmp(args,'*')), '"*" is not allwed in fetch1()')
             
-            s = self.fetch(varargin{:});            
+            s = self.fetch(varargin{:});
             dj.assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
             
             % copy into output arguments
