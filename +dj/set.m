@@ -4,7 +4,7 @@ function out = set(name, value)
 % USAGE:
 %    dj.set  - view current settings
 %    v = dj.set('settingName')  - get the value of a setting
-%    dj.set('settingName', value) - set the value of a setting
+%    oldValue = dj.set('settingName', value) - set the value of a setting
 %    dj.set('restore') - restore defaults
 
 persistent STATE
@@ -29,5 +29,8 @@ if nargin==1
     out = STATE.(name);
 end
 if nargin==2
+    if nargout
+        out = STATE.(name);
+    end
     STATE.(name) = value;
 end
