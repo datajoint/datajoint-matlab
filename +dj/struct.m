@@ -129,7 +129,10 @@ classdef struct
                     tab = cat(length(sz), tab, nan(sz(1:end-1)));
                     sz(end)=sz(end)+1;
                 end
-                tab(ixx{:},j)=s(i).(numField);
+                value = s(i).(numField);
+                assert(isnumeric(value) && isscalar(value), ...
+                    'tabulated field must be scalar numeric')
+                tab(ixx{:},j)=value;
             end
             varargout = v';
         end
