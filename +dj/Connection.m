@@ -73,7 +73,7 @@ classdef Connection < handle
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             if ~ret && self.inTransaction
-                if dj.set('reconnectTimeoutTransaction')
+                if dj.set('reconnectTimedoutTransaction')
                     dj.assert(false, '!disconnectedTransaction:Reconnected after server disconnected during a transaction')
                 else
                     dj.assert(false, 'disconnectedTransaction:Server disconnected during a transaction')

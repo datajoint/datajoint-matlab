@@ -120,7 +120,7 @@ classdef struct
             sz = [cellfun(@length,v)' 1];
             tab = nan(sz);
             m = zeros(sz);
-            for i=1:length(s)
+            for i=1:numel(s)
                 ixx = cellfun(@(ix) ix(i), ix, 'uni', false);
                 j = m(ixx{:})+1;
                 m(ixx{:})=j;
