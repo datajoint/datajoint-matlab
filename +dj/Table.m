@@ -204,7 +204,7 @@ classdef (Sealed) Table < handle
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
                         % exclude primary key fields of referenced tables from header
-                        dependentFields = dependentFields(~ismember(keyFields, {t.header([t.header.iskey]).name}));
+                        dependentFields = dependentFields(~ismember(dependentFields, {t.header([t.header.iskey]).name}));
                     end
                 end
             end
