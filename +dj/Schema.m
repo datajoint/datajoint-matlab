@@ -202,8 +202,8 @@ classdef Schema < handle
             % table declaration
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.re);
-                parentIndices = getParents(dj.Table([self.package '.' className]));
-                parentIndices(end) = [];  % remove this table
+                tab = dj.Table([self.package '.' className]);
+                parents = tab.parents;
             else
                 fprintf(f, '%%{\n');
                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
@@ -211,7 +211,7 @@ classdef Schema < handle
                 fprintf(f, '-----\n');
                 fprintf(f, '# add additional attributes\n');
                 fprintf(f, '%%}');
-                parentIndices = [];
+                parents = [];
             end
             % class definition
             fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
@@ -224,13 +224,13 @@ classdef Schema < handle
             fprintf(f, '\t\ttable = dj.Table(''%s.%s'')\n', self.package, className);
             if isAuto && ~isSubtable
                 fprintf(f, '\t\tpopRel');
-                for i = 1:length(parentIndices)
+                for i = 1:length(parents)
                     if i>1
                         fprintf(f, '*');
                     else
                         fprintf(f, ' = ');
                     end
-                    fprintf(f, '%s', self.classNames{parentIndices(i)});
+                    fprintf(f, '%s', parents{i});
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
             end
