@@ -323,11 +323,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %    rel.restrict('session_date>2012-01-01', 'not', struct('anesthesia', 'urethane'))
             %    rel2.restrict(rel)    % all tuples in rel2 that at least on tuple in rel
             
-            args = varargin;
-            if length(args)==1 && iscell(args{1})
-                args = args{1};
+            for arg = varargin
+                if iscell(arg{1})
+                    self.restrict(arg{1}{:})
+                end
+                % unless duplicate, append restriction
+                if ~any(cellfun(@(x) isequal(arg{1},x), self.restrictions))
+                    self.restrictions = [self.restrictions arg{1}];
+                end
             end
-            self.restrictions = [self.restrictions args];
         end
         
         function ret = and(self, arg)

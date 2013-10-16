@@ -32,7 +32,6 @@ classdef BaseRelvar < dj.GeneralRelvar
             % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.
             % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
-            
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
         
@@ -68,45 +67,29 @@ classdef BaseRelvar < dj.GeneralRelvar
                     end
                 end
                 
-                % compile the list of relvars to be deleted
-                disp 'ABOUT TO DELETE:'
-                fprintf('%4d tuples from %s (%s)\n', ...
-                    self.count, self.tab.fullTableName, self.tab.info.tier)
+                % compile the list of relvars to be deleted from
+                list = self.tab.descendants;
+                rels = cellfun(@(name) init(dj.BaseRelvar, dj.Table(name)), list, 'UniformOutput', false);
+                rels = [rels{:}];
                 
-                names = {self.tab.className};
-                rels = {self};
-                new = struct('rel',self,'restrictByMe',~isempty(self.restrictions));
-                while ~isempty(new)
-                    curr = new(1);
-                    new(1) = [];
-                    sch = curr.rel.schema;
-                    ixCurr = strcmp(sch.classNames, curr.rel.tab.className);
-                    j = find(sch.dependencies(:,ixCurr));
-                    j = j(~ismember(sch.classNames(j),names));  % remove duplicates
-                    j = j(:)';
-                    primary = full(sch.dependencies(j,ixCurr))==1;
-                    children = sch.classNames(j);
-                    names = [names children]; %#ok<AGROW>
-                    for j=1:length(children)
-                        child = sch.conn.getPackage(children{j},false);
-                        if child(1) == '$'  % ignore unloaded schemas
-                            dj.assert('!Ignoring %s because its schema is not loaded.', child)
+                % apply proper restrictions
+                restrictByMe = arrayfun(@(rel) any(ismember(rel.tab.references, list)), rels);  % restrict by all association tables
+                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                for i=1:length(rels)
+                    for ix = cellfun(@(child) find(strcmp(child,list)), [rels(i).tab.children rels(i).tab.referencing])
+                        if restrictByMe(i)
+                            rels(ix).restrict(rels(i));
                         else
-                            if curr.restrictByMe
-                                rel = init(dj.BaseRelvar, dj.Table(child)) & curr.rel;
-                            else
-                                rel = init(dj.BaseRelvar, dj.Table(child)) & curr.rel.restrictions;
-                            end
-                            n = rel.count;
-                            if n
-                                fprintf('%4d tuples from %s (%s)\n', ...
-                                    n, rel.tab.fullTableName, rel.tab.info.tier)
-                                rels{end+1} = rel; %#ok<AGROW>
-                                new(end+1) = struct('rel', rel,'restrictByMe', ~primary(j)); %#ok<AGROW>
-                            end
+                            rels(ix).restrict(rels(i).restrictions{:});
                         end
                     end
                 end
+                
+                fprintf '\nABOUT TO DELETE:'
+                for rel=rels
+                    fprintf('\n%8d tuples from %s (%s)', rel.count, rel.tab.fullTableName, rel.tab.info.tier)
+                end
+                fprintf \n\n
                 
                 % confirm and delete
                 if ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
@@ -114,15 +97,12 @@ classdef BaseRelvar < dj.GeneralRelvar
                 else
                     self.schema.conn.startTransaction
                     try
-                        for iRel = length(rels):-1:1
-                            fprintf('Deleting from %s... ', rels{iRel}.tab.className)
-                            self.schema.conn.query(sprintf('DELETE FROM %s%s', ...
-                                rels{iRel}.tab.fullTableName, rels{iRel}.whereClause))
-                            fprintf '(not committed)\n'
+                        for rel = fliplr(rel)
+                            fprintf('Deleting from %s\n', rel.tab.className)
+                            rel.delQuick
                         end
-                        fprintf 'committing ...'
                         self.schema.conn.commitTransaction
-                        disp done
+                        disp committed
                     catch err
                         fprintf '\n ** delete rolled back due to to error\n'
                         self.schema.conn.cancelTransaction

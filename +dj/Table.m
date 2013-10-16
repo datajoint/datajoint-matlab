@@ -28,6 +28,12 @@ classdef (Sealed) Table < handle
         header    % structure array describing header
         fullTableName  % `database`.`plain_table_name`
         plainTableName  % just the table name
+        parents      % names of tables referenced by foregin keys composed exclusively of primary key attributes
+        references   % names of tables referenced by foreign keys composed of primary and non-primary attributes
+        children     % names of tables referencing this table with their primary key attributes
+        referencing  % names of tables referencing this table with their primary and non-primary attributes
+        
+        descendants  % names of all dependent tables, recursively, in order of dependencies
     end
     
     properties(Constant)
@@ -43,8 +49,10 @@ classdef (Sealed) Table < handle
         function self = Table(className, declaration)
             % obj = dj.Table('package.className')
             self.className = className;
-            dj.assert(ischar(self.className),  ...
+            dj.assert(ischar(self.className) && ~isempty(self.className),  ...
                 'dj.Table requres input ''package.ClassName''')
+            dj.assert(self.className(1)~='$', ...
+                'Please activate package for %s', self.className)
             dj.assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w+','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
@@ -57,7 +65,7 @@ classdef (Sealed) Table < handle
         function ret = get.schema(self)
             if isempty(self.schema)
                 schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
-                dj.assert(~isempty(which(schemaFunction)), ['Not found: ' schemaFunction])
+                dj.assert(~isempty(which(schemaFunction)), ['Could not find ' schemaFunction])
                 self.schema = feval(schemaFunction);
                 dj.assert(isa(self.schema, 'dj.Schema'), ...
                     [schemaFunction ' must return an instance of dj.Schema'])
@@ -67,9 +75,9 @@ classdef (Sealed) Table < handle
         
         
         function info = get.info(self)
-            if ~self.exists   % table does not exist. Create it.
+            if ~self.isCreated   % table does not exist. Create it.
                 self.create
-                dj.assert(self.exists, 'Table %s is not found', self.className)
+                dj.assert(self.isCreated, 'Table %s is not found', self.className)
             end
             info = self.schema.tables(strcmp(self.className, self.schema.classNames));
         end
@@ -89,6 +97,54 @@ classdef (Sealed) Table < handle
             % just the table name, no database and no backquotes
             name = self.info.name;
         end
+        
+        
+        function list = get.parents(self)
+            list = self.schema.classNames(self.schema.dependencies(strcmp(self.className, self.schema.classNames),:)==1);
+            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+        end
+        
+        
+        function list = get.references(self)
+            list = self.schema.classNames(self.schema.dependencies(strcmp(self.className, self.schema.classNames),:)==2);
+            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+        end
+        
+        
+        function list = get.children(self)
+            list = self.schema.classNames(self.schema.dependencies(:,strcmp(self.className, self.schema.classNames))==1);
+            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+        end
+        
+        
+        function list = get.referencing(self)
+            list = self.schema.classNames(self.schema.dependencies(:,strcmp(self.className, self.schema.classNames))==2);
+            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+        end
+        
+        
+        function list = get.descendants(self)
+            list = recurse(self,'');
+            levels = nan(length(list),1);      % level in dependency chain
+            newLevels = zeros(length(list),1);
+            while ~all(newLevels==levels)
+                levels = newLevels;
+                newLevels = [0; arrayfun(@(x) max(levels(strcmp({list.name},x.parent)))+1,list(2:end))];
+                dj.assert(max(newLevels)<5000,'Circular dependencies are prohibited')
+            end
+            
+            %eliminate duplicates and sort by dependency level
+            [list,ix] = unique({list.name});
+            [~,ix] = sort(levels(ix));
+            list = list(ix);
+            
+            function list = recurse(table,parent)
+                toAdd = cellfun(@(name) recurse(dj.Table(name),table.className), ...
+                    [table.children table.referencing], 'UniformOutput',false);
+                list = cat(1, struct('name', table.className, 'parent', parent), toAdd{:});
+            end
+        end
+        
         
         
         function display(self)
@@ -112,7 +168,7 @@ classdef (Sealed) Table < handle
             % that are connected to self.
             %
             % SYNTAX
-            %   table.erd([depth1[,depth2]])
+            %   table.erd([depth1,depth2]])
             %
             % depth1 and depth2 specify the connectivity radius upstream
             % (depth<0) and downstream (depth>0) of this table.
@@ -121,24 +177,39 @@ classdef (Sealed) Table < handle
             %
             % Examples:
             %   t = dj.Table('vis2p.Scans');
-            %   t.erd       % plot two levels above and below
-            %   t.erd( 2);  % plot dependents up to 2 levels below
-            %   t.erd(-1);  % plot only immediate ancestors
+            %   t.erd(-1,1)  % plot immediate ancestors and descendants
+            %   t.erd(-1,0)  % plot only immediate ancestors
+            %   t.erd(-2,2)  % plot two levels in each direction
+            %   t.erd    -- same as t.erd(-2,2)
             %
             % See also dj.Schema/erd
-            if ~self.exists
+            if ~self.isCreated
                 self.create
             end
-            switch nargin
-                case 1
-                    depth1 = -2;
-                    depth2 = +2;
-                case 2
-                    depth2 = max(0, depth1);
-                    depth1 = min(0, depth1);
+            if nargin<=1
+                depth1 = -2;
+                depth2 = +2;
             end
-            
-            self.schema.erd(self.getNeighbors(depth1, depth2))
+            dj.assert(depth1<=0 && depth2>=0);
+            subset = {self.className};
+            tabs = self;
+            for i=1:max(-depth1,depth2)
+                newTabs = {};
+                for tab = tabs
+                    new = [];
+                    if i<=-depth1
+                        new = [new tab.parents tab.references]; %#ok<AGROW>
+                    end
+                    if i<=depth2
+                        new = [new tab.children tab.referencing]; %#ok<AGROW>
+                    end
+                    subset = union(subset, new);
+                    new = new(cellfun(@(x) x(1)~='$',new)); % do not expand unloaded schemas
+                    newTabs = [newTabs cellfun(@(x) dj.Table(x), new, 'UniformOutput', false)]; %#ok<AGROW>
+                end
+                tabs = [newTabs{:}];
+            end
+            self.schema.erd(subset)
         end
         
         
@@ -174,7 +245,7 @@ classdef (Sealed) Table < handle
             
             if ~expandForeignKeys
                 % list parent references
-                [classNames,tables] = getSortedForeignKeys(self, self.schema.getParents(self.className, 1));
+                [classNames,tables] = self.sortForeignKeys(self.parents);
                 if ~isempty(classNames)
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
@@ -199,7 +270,7 @@ classdef (Sealed) Table < handle
             
             % list other references
             if ~expandForeignKeys
-                [classNames,tables] = getSortedForeignKeys(self, self.schema.getParents(self.className, 2));
+                [classNames,tables] = self.sortForeignKeys(self.references);
                 if ~isempty(classNames)
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
@@ -248,24 +319,6 @@ classdef (Sealed) Table < handle
             
             if ~expandForeignKeys
                 str = sprintf('%s%%}\n', str);
-            end
-            
-            
-            function [classNames,tables] = getSortedForeignKeys(self, classNames)
-                % sort referenced tables so that they reproduce the correct
-                % order of primary key attributes
-                tables = cellfun(@(x) dj.Table(self.schema.conn.getPackage(x,true)), classNames,'uni',false);
-                tables = [tables{:}];
-                if isempty(tables)
-                    classNames = {};
-                else
-                    fkFields = arrayfun(@(x) {x.header([x.header.iskey]).name}, tables,'uni',false);
-                    fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.header.name})), s), fkFields, 'uni', false);
-                    m = max(cellfun(@max, fkOrder));
-                    [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
-                    tables = tables(fkOrder);
-                    classNames ={tables.className};
-                end
             end
         end
         
@@ -486,128 +539,60 @@ classdef (Sealed) Table < handle
             %
             % See also dj.Table, dj.BaseRelvar/del
             
-            if ~self.exists
+            if ~self.isCreated
                 disp 'Nothing to drop'
-                return
-            end
-            
-            self.schema.conn.cancelTransaction   % exit ongoing transaction
-            % warn user if self is a subtable
-            if ismember(self.info.tier, {'imported','computed'}) && ...
-                    ~isempty(which(self.className))
-                rel = eval(self.className);
-                if ~isa(rel,'dj.AutoPopulate')
-                    fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
-                        'drop its parent table instead.\n'], self.className)
-                    if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
-                        fprintf '\ndrop cancelled\n\n'
-                        return
-                    end
-                end
-            end
-            
-            % compile the list of dropped tables
-            doDrop = true;
-            fprintf 'ABOUT TO DROP TABLES: \n'
-            names = {self.className};
-            tables = self;
-            new = self;
-            n = count(init(dj.BaseRelvar, self));
-            fprintf('%20s (%s,%5d tuples)\n', self.fullTableName, self.info.tier, n)
-            doDrop = doDrop && ~n;   % drop without prompt if empty
-            
-            while ~isempty(new)
-                curr = new(1);
-                new(1) = [];
-                sch = curr.schema;
-                ixCurr = strcmp(sch.classNames, curr.className);
-                j = find(sch.dependencies(:,ixCurr));
-                j = j(~ismember(sch.classNames(j),names));  % remove duplicates
-                j = j(:)';
-                children = sch.classNames(j);
-                names = [names children]; %#ok<AGROW>
-                for j=1:length(children)
-                    child = sch.conn.getPackage(children{j});
-                    % ignore unloaded schemas
-                    dj.assert(child(1)~='$', 'Cannot drop %s because its schema is not loaded', child)
-                    table = dj.Table(child);
-                    n = count(init(dj.BaseRelvar, table));
-                    fprintf('%20s (%s,%5d tuples)\n', table.fullTableName, table.info.tier, n)
-                    tables(end+1) = table; %#ok<AGROW>
-                    new(end+1) = table; %#ok<AGROW>
-                    doDrop = doDrop && ~n;   % drop without prompt if empty
-                end
-            end
-            
-            % if any table has data, give option to cancel
-            if ~doDrop && ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed to drop? yes/no >', 's'));
-                disp 'User cancelled table drop'
             else
-                try
-                    for table = tables(end:-1:1)
-                        self.schema.conn.query(sprintf('DROP TABLE %s', table.fullTableName))
-                        fprintf('Dropped table %s\n', table.fullTableName)
+                doPrompt = false;  % don't prompt if tables are empty
+                self.schema.conn.cancelTransaction   % exit ongoing transaction
+                % warn user if self is a subtable
+                if ismember(self.info.tier, {'imported','computed'}) && ...
+                        ~isempty(which(self.className))
+                    rel = eval(self.className);
+                    if ~isa(rel,'dj.AutoPopulate') && ~dj.set('suppressPrompt')
+                        fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
+                            'drop its parent table instead.\n'], self.className)
+                        if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
+                            fprintf '\ndrop cancelled\n\n'
+                            return
+                        end
                     end
-                catch err
-                    self.schema.conn.reload
-                    rethrow(err)
                 end
-                % reload all schemas
-                self.schema.conn.reload
+                fprintf 'ABOUT TO DROP TABLES: \n'
+                tables = cellfun(@(x) dj.Table(x), self.descendants, 'UniformOutput', false);
+                tables = [tables{:}];
+                for table = tables
+                    n = count(init(dj.BaseRelvar,table));
+                    fprintf('%20s (%s,%5d tuples)\n', table.fullTableName, table.info.tier, n)
+                    doPrompt = doPrompt || n;   % prompt if not empty
+                end
+                
+                % if any table has data, give option to cancel
+                doPrompt = doPrompt && ~dj.set('suppressPrompt');  % suppress prompt
+                if doPrompt && ~strcmpi('yes', input('Proceed to drop? yes/no >', 's'));
+                    disp 'User cancelled table drop'
+                else
+                    try
+                        for table = tables(end:-1:1)
+                            self.schema.conn.query(sprintf('DROP TABLE %s', table.fullTableName))
+                            fprintf('Dropped table %s\n', table.fullTableName)
+                        end
+                    catch err
+                        self.schema.conn.reload
+                        rethrow(err)
+                    end
+                    % reload all schemas
+                    self.schema.conn.reload
+                end
+                fprintf \n
             end
-            fprintf \n
         end
     end
     
     methods(Access=private)
         
-        function yes = exists(self)
+        function yes = isCreated(self)
             yes = any(strcmp(self.className, self.schema.classNames));
         end
-        
-        
-        function neighbors = getNeighbors(self, depth1, depth2, crossSchemas)
-            % dj.Table/getNeighbors -- get the class names of tables that are
-            % directly related to the given table.
-            %
-            % depth1 and depth2 specify the connectivity radius upstream
-            % (depth<0) and downstream (depth>0) of this table.
-            % Omitting both depths defaults to (-2,2).
-            % Omitting any one of the depths sets it to zero.
-            %
-            % If crossSchemas is set to true, the search cascades into other schemas.
-            %
-            % Examples:
-            %   table.getNeighbors(-1,0)     % get table's parents
-            %   table.getNeighbors(0,1)      % get table's children
-            %   table.getNeighbors(-2,2)     % two levels up and down
-            
-            crossSchemas = nargin>=4 && crossSchemas;
-            
-            % find tables on which self depends
-            neighbors = {self.className};
-            nodes = {self.className};
-            for j=1:-depth1
-                nodes = unique(self.schema.getParents(nodes,[1 2],crossSchemas));
-                if isempty(nodes)
-                    break
-                end
-                neighbors(ismember(neighbors,nodes))=[];
-                neighbors = [nodes neighbors];  %#ok:<AGROW>
-            end
-            
-            % find tables dependent on self
-            nodes = {self.className};
-            for j=1:depth2
-                nodes = unique(self.schema.getChildren(nodes,[1 2],crossSchemas));
-                if isempty(nodes)
-                    break;
-                end
-                neighbors(ismember(neighbors,nodes))=[];
-                neighbors = [neighbors nodes];  %#ok:<AGROW>
-            end
-        end
-        
         
         
         function declaration = getDeclaration(self)
@@ -729,7 +714,7 @@ classdef (Sealed) Table < handle
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s$"', sql(1:end-2), tableInfo.comment);
             
             self.schema.reload   % again, ensure that the table does not already exist
-            if ~self.exists
+            if ~self.isCreated
                 % execute declaration
                 fprintf \n<SQL>\n
                 disp(sql)
@@ -775,16 +760,36 @@ classdef (Sealed) Table < handle
             end
         end
         
+        
         function indexInfo = getImplicitIndexes(self)
             % dj.Table/getImplicitIndexes
             % Returns database indexes that are implied by
             % table relationships and should not be shown to the user
             % or modified by the user
             indexInfo = struct('attributes', {}, 'unique', {});
-            for refClassName = self.schema.getParents(self.className)
+            for refClassName = [self.references self.parents]
                 refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
                 indexInfo(end+1).attributes = ...
                     {refObj.header([refObj.header.iskey]).name};  %#ok<AGROW>
+            end
+        end
+        
+        
+        
+        function [classNames,tables] = sortForeignKeys(self, classNames)
+            % sort referenced tables so that they reproduce the correct
+            % order of primary key attributes
+            tables = cellfun(@(x) dj.Table(self.schema.conn.getPackage(x,true)), classNames,'uni',false);
+            tables = [tables{:}];
+            if isempty(tables)
+                classNames = {};
+            else
+                fkFields = arrayfun(@(x) {x.header([x.header.iskey]).name}, tables,'uni',false);
+                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.header.name})), s), fkFields, 'uni', false);
+                m = max(cellfun(@max, fkOrder));
+                [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
+                tables = tables(fkOrder);
+                classNames ={tables.className};
             end
         end
     end

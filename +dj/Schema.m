@@ -202,7 +202,7 @@ classdef Schema < handle
             % table declaration
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.re);
-                parentIndices = self.getParents([self.package '.' className]);
+                parentIndices = getParents(dj.Table([self.package '.' className]));
                 parentIndices(end) = [];  % remove this table
             else
                 fprintf(f, '%%{\n');
@@ -550,63 +550,6 @@ classdef Schema < handle
         end
         
         
-        function names = getParents(self, className, hierarchy, crossSchemas)
-            % retrieve the class names of the parents of given table classes
-            if nargin<3
-                hierarchy = [1 2];
-            end
-            crossSchemas = nargin>=4 && crossSchemas;
-            names = self.getRelatives(className, true, hierarchy, crossSchemas);
-        end
-        
-        
-        function names = getChildren(self, className, hierarchy, crossSchemas)
-            % retrieve the class names of the parents of given table classes
-            if nargin<3
-                hierarchy = [1 2];
-            end
-            crossSchemas = nargin>=4 && crossSchemas;
-            names = self.getRelatives(className, false, hierarchy, crossSchemas);
-        end
-        
-        
-        function names = getRelatives(self, className, up, hierarchy, crossSchemas)
-            % gets the list of parent tables (up=true) or children tables (up=false)
-            names = {};
-            if ~isempty(className)
-                if ischar(className)
-                    if crossSchemas || className(1)~='$'
-                        className = self.conn.getPackage(className);
-                        pack = strtok(className,'.');
-                        if ~strcmp(pack, self.package) && crossSchemas
-                            % parents from other packages
-                            otherSchema = eval([pack '.getSchema']);
-                            names = [names ...
-                                otherSchema.getRelatives(className, up, hierarchy, crossSchemas)];
-                        else
-                            ix = strcmp(self.classNames, className);
-                            if any(ix)
-                                if up
-                                    names = self.classNames(ismember(self.dependencies(ix,:),hierarchy));
-                                else
-                                    names = self.classNames(ismember(self.dependencies(:,ix),hierarchy));
-                                end
-                            end
-                        end
-                    end
-                elseif iscellstr(className)
-                    for i=1:length(className)
-                        newNames = self.getRelatives(className{i}, up, hierarchy, crossSchemas);
-                        if up
-                            names = [newNames names];    %#ok:AGROW
-                        else
-                            names = [names newNames];    %#ok:AGROW
-                        end
-                    end
-                end
-            end
-        end
-        
         
         function display(self)
             for i=1:numel(self)
@@ -645,7 +588,7 @@ classdef Schema < handle
             if ix
                 db = [db '/' tab(1:ix(1)-1)];
                 tab = tab(ix(1)+1:end);
-            end            
+            end
             str = self.conn.getPackage(['$' db '.' dj.Schema.toCamelCase(tab)]);
         end
     end
