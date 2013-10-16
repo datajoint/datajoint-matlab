@@ -97,7 +97,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                 else
                     self.schema.conn.startTransaction
                     try
-                        for rel = fliplr(rel)
+                        for rel = fliplr(rels)
                             fprintf('Deleting from %s\n', rel.tab.className)
                             rel.delQuick
                         end
