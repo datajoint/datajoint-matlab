@@ -933,7 +933,7 @@ fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
     % try no default value
     fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    dj.assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line)
+    dj.assert(~isempty(fieldInfo), 'invalid field declaration line "%s"', line)
     fieldInfo.default = '<<<no default>>>';  % special value indicating no default
 end
 dj.assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
