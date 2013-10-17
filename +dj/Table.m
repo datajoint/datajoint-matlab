@@ -907,7 +907,9 @@ if nargout > 1
                 % parse index definition
                 indexInfo = parseIndexDef(line);
                 indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
-            case regexp(line, '^[a-z][a-z\d_]*\s*(=\s*\S+\s*)?:\s*\w[^#]*\S\s*#.*$')
+            case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
+                    '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
+                    ':\s*\w[^#]*\S\s*#.*$'])                  % type, comment
                 fieldInfo = parseAttrDef(line, inKey);
                 fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
             otherwise
