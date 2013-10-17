@@ -881,10 +881,10 @@ pat = {
     '#\s*(?<comment>\S.*\S)$'                 % # comment
     };
 tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-assert(numel(tableInfo)==1, ...
-    'incorrect syntax is table declaration, line 1')
-assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-    ['Invalid tier for table ' tableInfo.className])
+dj.assert(numel(tableInfo)==1, ...
+    'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+dj.assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+    'invalidTableTier:Invalid tier for table ', tableInfo.className)
 
 if nargout > 1
     % parse field declarations and references
