@@ -10,7 +10,7 @@ classdef struct
             % >> s = structSort(s, 'c');
             % >> s = structSort(s, {'b','a'})
             
-            assert(isstruct(s) && ndims(s)==2 && size(s,2)==1, ...
+            assert(isstruct(s) && ismatrix(s) && size(s,2)==1, ...
                 'first input must be a column array of structures.')
             if ischar(fieldNames)
                 fieldNames = {fieldNames};
@@ -68,22 +68,21 @@ classdef struct
             % DJ.STRUCT.FROMFIELDS - construct a structure array from a
             % scalar structure whose fields contain same-sized arrays of values.
             
-            lst = {};
-            for fname = fieldnames(s)'
-                lst{end+1} = fname{1};  %#ok<AGROW>
-                v = s.(fname{1});
+            fnames = fieldnames(s)';
+            lst = cell(1,length(fnames)*2);
+            for i = 1:length(fnames)
+                lst{i*2-1} = fnames{i};
+                v = s.(fnames{i});
                 if isempty(v)
-                    lst{end+1}={};   %#ok<AGROW>
+                    lst{i*2}={};
                 else
                     if isnumeric(v) || islogical(v)
-                        lst{end+1} = num2cell(s.(fname{1}));  %#ok<AGROW>
+                        lst{i*2} = num2cell(s.(fnames{i}));
                     else
-                        lst{end+1} = s.(fname{1});  %#ok<AGROW>
+                        lst{i*2} = s.(fnames{i});
                     end
                 end
             end
-            
-            % convert into struct array
             s = struct(lst{:});
         end
         
