@@ -133,8 +133,13 @@ classdef (Sealed) Table < handle
                 dj.assert(max(newLevels)<5000,'Circular dependencies are prohibited')
             end
             
-            %eliminate duplicates and sort by dependency level
-            [list,ix] = unique({list.name});
+            % Eliminate duplicates by picking the entry with the highest
+            % dependency level and then sort by dependency level.
+            % We sort, pick and sort again. One could rely on a specific
+            % behavior of unique but that changed from 2011/2012 to 2013.
+            [levels,ix] = sort(levels);
+            [list,~,il] = unique({list(ix).name});
+            ix = arrayfun(@(x) find(il==x, 1, 'last'), 1:numel(list));
             [~,ix] = sort(levels(ix));
             list = list(ix);
             
@@ -144,7 +149,6 @@ classdef (Sealed) Table < handle
                 list = cat(1, struct('name', table.className, 'parent', parent), toAdd{:});
             end
         end
-        
         
         
         function display(self)
@@ -747,7 +751,7 @@ classdef (Sealed) Table < handle
                 self.schema.conn.query(sprintf(...
                 ['SHOW INDEX FROM `%s` IN `%s` ' ...
                 'WHERE NOT `Key_name`="PRIMARY"'], ...
-                self.plainTableName, self.schema.dbname)));
+                self.plainTableName, self.schema.dbname), 'bigint_to_double'));
             [indexNames, ~, indexId] = unique({indexes.Key_name});
             for iIndex=1:numel(indexNames)
                 % Get attribute names and sort by position in index
