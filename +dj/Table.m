@@ -151,6 +151,7 @@ classdef (Sealed) Table < handle
         end
         
         
+
         function display(self)
             fprintf \n
             for i=1:numel(self)
@@ -751,7 +752,7 @@ classdef (Sealed) Table < handle
                 self.schema.conn.query(sprintf(...
                 ['SHOW INDEX FROM `%s` IN `%s` ' ...
                 'WHERE NOT `Key_name`="PRIMARY"'], ...
-                self.plainTableName, self.schema.dbname), 'bigint_to_double'));
+                self.plainTableName, self.schema.dbname)));
             [indexNames, ~, indexId] = unique({indexes.Key_name});
             for iIndex=1:numel(indexNames)
                 % Get attribute names and sort by position in index
