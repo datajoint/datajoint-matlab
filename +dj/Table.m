@@ -517,7 +517,7 @@ classdef (Sealed) Table < handle
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, {self.header.name});
-            dj.assert(any(x), 'Attribute "%s" not found', attr)
+            dj.assert(any(ix), 'Attribute "%s" not found', attr)
             list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
             dj.assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
