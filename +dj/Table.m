@@ -33,7 +33,7 @@ classdef (Sealed) Table < handle
         children     % names of tables referencing this table with their primary key attributes
         referencing  % names of tables referencing this table with their primary and non-primary attributes
         
-        descendants  % names of all dependent tables, recursively, in order of dependencies
+        descendants  % names of all dependent tables, including self, recursively, in order of dependencies
     end
     
     properties(Constant)
@@ -141,7 +141,7 @@ classdef (Sealed) Table < handle
         end
         
         
-        
+
         function display(self)
             fprintf \n
             for i=1:numel(self)
@@ -513,7 +513,7 @@ classdef (Sealed) Table < handle
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, {self.header.name});
-            dj.assert(any(x), 'Attribute "%s" not found', attr)
+            dj.assert(any(ix), 'Attribute "%s" not found', attr)
             list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
             dj.assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
@@ -877,10 +877,10 @@ pat = {
     '#\s*(?<comment>\S.*\S)$'                 % # comment
     };
 tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-assert(numel(tableInfo)==1, ...
-    'incorrect syntax is table declaration, line 1')
-assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-    ['Invalid tier for table ' tableInfo.className])
+dj.assert(numel(tableInfo)==1, ...
+    'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+dj.assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+    'invalidTableTier:Invalid tier for table ', tableInfo.className)
 
 if nargout > 1
     % parse field declarations and references
@@ -903,7 +903,9 @@ if nargout > 1
                 % parse index definition
                 indexInfo = parseIndexDef(line);
                 indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
-            case regexp(line, '^[a-z][a-z\d_]*\s*(=\s*\S+\s*)?:\s*\w[^#]*\S\s*#.*$')
+            case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
+                    '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
+                    ':\s*\w[^#]*\S\s*#.*$'])                  % type, comment
                 fieldInfo = parseAttrDef(line, inKey);
                 fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
             otherwise
@@ -927,7 +929,7 @@ fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
     % try no default value
     fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    dj.assert(~isempty(fieldInfo), 'invalid field declaration line: %s', line)
+    dj.assert(~isempty(fieldInfo), 'invalid field declaration line "%s"', line)
     fieldInfo.default = '<<<no default>>>';  % special value indicating no default
 end
 dj.assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
