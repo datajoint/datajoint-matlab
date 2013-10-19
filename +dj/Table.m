@@ -295,8 +295,7 @@ classdef (Sealed) Table < handle
             str = sprintf('%s\n', str);
             
             % list user-defined secondary indexes
-            %allIndexes = self.getDatabaseIndexes;
-            allIndexes = {};   % Temporary fix until mym is fixed.
+            allIndexes = self.getDatabaseIndexes;
             implicitIndexes = self.getImplicitIndexes;
             for thisIndex=allIndexes
                 % Skip implicit indexes
