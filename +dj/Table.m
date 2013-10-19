@@ -53,7 +53,7 @@ classdef (Sealed) Table < handle
                 'dj.Table requres input ''package.ClassName''')
             dj.assert(self.className(1)~='$', ...
                 'Please activate package for %s', self.className)
-            dj.assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w+','once')), ...
+            dj.assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w*','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
             if nargin>=2
@@ -124,24 +124,19 @@ classdef (Sealed) Table < handle
         
         
         function list = get.descendants(self)
-            list = recurse(self,'');
-            levels = nan(length(list),1);      % level in dependency chain
-            newLevels = zeros(length(list),1);
-            while ~all(newLevels==levels)
-                levels = newLevels;
-                newLevels = [0; arrayfun(@(x) max(levels(strcmp({list.name},x.parent)))+1,list(2:end))];
-                dj.assert(max(newLevels)<5000,'Circular dependencies are prohibited')
-            end
+            map = containers.Map('KeyType','char','ValueType','uint16');
+            recurse(self,0);
+            levels = map.values;
+            [~,order] = sort([levels{:}]);
+            list = map.keys;
+            list = list(order);
             
-            %eliminate duplicates and sort by dependency level
-            [list,ix] = unique({list.name});
-            [~,ix] = sort(levels(ix));
-            list = list(ix);
-            
-            function list = recurse(table,parent)
-                toAdd = cellfun(@(name) recurse(dj.Table(name),table.className), ...
-                    [table.children table.referencing], 'UniformOutput',false);
-                list = cat(1, struct('name', table.className, 'parent', parent), toAdd{:});
+            function recurse(table,level)
+                if ~map.isKey(table.className) || level>map(table.className)
+                    cellfun(@(name) recurse(dj.Table(name),level+1), ...
+                        [table.children table.referencing]);
+                    map(table.className)=level;
+                end
             end
         end
         
@@ -300,7 +295,8 @@ classdef (Sealed) Table < handle
             str = sprintf('%s\n', str);
             
             % list user-defined secondary indexes
-            allIndexes = self.getDatabaseIndexes;
+            %allIndexes = self.getDatabaseIndexes;
+            allIndexes = {};   % Temporary fix until mym is fixed.
             implicitIndexes = self.getImplicitIndexes;
             for thisIndex=allIndexes
                 % Skip implicit indexes
