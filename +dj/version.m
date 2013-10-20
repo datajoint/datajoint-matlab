@@ -1,10 +1,10 @@
 function varargout = version
 % report DataJoint version
 
-v = sprintf('DataJoint version 2.5.1');
-if ~nargout
-    fprintf('\n%s\n\n',v)
-else
+v = struct('major',2,'minor',6,'bugfix',9);
+
+if nargout
     varargout{1}=v;
-end
+else
+    fprintf('\nDataJoint version %d.%d.%d\n\n', v.major, v.minor, v.bugfix)
 end
