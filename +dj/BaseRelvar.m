@@ -164,9 +164,6 @@ classdef BaseRelvar < dj.GeneralRelvar
                     elseif header(i).isBlob
                         queryStr = sprintf('%s`%s`="{M}",', ...
                             queryStr,header(i).name);
-                        if islogical(v) % mym doesn't accept logicals - save as uint8 instead
-                            v = uint8(v);
-                        end
                         blobs{end+1} = v;    %#ok<AGROW>
                     else
                         if islogical(v)  % mym doesn't accept logicals - save as unit8 instead
