@@ -125,7 +125,7 @@ classdef (Sealed) Table < handle
         
         function list = get.descendants(self)
             map = containers.Map('KeyType','char','ValueType','uint16');
-            recurse(self,0);
+            recurse(self,0)
             levels = map.values;
             [~,order] = sort([levels{:}]);
             list = map.keys;
@@ -134,14 +134,14 @@ classdef (Sealed) Table < handle
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
                     cellfun(@(name) recurse(dj.Table(name),level+1), ...
-                        [table.children table.referencing]);
+                        [table.children table.referencing])
                     map(table.className)=level;
                 end
             end
         end
         
         
-
+        
         function display(self)
             fprintf \n
             for i=1:numel(self)
@@ -742,7 +742,7 @@ classdef (Sealed) Table < handle
                 self.schema.conn.query(sprintf(...
                 ['SHOW INDEX FROM `%s` IN `%s` ' ...
                 'WHERE NOT `Key_name`="PRIMARY"'], ...
-                self.plainTableName, self.schema.dbname)));
+                self.plainTableName, self.schema.dbname),'bigint_to_double'));
             [indexNames, ~, indexId] = unique({indexes.Key_name});
             for iIndex=1:numel(indexNames)
                 % Get attribute names and sort by position in index
