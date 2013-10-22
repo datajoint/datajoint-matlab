@@ -344,9 +344,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %   tp.Scans & struct('mouse_id',3, 'scannum', 4);
             %   tp.Scans & 'lens=10'
             %   tp.Mice & (tp.Scans & 'lens=10')
-            if ~iscell(arg)
-                arg = {arg};
-            end
             ret = self.copy;
             ret.restrict(arg)
         end
@@ -404,7 +401,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     'Antijoin only accepts single restrictions'))
             end
             ret = self.copy;
-            ret.restrictions = [ret.restrictions {'not' arg}];
+            ret.restrict('not', arg)
         end
         
         function ret = pro(self, varargin)
