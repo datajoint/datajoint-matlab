@@ -326,10 +326,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             for arg = varargin
                 if iscell(arg{1})
                     self.restrict(arg{1}{:})
-                end
-                % unless duplicate, append restriction
-                if ~any(cellfun(@(x) isequal(arg{1},x), self.restrictions))
-                    self.restrictions = [self.restrictions arg{1}];
+                else
+                    self.restrictions = [self.restrictions arg(1)];
                 end
             end
         end
@@ -350,7 +348,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 arg = {arg};
             end
             ret = self.copy;
-            ret.restrictions = [ret.restrictions arg];
+            ret.restrict(arg)
         end
         
         function ret = or(self, arg)
