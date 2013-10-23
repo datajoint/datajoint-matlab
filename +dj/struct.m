@@ -125,7 +125,7 @@ classdef struct
                 m(ixx{:})=j;
                 if j>sz(end)
                     % extend the additional dimension
-                    tab = cat(length(sz), tab, nan(sz(1:end-1)));
+                    tab = cat(length(sz), tab, nan([sz(1:end-1) 1]));
                     sz(end)=sz(end)+1;
                 end
                 value = s(i).(numField);

@@ -137,5 +137,10 @@ classdef Connection < handle
             self.inTransaction = false;
         end
         
+        
+        function delete(self)
+            self.close
+        end
+        
     end
 end
