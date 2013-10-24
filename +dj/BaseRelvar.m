@@ -71,6 +71,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                 list = self.tab.descendants;
                 rels = cellfun(@(name) init(dj.BaseRelvar, dj.Table(name)), list, 'UniformOutput', false);
                 rels = [rels{:}];
+                rels(1) = rels(1) & self.restrictions;
                 
                 % apply proper restrictions
                 restrictByMe = arrayfun(@(rel) any(ismember(rel.tab.references, list)), rels);  % restrict by all association tables
