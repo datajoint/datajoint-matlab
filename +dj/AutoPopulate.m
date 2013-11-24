@@ -28,7 +28,7 @@
 
 classdef AutoPopulate < handle
     
-    properties(Constant,Abstract)
+    properties(Abstract)
         popRel     % specify the relation providing tuples for which makeTuples is called.
     end
     
@@ -347,7 +347,7 @@ classdef AutoPopulate < handle
             % and batch_populate
             if dj.set('populateCheck')
                 dj.assert(isempty(self.restrictions), ...
-                    'Cannot populate a restricted relation. Correct syntax: populate(rel, restriction)')
+                    'Cannot populate a restricted relation. Correct syntax -- populate(rel, restriction)')
                 dj.assert(isa(self.popRel, 'dj.GeneralRelvar'), ...
                     'property popRel must be a subclass of dj.GeneralRelvar')
                 dj.assert(all(ismember(self.popRel.primaryKey, self.primaryKey)), ...

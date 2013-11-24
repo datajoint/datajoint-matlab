@@ -6,27 +6,23 @@
 
 classdef BaseRelvar < dj.GeneralRelvar
     
-    properties(Dependent,Access=private)
-        tab     % associated table
+    properties(Dependent, Access=private)
+        tab  % the table that belongs to this BaseRelvar
     end
     
     methods
-        function self = init(self, table)
-            switch true
-                case isa(table, 'dj.Table')
-                    init@dj.GeneralRelvar(self, 'table', {table});
-                case isa(table, 'dj.BaseRelvar')
-                    init@dj.GeneralRelvar(self, 'table', {table.tab}, table.restrictions);
-                otherwise
-                    dj.assert(false, 'BaseRelvar requires a dj.Table object')
+        function self = BaseRelvar(table)
+            if isa(self, 'dj.Table')
+                assert(~nargin)
+                table = self;
             end
+            assert(isa(table,'dj.Table'))
+            self.init('table',{table});
         end
         
-        
-        function info = get.tab(self)
-            info = self.operands{1};
+        function tab = get.tab(self)
+            tab = self.operands{1};
         end
-        
         
         function delQuick(self)
             % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.

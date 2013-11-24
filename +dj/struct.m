@@ -87,6 +87,17 @@ classdef struct
         end
         
         
+        function s = rename(s, varargin)
+            % dj.struct.rename - rename fields
+            % SYNTAX:
+            %    s = dj.struct.rename(s,oldName1,newName1,...,oldNameN,newNameN)
+            for i=1:2:length(varargin)
+                [s.(varargin{i+1})] = deal(s.(varargin{i}));
+                s = rmfield(s,varargin{i});
+            end
+        end
+        
+        
         function [tab,varargout] = tabulate(s,numField,varargin)
             % dj.struct.tablulate - convert structure array into a multidimensional array
             %

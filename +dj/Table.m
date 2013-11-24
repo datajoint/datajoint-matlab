@@ -16,38 +16,54 @@
 % The syntax of the table definition can be found at
 % http://code.google.com/p/datajoint/wiki/TableDeclarationSyntax
 
-classdef (Sealed) Table < handle
+classdef Table < handle
     
-    properties(SetAccess = private)
-        schema   % handle to a schema object
+    properties(SetAccess = protected)
         className    % the name of the corresponding base dj.Relvar class
     end
     
-    properties(Dependent, SetAccess = private)
-        info     % name, tier, comment.  See dj.Schema
-        header    % structure array describing header
-        fullTableName  % `database`.`plain_table_name`
+    properties(SetAccess = private)
+        schema          % handle to a schema object
         plainTableName  % just the table name
-        parents      % names of tables referenced by foregin keys composed exclusively of primary key attributes
-        references   % names of tables referenced by foreign keys composed of primary and non-primary attributes
-        children     % names of tables referencing this table with their primary key attributes
-        referencing  % names of tables referencing this table with their primary and non-primary attributes
-        
-        descendants  % names of all dependent tables, including self, recursively, in order of dependencies
     end
     
-    properties(Constant)
+    properties(Dependent, SetAccess = private)
+        fullTableName  % `database`.`plain_table_name`
+        tableHeader    % attribute information
+        parents        % names of tables referenced by foregin keys composed exclusively of primary key attributes
+        references     % names of tables referenced by foreign keys composed of primary and non-primary attributes
+        children       % names of tables referencing this table with their primary key attributes
+        referencing    % names of tables referencing this table with their primary and non-primary attributes
+        descendants    % names of all dependent tables, including self, recursively, in order of dependencies
+    end
+    
+    properties(Constant,Access=private)
         mysql_constants = {'CURRENT_TIMESTAMP'}
     end
     
     properties(Access=private)
-        declaration
-    end
-    
+        declaration     % table declaration
+    end    
     
     methods
-        function self = Table(className, declaration)
-            % obj = dj.Table('package.className')
+        function self = Table(className)
+            if nargin>=1
+                self.className = className;
+            end
+        end
+        
+        
+        function name = get.className(self)
+            name = self.className;
+            if isempty(name)
+                name = class(self);
+                assert(isa(self,'dj.Relvar') && ~strcmp(name,'dj.Relvar'))   %#ok<STISA>
+                self.className = name;
+            end
+        end
+        
+        
+        function set.className(self, className)
             self.className = className;
             dj.assert(ischar(self.className) && ~isempty(self.className),  ...
                 'dj.Table requres input ''package.ClassName''')
@@ -56,14 +72,17 @@ classdef (Sealed) Table < handle
             dj.assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w*','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
-            if nargin>=2
-                self.declaration = declaration;
-            end
+        end
+        
+        
+        function hdrObj = get.tableHeader(self)
+            hdrObj = self.schema.headers(self.plainTableName);
         end
         
         
         function ret = get.schema(self)
             if isempty(self.schema)
+                dj.assert(~isempty(self.className), 'className not set')
                 schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
                 dj.assert(~isempty(which(schemaFunction)), ['Could not find ' schemaFunction])
                 self.schema = feval(schemaFunction);
@@ -74,28 +93,17 @@ classdef (Sealed) Table < handle
         end
         
         
-        function info = get.info(self)
-            if ~self.isCreated   % table does not exist. Create it.
-                self.create
-                dj.assert(self.isCreated, 'Table %s is not found', self.className)
-            end
-            info = self.schema.tables(strcmp(self.className, self.schema.classNames));
-        end
-        
-        
-        function header = get.header(self)
-            header = self.schema.header(strcmp(self.info.name, {self.schema.header.table}));
-        end
-        
-        
         function name = get.fullTableName(self)
-            name = sprintf('`%s`.`%s`', self.schema.dbname, self.info.name);
+            name = sprintf('`%s`.`%s`', self.schema.dbname, self.plainTableName);
         end
         
         
         function name = get.plainTableName(self)
-            % just the table name, no database and no backquotes
-            name = self.info.name;
+            if isempty(self.plainTableName)
+                self.create
+                self.plainTableName = self.schema.tableNames(self.className);
+            end
+            name = self.plainTableName;
         end
         
         
@@ -142,7 +150,7 @@ classdef (Sealed) Table < handle
         
         
         
-        function display(self)
+        function showTable(self)
             fprintf \n
             for i=1:numel(self)
                 fprintf('DataJoint table\n\n')
@@ -156,6 +164,7 @@ classdef (Sealed) Table < handle
             fprintf('\n<a href="matlab:disp(%s.table.re)">Display declaration</a>. <a href="matlab:%s.table.erd">Plot ERD</a>\n\n',...
                 self.className, self.className)
         end
+        
         
         
         function erd(self, depth1, depth2)
@@ -178,9 +187,7 @@ classdef (Sealed) Table < handle
             %   t.erd    -- same as t.erd(-2,2)
             %
             % See also dj.Schema/erd
-            if ~self.isCreated
-                self.create
-            end
+            self.create
             if nargin<=1
                 depth1 = -2;
                 depth2 = +2;
@@ -586,7 +593,7 @@ classdef (Sealed) Table < handle
     methods(Access=private)
         
         function yes = isCreated(self)
-            yes = any(strcmp(self.className, self.schema.classNames));
+            yes = self.schema.tableNames.isKey(self.className);
         end
         
         
@@ -608,6 +615,9 @@ classdef (Sealed) Table < handle
         
         
         function create(self)
+            if self.isCreated
+                return
+            end
             [tableInfo, parents, references, fieldDefs, indexDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);

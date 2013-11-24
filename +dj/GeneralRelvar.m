@@ -4,12 +4,11 @@
 
 classdef GeneralRelvar < matlab.mixin.Copyable
     
-    properties(Dependent, SetAccess = private)
-        schema       % schema object
-        header       % attributes and their properties
+    properties(Dependent, SetAccess=private)
         sql          % sql expression
         primaryKey   % primary key attribute names
         nonKeyFields % non-key attribute names
+        header       % attributes and their properties
     end
     
     properties(SetAccess=private, GetAccess=public)
@@ -17,6 +16,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
     end
     
     properties(SetAccess=private, GetAccess=protected)
+        conn              % connection object
         operator          % node type: table, join, or pro
         operands = {}     % list of operands
     end
@@ -32,6 +32,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
+        function conn = get.conn(self)
+            if isempty(self.conn)
+                self.conn = self.getConn;
+            end
+            conn = self.conn;
+        end
+        
         function header = get.header(self)
             header = self.compile;
         end
@@ -40,21 +47,12 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [~, s] = self.compile;
         end
         
-        function schema = get.schema(self)
-            schema = self.getSchema;
-        end
-        
         function names = get.primaryKey(self)
-            dj.assert(~isempty(self.header),'emptyPrimaryKey:empty primary key.')
-            names = {self.header([self.header.iskey]).name};
+            names = self.header.primaryKey;
         end
         
         function names = get.nonKeyFields(self)
-            if isempty(self.header)
-                names = {};
-            else
-                names = {self.header(~[self.header.iskey]).name};
-            end
+            names = self.header.dependentFields;
         end
         
         function clause = whereClause(self)
@@ -85,17 +83,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if self.exists
                 % print header
                 header = self.header;
-                ix = find( ~[header.isBlob] );  % header to display
-                fprintf('  %16.16s', header(ix).name)
+                ix = find( ~[header.attributes.isBlob] );  % header to display
+                fprintf('  %16.16s', header.attributes(ix).name)
                 fprintf \n
                 maxRows = 12;
-                tuples = self.fetch(header(ix).name, sprintf('LIMIT %d', maxRows+1));
+                tuples = self.fetch(header.attributes(ix).name, sprintf('LIMIT %d', maxRows+1));
                 nTuples = max(self.count, length(tuples));
                 
                 % print rows
                 for s = tuples(1:min(end,maxRows))'
                     for iField = ix
-                        v = s.(header(iField).name);
+                        v = s.(header.attributes(iField).name);
                         if isnumeric(v)
                             if ismember(class(v),{'double','single'})
                                 fprintf('  %16g',v)
@@ -125,7 +123,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if ~self.exists
                 disp 'empty relation'
             else
-                columns = {self.header.name};
+                columns = {self.header.attributes.name};
                 sel = 1:length(columns);
                 if any([self.header.isBlob])
                     dj.assert(false, '!viewblobs:excluding blobs from the view')
@@ -175,14 +173,14 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/exists - a fast check whether the relvar
             % contains any tuples
             [~, sql] = self.compile(3);
-            yes = self.schema.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql));
+            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql));
             yes = logical(yes.yes);
         end
         
         function n = count(self)
             % dj.GeneralRelvar/count - the number of tuples in the relation.
             [~, sql] = self.compile(3);
-            n = self.schema.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
+            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
             n = double(n.n);
         end
         
@@ -225,8 +223,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [limit, args] = makeLimitClause(varargin{:});
             self = self.pro(args{:});
             [header, sql] = self.compile;
-            ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s', ...
-                makeAttrList(header), sql, limit));
+            ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
+                header.sql, sql, limit));
             ret = dj.struct.fromFields(ret);
         end
         
@@ -291,8 +289,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
             [header, sql] = self.compile;
-            ret = self.schema.conn.query(sprintf('SELECT %s FROM %s%s%s',...
-                makeAttrList(header), sql, limit));
+            ret = self.conn.query(sprintf('SELECT %s FROM %s%s%s',...
+                header.sql, sql, limit));
             
             % copy into output arguments
             varargout = cell(length(specs));
@@ -515,13 +513,12 @@ classdef GeneralRelvar < matlab.mixin.Copyable
     %%%%%%%%%%%%%%% PRIVATE HELPER FUNCTIONS %%%%%%%%%%%%%%%%%%%%%
     methods(Access = private)
         
-        function schema = getSchema(self)
-            % get reference to the schema from the first base relvar
-            op = self.operands{1};
+        function conn = getConn(self)
+            % get reference to the connection object from the first table
             if strcmp(self.operator, 'table')
-                schema = op.schema;
+                conn = self.operands{1}.schema.conn;
             else
-                schema = op.getSchema;
+                conn = self.operands{1}.getConn;
             end
         end
         
@@ -561,58 +558,42 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                         'The NOT operator must be used in a restriction'))
                     
                 case 'table'  % terminal node
-                    r = self.operands{1};
-                    header = r.header;
-                    sql = r.fullTableName;
+                    tab = self.operands{1};
+                    header = derive(tab.tableHeader);
+                    sql = tab.fullTableName;
                     
                 case 'pro'
                     [header, sql] = compile(self.operands{1},1);
-                    header = projectHeader(header, self.operands(2:end));
+                    header.project(self.operands(2:end));
                     
                 case 'aggregate'
                     [header, sql] = compile(self.operands{1},2);
                     [header2, sql2] = compile(self.operands{2},2);
-                    commonIllegal = intersect(...
-                        {header([header.isBlob]).name}, ...
-                        {header2([header2.isBlob]).name});
-                    if ~isempty(commonIllegal)
-                        throwAsCaller(MException('DataJoint:invalidOperator', ...
-                            'join cannot be done on blob attributes'))
-                    end
-                    pkeyAttrs = sprintf(',`%s`', header([header.iskey]).name);
-                    sql = sprintf(...
-                        '%s NATURAL JOIN %s GROUP BY %s', ...
-                        sql, sql2, pkeyAttrs(2:end));
-                    header = projectHeader(header, self.operands(3:end));
-                    
-                    dj.assert(~all(arrayfun(@(x) isempty(x.alias), header)),...
+                    commonBlobs = intersect(header.blobNames, header2.blobNames);
+                    assert(isempty(commonBlobs), 'join cannot be done on blob attributes')
+                    pkey = sprintf(',`%s`', header.primaryKey{:});
+                    sql = sprintf('%s NATURAL JOIN %s GROUP BY %s', sql, sql2, pkey(2:end));
+                    header.project(self.operands(3:end));
+                    assert(~all(arrayfun(@(x) isempty(x.alias), header)),...
                         'Aggregate opeators must define at least one computation')
                     
                 case 'join'
-                    [header1, sql] = compile(self.operands{1},2);
+                    [header1, sql1] = compile(self.operands{1},2);
                     [header2, sql2] = compile(self.operands{2},2);
-                    sql = sprintf('%s NATURAL JOIN %s', sql, sql2);
-                    % merge primary key attributes
-                    header = header1([header1.iskey]);
-                    header = [header; header2([header2.iskey] & ~ismember({header2.name}, {header.name}))];
-                    % merge dependent fields
-                    header = [header; header1(~ismember({header1.name}, {header.name}))];
-                    header = [header; header2(~ismember({header2.name}, {header.name}))];
-                    clear header1 header2 sql2
+                    sql = sprintf('%s NATURAL JOIN %s', sql1, sql2);
+                    header = join(header1,header2);
+                    clear header1 header2 sql1 sql2
                     
                 otherwise
-                    dj.assert(false, 'unknown relational operator')
+                    error 'unknown relational operator'
             end
-            
-            haveAliasedAttrs = ~all(arrayfun(@(x) isempty(x.alias), header));
-            
+                       
             % apply restrictions
             if ~isempty(self.restrictions)
                 % clear aliases and enclose
-                if haveAliasedAttrs
-                    [attrStr, header] = makeAttrList(header);
-                    sql = sprintf('(SELECT %s FROM %s) as `$s%x`', attrStr, sql, aliasCount);
-                    haveAliasedAttrs = false;
+                if header.hasAliases
+                    sql = sprintf('(SELECT %s FROM %s) as `$s%x`', header.sql, sql, aliasCount);
+                    header.stripAliases;
                 end
                 % add WHERE clause
                 sql = sprintf('%s%s', sql);
@@ -623,18 +604,18 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
             
             % enclose in parentheses if necessary
-            if enclose==1 && haveAliasedAttrs ...
+            if enclose==1 && header.hasAliases ...
                     || enclose==2 && (~ismember(self.operator, {'table', 'join'}) || ~isempty(self.restrictions)) ...
                     || enclose==3 && strcmp(self.operator, 'aggregate')
-                [attrStr, header] = makeAttrList(header);
-                sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', attrStr, sql, aliasCount);
+                sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', header.sql, sql, aliasCount);
+                header.stripAliases;
             end
         end
     end
 end
 
 
-function clause = makeWhereClause(selfAttrs, restrictions)
+function clause = makeWhereClause(header, restrictions)
 % make the where clause from self.restrictions
 persistent aliasCount
 if isempty(aliasCount)
@@ -643,7 +624,7 @@ else
     aliasCount = aliasCount + 1;
 end
 
-dj.assert(all(arrayfun(@(x) isempty(x.alias), selfAttrs)), ...
+dj.assert(all(arrayfun(@(x) isempty(x.alias), header.attributes)), ...
     'aliases must be resolved before restriction')
 
 clause = '';
@@ -654,14 +635,14 @@ for arg = restrictions
     switch true
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
             % union
-            s = cellfun(@(x) makeWhereClause(selfAttrs, {x}), cond.operands, 'UniformOutput', false);
+            s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'UniformOutput', false);
             dj.assert(~isempty(s));
             s = sprintf('(%s) OR ', s{:});
             clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
             
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'not')
             clause = sprintf('%s AND NOT(%s)', clause, ...
-                makeWhereClause(selfAttrs, cond.operands));
+                makeWhereClause(header, cond.operands));
             
         case ischar(cond) && strcmpi(cond,'NOT')
             % negation of the next condition
@@ -674,7 +655,7 @@ for arg = restrictions
             
         case isstruct(cond)
             % restriction by a
-            cond = dj.struct.pro(cond, selfAttrs.name); % project onto common attributes
+            cond = dj.struct.pro(cond, header.names{:}); % project onto common attributes
             if isempty(fieldnames(cond))
                 % restrictor has no common attributes:
                 %    semijoin leaves relation unchanged.
@@ -685,7 +666,7 @@ for arg = restrictions
             else
                 if ~isempty(cond)
                     % normal restricton
-                    clause = sprintf('%s AND %s(%s)', clause, not, struct2cond(cond, selfAttrs));
+                    clause = sprintf('%s AND %s(%s)', clause, not, struct2cond(cond, header));
                 else
                     if isempty(cond)
                         % restrictor has common attributes but is empty:
@@ -700,18 +681,16 @@ for arg = restrictions
             
         case isa(cond, 'dj.GeneralRelvar')
             % semijoin or antijoin
-            [condAttrs, condSQL] = cond.compile;
+            [condHeader, condSQL] = cond.compile;
             
             % isolate previous projection (if not already)
             if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions)
-                [attrStr, condAttrs] = makeAttrList(condAttrs);
-                condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', attrStr, condSQL, aliasCount);
+                condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', ...
+                    condHeader.sql, condSQL, aliasCount);
             end
             
             % common attributes for matching. Blobs are not included
-            commonAttrs = intersect(...
-                {selfAttrs(~[selfAttrs.isBlob]).name}, ...
-                {condAttrs(~[condAttrs.isBlob]).name});
+            commonAttrs = intersect(header.notBlobs, condHeader.notBlobs);
             if isempty(commonAttrs)
                 % no common attributes. Semijoin = original relation, antijoin = empty relation
                 if ~isempty(not)
@@ -749,20 +728,18 @@ cond = cond(min(end,5):end);  % strip " OR "
         subcond = '';
         for field = fieldnames(key)'
             value = key.(field{1});
-            iField = find(strcmp(field{1}, {header.name}));
-            dj.assert(~header(iField).isBlob,...
-                'The key must not include blob header.');
-            if header(iField).isString
-                dj.assert(ischar(value), ...
+            attr = header.byName(field{1});
+            assert(~attr.isBlob, 'The key must not include blob header.')
+            if attr.isString
+                assert(ischar(value), ...
                     'Value for key.%s must be a string', field{1})
                 value = sprintf('''%s''', escapeString(value));
             else
-                dj.assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
+                assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                     'Value for key.%s must be a numeric scalar', field{1});
                 value=sprintf('%1.16g', value);
             end
-            subcond = sprintf('%s AND `%s`=%s', ...
-                subcond, header(iField).name, value);
+            subcond = sprintf('%s AND `%s`=%s', subcond, field{1}, value);
         end
         subcond = subcond(min(6,end):end);  % strip " AND "
     end
@@ -787,74 +764,6 @@ if nargin
 end
 end
 
-
-function header = projectHeader(header, params)
-% This is a helper function for dj.Revlar.pro.
-% Update the header based on a list of attributes
-
-include = [header.iskey];  % always include the primary key
-for iAttr=1:length(params)
-    if strcmp('*',params{iAttr})
-        include = include | true;   % include all attributes
-    else
-        % process a renamed attribute
-        toks = regexp(params{iAttr}, ...
-            '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
-        if ~isempty(toks)
-            ix = find(strcmp(toks{1}{1},{header.name}));
-            dj.assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
-            dj.assert(~ismember(toks{1}{2},union({header.alias},{header.name})),...
-                'Duplicate attribute alias `%s`',toks{1}{2})
-            header(ix).name = toks{1}{2};
-            header(ix).alias = toks{1}{1};
-        else
-            % process a computed attribute
-            toks = regexp(params{iAttr}, ...
-                '(.*\S)\s*->\s*(\w+)', 'tokens');
-            if ~isempty(toks)
-                %add computed attribute
-                ix = length(header)+1;
-                header(ix) = struct(...
-                    'table','', ...
-                    'name', toks{1}{2}, ...
-                    'iskey', false, ...
-                    'type','<sql_computed>',...
-                    'isnullable', false,...
-                    'comment','server-side computation', ...
-                    'default', [], ...
-                    'isNumeric', true, ...  % only numeric computations allowed for now, deal with character string expressions somehow
-                    'isString', false, ...
-                    'isBlob', false, ...
-                    'alias', toks{1}{1});
-            else
-                % process a regular attribute
-                ix = find(strcmp(params{iAttr},{header.name}));
-                dj.assert(~isempty(ix), 'Attribute `%s` does not exist', params{iAttr})
-            end
-        end
-        include(ix)=true;
-    end
-end
-header = header(include);
-end
-
-
-function [str, header] = makeAttrList(header)
-% make an SQL list of attributes for header, expanding aliases and strip
-% aliases from header
-str = '';
-if ~isempty(header)
-    for i = 1:length(header)
-        if isempty(header(i).alias)
-            str = sprintf('%s,`%s`', str, header(i).name);
-        else
-            str = sprintf('%s,(%s) AS `%s`', str, header(i).alias, header(i).name);
-            header(i).alias = '';
-        end
-    end
-    str = str(2:end);
-end
-end
 
 
 function str = escapeString(str)
