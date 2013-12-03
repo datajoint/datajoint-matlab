@@ -453,7 +453,7 @@ classdef Schema < handle
                     objects{i} = eval(classes{i});
                     objects{i}.header;  % this will trigger the creation of a table if missing.
                 catch err
-                    dj.assert(false,['!invalidClass:;' err.message])
+                    dj.assert(false,['!invalidClass:' err.message])
                     continue
                 end
             end
