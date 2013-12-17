@@ -61,7 +61,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                         && ~isa(self, 'dj.AutoPopulate')
                     fprintf(['!!! %s is a subtable. For referential integrity, ' ...
                         'delete from its parent instead.\n'], class(self))
-                    if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
+                    if ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
                         disp 'delete cancelled'
                         return
                     end
