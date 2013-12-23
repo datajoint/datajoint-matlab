@@ -277,7 +277,7 @@ classdef Schema < handle
                 % limit the diagram to the specified subset of tables
                 ix = find(~ismember(subset,self.classNames));
                 if ~isempty(ix)
-                    dj.assert(false,'Unknown table %d', subset(ix(1)))
+                    dj.assert(false,'Unknown table %s', subset{ix(1)})
                 end
             end
             subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
