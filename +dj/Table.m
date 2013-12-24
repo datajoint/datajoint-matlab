@@ -25,11 +25,12 @@ classdef Table < handle
     properties(SetAccess = private)
         schema          % handle to a schema object
         plainTableName  % just the table name
+        tableHeader     % attribute information
     end
     
     properties(Dependent, SetAccess = private)
+        info           % table information
         fullTableName  % `database`.`plain_table_name`
-        tableHeader    % attribute information
         parents        % names of tables referenced by foregin keys composed exclusively of primary key attributes
         references     % names of tables referenced by foreign keys composed of primary and non-primary attributes
         children       % names of tables referencing this table with their primary key attributes
@@ -43,7 +44,8 @@ classdef Table < handle
     
     properties(Access=private)
         declaration     % table declaration
-    end    
+    end
+    
     
     methods
         function self = Table(className)
@@ -75,8 +77,16 @@ classdef Table < handle
         end
         
         
+        function info = get.info(self)
+            info = self.schema.headers(self.plainTableName).info;
+        end
+        
+        
         function hdrObj = get.tableHeader(self)
-            hdrObj = self.schema.headers(self.plainTableName);
+            if isempty(self.tableHeader)
+                self.tableHeader = self.schema.headers(self.plainTableName);
+            end
+            hdrObj = self.tableHeader;
         end
         
         
@@ -108,26 +118,42 @@ classdef Table < handle
         
         
         function list = get.parents(self)
-            list = self.schema.classNames(self.schema.dependencies(strcmp(self.className, self.schema.classNames),:)==1);
-            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+            self.schema.reload(false)
+            if self.schema.conn.parents.isKey(self.fullTableName)
+                list = self.schema.conn.parents(self.fullTableName);
+            else
+                list = {};
+            end
         end
         
         
         function list = get.references(self)
-            list = self.schema.classNames(self.schema.dependencies(strcmp(self.className, self.schema.classNames),:)==2);
-            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+            self.schema.reload(false)
+            if self.schema.conn.references.isKey(self.fullTableName)
+                list = self.schema.conn.references(self.fullTableName);
+            else
+                list = {};
+            end
         end
         
         
         function list = get.children(self)
-            list = self.schema.classNames(self.schema.dependencies(:,strcmp(self.className, self.schema.classNames))==1);
-            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+            self.schema.reload(false)
+            if self.schema.conn.children.isKey(self.fullTableName)
+                list = self.schema.conn.children(self.fullTableName);
+            else
+                list = {};
+            end
         end
         
         
         function list = get.referencing(self)
-            list = self.schema.classNames(self.schema.dependencies(:,strcmp(self.className, self.schema.classNames))==2);
-            list = cellfun(@(name) self.schema.conn.getPackage(name), list, 'uniformOutput', false);
+            self.schema.reload(false)
+            if self.schema.conn.referencing.isKey(self.fullTableName)
+                list = self.schema.conn.referencing(self.fullTableName);
+            else
+                list = {};
+            end
         end
         
         
@@ -243,7 +269,7 @@ classdef Table < handle
                 'class %s does not appear in the class list of the schema', self.className);
             
             % list primary key fields
-            keyFields = {self.header([self.header.iskey]).name};
+            keyFields = {self.tableHeader([self.tableHeader.iskey]).name};
             
             if ~expandForeignKeys
                 % list parent references
@@ -252,23 +278,23 @@ classdef Table < handle
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
                         % exclude primary key fields of referenced tables from the primary attribute list
-                        keyFields = keyFields(~ismember(keyFields, {t.header([t.header.iskey]).name}));
+                        keyFields = keyFields(~ismember(keyFields, {t.tableHeader([t.tableHeader.iskey]).name}));
                     end
                 end
             end
             
             % additional primary attributes
-            for i=find(ismember({self.header.name}, keyFields))
-                comment = self.header(i).comment;
+            for i=find(ismember({self.tableHeader.name}, keyFields))
+                comment = self.tableHeader(i).comment;
                 str = sprintf('%s\n%-40s# %s', str, ...
-                    sprintf('%-16s: %s', self.header(i).name, self.header(i).type), comment);
+                    sprintf('%-16s: %s', self.tableHeader(i).name, self.tableHeader(i).type), comment);
             end
             
             % dividing line
             str = sprintf('%s\n---', str);
             
             % list dependent attributes
-            dependentFields = {self.header(~[self.header.iskey]).name};
+            dependentFields = {self.tableHeader(~[self.tableHeader.iskey]).name};
             
             % list other references
             if ~expandForeignKeys
@@ -277,26 +303,26 @@ classdef Table < handle
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
                         % exclude primary key fields of referenced tables from header
-                        dependentFields = dependentFields(~ismember(dependentFields, {t.header([t.header.iskey]).name}));
+                        dependentFields = dependentFields(~ismember(dependentFields, {t.tableHeader([t.tableHeader.iskey]).name}));
                     end
                 end
             end
             
             % list remaining attributes
-            for i=find(ismember({self.header.name}, dependentFields))
-                if self.header(i).isnullable
+            for i=find(ismember({self.tableHeader.name}, dependentFields))
+                if self.tableHeader(i).isnullable
                     default = '=null';
-                elseif strcmp(char(self.header(i).default(:)'), '<<<no default>>>')
+                elseif strcmp(char(self.tableHeader(i).default(:)'), '<<<no default>>>')
                     default = '';
-                elseif self.header(i).isNumeric || ...
-                        any(strcmp(self.header(i).default,self.mysql_constants))
-                    default = ['=' self.header(i).default];
+                elseif self.tableHeader(i).isNumeric || ...
+                        any(strcmp(self.tableHeader(i).default,self.mysql_constants))
+                    default = ['=' self.tableHeader(i).default];
                 else
-                    default = ['="' self.header(i).default '"'];
+                    default = ['="' self.tableHeader(i).default '"'];
                 end
-                comment = self.header(i).comment;
+                comment = self.tableHeader(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
-                    sprintf('%-28s: %s', [self.header(i).name default], self.header(i).type), ...
+                    sprintf('%-28s: %s', [self.tableHeader(i).name default], self.tableHeader(i).type), ...
                     comment);
             end
             str = sprintf('%s\n', str);
@@ -411,7 +437,7 @@ classdef Table < handle
                 indexAttributes = {indexAttributes};
             end
             assert(~isempty(indexAttributes) && ...
-                all(ismember(indexAttributes, {self.header.name})), ...
+                all(ismember(indexAttributes, {self.tableHeader.name})), ...
                 'Index definition contains invalid attribute names');
             % Don't allow indexes that may conflict with foreign keys
             implicitIndexes = self.getImplicitIndexes;
@@ -518,9 +544,9 @@ classdef Table < handle
         
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
-            ix = strcmpi(attr, {self.header.name});
+            ix = strcmpi(attr, {self.tableHeader.attributes.name});
             assert(any(ix), 'Attribute "%s" not found', attr)
-            list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
+            list = regexpi(self.tableHeader.attributes(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
             assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
             list = {list.item};
@@ -635,8 +661,8 @@ classdef Table < handle
             primaryKeyFields = {};
             nonKeyFields = {};
             for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.header.attributes.iskey])
-                    field = parents{iRef}.header.attributes(iField);
+                for iField = find([parents{iRef}.tableHeader.attributes.iskey])
+                    field = parents{iRef}.tableHeader.attributes(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
                         assert(~field.isnullable, 'primary key header cannot be nullable')
@@ -658,8 +684,8 @@ classdef Table < handle
             
             % add secondary foreign key attributes
             for iRef = 1:length(references)
-                for iField = find([references{iRef}.table.header.iskey])
-                    field = references{iRef}.table.header(iField);
+                for iField = find([references{iRef}.tableHeader.attributes.iskey])
+                    field = references{iRef}.tableHeader.attributes(iField);
                     if ~ismember(field.name, [primaryKeyFields nonKeyFields])
                         nonKeyFields{end+1} = field.name; %#ok<AGROW>
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
@@ -694,8 +720,8 @@ classdef Table < handle
             % gather implicit indexes due to foreign keys first
             implicitIndexes = {};
             for fkSource = [parents references]
-                isKey = [fkSource{1}.header.attributes.iskey];
-                implicitIndexes{end+1} = {fkSource{1}.header.attributes(isKey).name}; %#ok<AGROW>
+                isKey = [fkSource{1}.tableHeader.attributes.iskey];
+                implicitIndexes{end+1} = {fkSource{1}.tableHeader.attributes(isKey).name}; %#ok<AGROW>
             end
             
             for iIndex = 1:numel(indexDefs)
@@ -775,7 +801,7 @@ classdef Table < handle
             for refClassName = [self.references self.parents]
                 refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
                 indexInfo(end+1).attributes = ...
-                    {refObj.header([refObj.header.iskey]).name};  %#ok<AGROW>
+                    {refObj.tableHader([refObj.tableHeader.iskey]).name};  %#ok<AGROW>
             end
         end
         
@@ -789,8 +815,8 @@ classdef Table < handle
             if isempty(tables)
                 classNames = {};
             else
-                fkFields = arrayfun(@(x) {x.header([x.header.iskey]).name}, tables,'uni',false);
-                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.header.name})), s), fkFields, 'uni', false);
+                fkFields = arrayfun(@(x) {x.tableHeader([x.tableHeader.iskey]).name}, tables,'uni',false);
+                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.tableHeader.name})), s), fkFields, 'uni', false);
                 m = max(cellfun(@max, fkOrder));
                 [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
                 tables = tables(fkOrder);
@@ -866,7 +892,7 @@ fieldDefs = [];
 indexDefs = [];
 
 % split into a columnwise cell array
-declaration = [strtrim(regexp(declaration,'\n','split')'); ''];
+declaration = strtrim(regexp(declaration,'\n','split')');
 
 % append the next line to lines that end in a backslash
 for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', declaration'))

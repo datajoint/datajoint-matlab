@@ -5,8 +5,14 @@ classdef Connection < handle
         user
         initQuery    % initializing function or query executed for each new session
         inTransaction = false
-        connId        % connection handle
-        packageDict = containers.Map    % Map database names to package names
+        connId       % connection handle
+        packages     % maps database names to package names
+        
+        % dependency lookups by table name
+        children     % maps table names to their children table names   (primary foreign key)
+        parents      % maps table names to their parent table names     (primary foreign key)
+        references   % maps table names to their refenced tables    (non-primary foreign key)
+        referencing  % maps table names to their referencing tables (non-primary foreign key)
     end
     
     properties(Access = private)
@@ -27,7 +33,7 @@ classdef Connection < handle
                 mymVersion = mym('version');
                 assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
             catch
-                error(false,'Outdated version of mYm.  Please upgrade to version 2.6 or later')
+                error('Outdated version of mYm.  Please upgrade to version 2.6 or later')
             end
             self.host = host;
             self.user = username;
@@ -35,15 +41,52 @@ classdef Connection < handle
             if nargin>=4
                 self.initQuery = initQuery;
             end
+            self.children    = containers.Map('KeyType','char','ValueType','any');
+            self.parents     = containers.Map('KeyType','char','ValueType','any');
+            self.references  = containers.Map('KeyType','char','ValueType','any');
+            self.referencing = containers.Map('KeyType','char','ValueType','any');
+            self.packages = containers.Map;
         end
         
         
         
         function addPackage(self, dbname, package)
-            self.packageDict(dbname) = package;
+            self.packages(dbname) = package;
         end
         
         
+        function loadDependencies(self, schema)
+            % load dependencies from SHOW CREATE TABLE
+            pat = cat(2,...
+                'FOREIGN KEY\s+\((?<attrs1>[`\w, ]+)\)\s+',...  % attrs1
+                'REFERENCES\s+(?<ref>[^\s]+)\s+',...        % referenced table name
+                '\((?<attrs2>[`\w, ]+)\)');
+            
+            for tabName = schema.headers.keys
+                s = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
+                s = strtrim(regexp(s.('Create Table'){1},'\n','split')');
+                s = regexp(s,pat,'names');
+                for s=[s{~cellfun(@isempty,s)}]
+                    assert(isequal(s.attrs1,s.attrs2),...
+                        'Foreign keys must link identically named attributes')
+                    s.attrs = strsplit(s.attrs1,', ');
+                    s.attrs = cellfun(@(s) s(2:end-1), s.attrs, 'uni',false);
+                    isPrimary = all(ismember(s.attrs,schema.headers(tabName{1}).primaryKey));
+                    from = sprintf('`%s`.`%s`',schema.dbname,tabName{1});
+                    if isempty(regexp(s.ref,'`\.`','once'))
+                        s.ref = sprintf('`%s`.%s',schema.dbname,s.ref);
+                    end
+                    if isPrimary
+                        addMember(self.parents, from, s.ref)
+                        addMember(self.children, s.ref, from)
+                    else
+                        addMember(self.references, from, s.ref)
+                        addMember(self.referencing, s.ref, from)
+                    end
+                end
+            end
+        end
+                
         
         function className = getPackage(self, className, strict)
             % convert '$database_name.ClassName' to 'package.ClassName'
@@ -52,8 +95,8 @@ classdef Connection < handle
             if className(1)=='$'
                 [schemaName,className] = strtok(className,'.');
                 
-                if self.packageDict.isKey(schemaName(2:end))
-                    schemaName = self.packageDict(schemaName(2:end));
+                if self.packages.isKey(schemaName(2:end))
+                    schemaName = self.packages(schemaName(2:end));
                 elseif strict
                     error('Unknown package for "%s%s". Activate its schema first.', ...
                         schemaName(2:end), className)
@@ -66,7 +109,7 @@ classdef Connection < handle
         
         function reload(self)
             % reload all schemas
-            schemas = self.packageDict.values;
+            schemas = self.packages.values;
             for s=schemas(:)'
                 reload(feval([s{1} '.getSchema']))
             end
@@ -143,4 +186,12 @@ classdef Connection < handle
         end
         
     end
+end
+
+
+function addMember(map,key,value)
+if ~map.isKey(key)
+    map(key) = {};
+end
+map(key) = [map(key) {value}]; %#ok<NASGU>
 end
