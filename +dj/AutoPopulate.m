@@ -28,10 +28,6 @@
 
 classdef AutoPopulate < handle
     
-    properties(Abstract)
-        popRel     % specify the relation providing tuples for which makeTuples is called.
-    end
-    
     properties(Access=protected)
         useReservations
         executionEngine
@@ -313,10 +309,7 @@ classdef AutoPopulate < handle
         function createJobTable(self)
             % Create the Jobs class if it does not yet exist
             schemaPath = which([self.schema.package '.getSchema']);
-            if isempty(schemaPath)
-                throwAsCaller(MException('DataJoint:invalidSchema',...
-                    sprintf('missing function %s.getSchema', self.schema.package)));
-            end
+            assert(~isempty(schemaPath), 'missing function %s.getSchema', self.schema.package)
             path = fullfile(fileparts(schemaPath), 'Jobs.m');
             f = fopen(path,'w');
             fprintf(f, '%% %s.Jobs -- job reservation table\n\n', self.schema.package);
@@ -346,19 +339,19 @@ classdef AutoPopulate < handle
             % Performs sanity checks that are common to populate, parpopulate
             % and batch_populate
             if dj.set('populateCheck')
-                dj.assert(isempty(self.restrictions), ...
+                assert(isproperty(self,'popRel'), ...
+                    'Automatically populated tables must declare a popRel property')
+                assert(isempty(self.restrictions), ...
                     'Cannot populate a restricted relation. Correct syntax -- populate(rel, restriction)')
-                dj.assert(isa(self.popRel, 'dj.GeneralRelvar'), ...
+                assert(isa(self.popRel, 'dj.GeneralRelvar'), ...
                     'property popRel must be a subclass of dj.GeneralRelvar')
-                dj.assert(all(ismember(self.popRel.primaryKey, self.primaryKey)), ...
+                assert(all(ismember(self.popRel.primaryKey, self.primaryKey)), ...
                     '%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))
                 if self.useReservations
                     abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
-                    if ~isempty(abovePopRel)
-                        dj.assert(false, ...
-                            ['!Primary key attribute %s is above popRel''s primary key attributes. '...
-                            'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
-                    end
+                    assert( ~isempty(abovePopRel), ...
+                        ['!Primary key attribute %s is above popRel''s primary key attributes. '...
+                        'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                 end
             end
         end

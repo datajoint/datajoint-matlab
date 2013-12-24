@@ -118,10 +118,10 @@ classdef Header < matlab.mixin.Copyable
                     if ~isempty(toks)
                         ix = find(strcmp(toks{1}{1},self.names));
                         assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
-                        assert(~ismember(toks{1}{2},union({self.attributes.alias},header.names)),...
+                        assert(~ismember(toks{1}{2},union({self.attributes.alias},self.names)),...
                             'Duplicate attribute alias `%s`',toks{1}{2})
-                        self(ix).name = toks{1}{2};
-                        self(ix).alias = toks{1}{1};
+                        self.attributes(ix).name = toks{1}{2};
+                        self.attributes(ix).alias = toks{1}{1};
                     else
                         % process a computed attribute
                         toks = regexp(params{iAttr}, '(.*\S)\s*->\s*(\w+)', 'tokens');
@@ -185,7 +185,7 @@ classdef Header < matlab.mixin.Copyable
         
         function stripAliases(self)
             for i=1:length(self.attributes)
-                self.attributes(i).alias = [];
+                self.attributes(i).alias = '';
             end
         end
     end

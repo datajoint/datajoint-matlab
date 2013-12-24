@@ -65,11 +65,11 @@ classdef Table < handle
         
         function set.className(self, className)
             self.className = className;
-            dj.assert(ischar(self.className) && ~isempty(self.className),  ...
+            assert(ischar(self.className) && ~isempty(self.className),  ...
                 'dj.Table requres input ''package.ClassName''')
-            dj.assert(self.className(1)~='$', ...
+            assert(self.className(1)~='$', ...
                 'Please activate package for %s', self.className)
-            dj.assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w*','once')), ...
+            assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w*','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
         end
@@ -82,11 +82,11 @@ classdef Table < handle
         
         function ret = get.schema(self)
             if isempty(self.schema)
-                dj.assert(~isempty(self.className), 'className not set')
+                assert(~isempty(self.className), 'className not set')
                 schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
-                dj.assert(~isempty(which(schemaFunction)), ['Could not find ' schemaFunction])
+                assert(~isempty(which(schemaFunction)), ['Could not find ' schemaFunction])
                 self.schema = feval(schemaFunction);
-                dj.assert(isa(self.schema, 'dj.Schema'), ...
+                assert(isa(self.schema, 'dj.Schema'), ...
                     [schemaFunction ' must return an instance of dj.Schema'])
             end
             ret = self.schema;
@@ -192,7 +192,7 @@ classdef Table < handle
                 depth1 = -2;
                 depth2 = +2;
             end
-            dj.assert(depth1<=0 && depth2>=0);
+            assert(depth1<=0 && depth2>=0);
             subset = {self.className};
             tabs = self;
             for i=1:max(-depth1,depth2)
@@ -239,7 +239,7 @@ classdef Table < handle
             end
             str = sprintf('%s%s (%s) # %s', ...
                 str, self.className, self.info.tier, self.info.comment);
-            dj.assert(any(strcmp(self.schema.classNames, self.className)), ...
+            assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
             % list primary key fields
@@ -410,19 +410,19 @@ classdef Table < handle
             if ischar(indexAttributes)
                 indexAttributes = {indexAttributes};
             end
-            dj.assert(~isempty(indexAttributes) && ...
+            assert(~isempty(indexAttributes) && ...
                 all(ismember(indexAttributes, {self.header.name})), ...
                 'Index definition contains invalid attribute names');
             % Don't allow indexes that may conflict with foreign keys
             implicitIndexes = self.getImplicitIndexes;
-            dj.assert( ~any(arrayfun( ...
+            assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
                 implicitIndexes)), ...
                 ['The specified set of attributes is implicitly ' ...
                 'indexed because of a foreign key constraint.']);
             % Prevent interference with existing indexes
             allIndexes = self.getDatabaseIndexes;
-            dj.assert( ~any(arrayfun( ...
+            assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
                 allIndexes)), ...
                 ['Only one index can be specified for any tuple ' ...
@@ -450,7 +450,7 @@ classdef Table < handle
             
             % Don't touch indexes introduced by foreign keys
             implicitIndexes = self.getImplicitIndexes;
-            dj.assert(~any(arrayfun( ...
+            assert(~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
                 implicitIndexes)), ...
                 ['The specified set of attributes is indexed ' ...
@@ -466,7 +466,7 @@ classdef Table < handle
                 arrayfun(@(x) self.alter(sprintf('DROP INDEX `%s`', x.name)), ...
                     allIndexes(selIndexToDrop));
             else
-                dj.assert(false, 'Could not locate specfied index in database.')
+                error('Could not locate specfied index in database.')
             end
         end
         
@@ -519,9 +519,9 @@ classdef Table < handle
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, {self.header.name});
-            dj.assert(any(ix), 'Attribute "%s" not found', attr)
+            assert(any(ix), 'Attribute "%s" not found', attr)
             list = regexpi(self.header(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
-            dj.assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
+            assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
             list = {list.item};
         end
@@ -604,10 +604,10 @@ classdef Table < handle
                 declaration = self.declaration;
             else
                 file = which(self.className);
-                dj.assert(~isempty(file), ...
+                assert(~isempty(file), ...
                     'MissingTableDefinition:Could not find table definition file %s', file)
                 declaration = readPercentBraceComment(file);
-                dj.assert(~isempty(declaration), ...
+                assert(~isempty(declaration), ...
                     'MissingTableDefnition:Could not find the table declaration in %s', file)
             end
         end
@@ -621,7 +621,7 @@ classdef Table < handle
             [tableInfo, parents, references, fieldDefs, indexDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
-            dj.assert(strcmp(cname, self.className), ...
+            assert(strcmp(cname, self.className), ...
                 'Table name %s does not match in file %s', cname, self.className)
             
             % compile the CREATE TABLE statement
@@ -635,11 +635,11 @@ classdef Table < handle
             primaryKeyFields = {};
             nonKeyFields = {};
             for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.table.header.iskey])
-                    field = parents{iRef}.table.header(iField);
+                for iField = find([parents{iRef}.header.attributes.iskey])
+                    field = parents{iRef}.header.attributes(iField);
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        dj.assert(~field.isnullable, 'primary key header cannot be nullable')
+                        assert(~field.isnullable, 'primary key header cannot be nullable')
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
                     end
                 end
@@ -650,7 +650,7 @@ classdef Table < handle
                 for iField = find([fieldDefs.iskey])
                     field = fieldDefs(iField);
                     primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
-                    dj.assert(~strcmpi(field.default,'NULL'), ...
+                    assert(~strcmpi(field.default,'NULL'), ...
                         'primary key header cannot be nullable')
                     sql = sprintf('%s%s', sql, fieldToSQL(field));
                 end
@@ -677,7 +677,7 @@ classdef Table < handle
             end
             
             % add primary key declaration
-            dj.assert(~isempty(primaryKeyFields), 'table must have a primary key')
+            assert(~isempty(primaryKeyFields), 'table must have a primary key')
             str = sprintf(',`%s`', primaryKeyFields{:});
             sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
             
@@ -687,22 +687,22 @@ classdef Table < handle
                 fieldList(end)=[];
                 sql = sprintf(...
                     '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-                    sql, fieldList, ref{1}.table.fullTableName, fieldList);
+                    sql, fieldList, ref{1}.fullTableName, fieldList);
             end
             
             % add secondary index declarations
             % gather implicit indexes due to foreign keys first
             implicitIndexes = {};
             for fkSource = [parents references]
-                isKey = [fkSource{1}.table.header.iskey];
-                implicitIndexes{end+1} = {fkSource{1}.table.header(isKey).name}; %#ok<AGROW>
+                isKey = [fkSource{1}.header.attributes.iskey];
+                implicitIndexes{end+1} = {fkSource{1}.header.attributes(isKey).name}; %#ok<AGROW>
             end
             
             for iIndex = 1:numel(indexDefs)
-                dj.assert(all(ismember(indexDefs(iIndex).attributes, ...
+                assert(all(ismember(indexDefs(iIndex).attributes, ...
                     [primaryKeyFields, nonKeyFields])), ...
                     'Index definition contains invalid attribute names');
-                dj.assert(~any(cellfun( ...
+                assert(~any(cellfun( ...
                     @(x) isequal(x, indexDefs(iIndex).attributes), ...
                     implicitIndexes)), ...
                     ['The specified set of attributes is implicitly ' ...
@@ -809,7 +809,7 @@ function str = readPercentBraceComment(filename)
 % reads the initial comment block %{ ... %} in filename
 
 f = fopen(filename, 'rt');
-dj.assert(f~=-1, 'Could not open %s', filename)
+assert(f~=-1, 'Could not open %s', filename)
 str = '';
 
 % skip all lines that do not begin with a %{
@@ -838,22 +838,20 @@ function sql = fieldToSQL(field)
 % convert the structure field with header {'name' 'type' 'default' 'comment'}
 % to the SQL column declaration
 
-default = field.default;
-if strcmpi(default, 'NULL')   % all nullable attributes default to null
+if field.isnullable   % all nullable attributes default to null
     default = 'DEFAULT NULL';
 else
-    if strcmp(default,'<<<no default>>>')  %DataJoint's special value to indicate no default
-        default = 'NOT NULL';
-    else
-        % enclose value in quotes (even numeric), except special SQL values
-        if ~any(strcmpi(default, dj.Table.mysql_constants)) && ...
-                ~any(strcmp(default([1 end]), {'''''','""'}))
-            default = sprintf('"%s"',default);
+    default = 'NOT NULL';
+    if ~isempty(field.default)
+        if any(strcmpi(field.default, dj.Table.mysql_constants))
+            default = sprintf('%s DEFAULT %s', default, field.default);
+        else
+            % enclose value in quotes (even numeric), except special SQL values
+            default = sprintf('%s DEFAULT "%s"', default, field.default);
         end
-        default = sprintf('NOT NULL DEFAULT %s', default);
     end
 end
-dj.assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
+assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
     'illegal characters in attribute comment "%s"', field.comment)
 sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
     field.name, field.type, default, field.comment);
@@ -886,9 +884,9 @@ pat = {
     '#\s*(?<comment>\S.*\S)$'                 % # comment
     };
 tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-dj.assert(numel(tableInfo)==1, ...
+assert(numel(tableInfo)==1, ...
     'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
-dj.assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
     'invalidTableTier:Invalid tier for table ', tableInfo.className)
 
 if nargout > 1
@@ -902,7 +900,7 @@ if nargout > 1
             case strncmp(line,'->',2)
                 % foreign key
                 p = feval(strtrim(line(3:end)));
-                dj.assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
+                assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
                 if inKey
                     parents{end+1} = p;     %#ok:<AGROW>
                 else
@@ -918,7 +916,7 @@ if nargout > 1
                 fieldInfo = parseAttrDef(line, inKey);
                 fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
             otherwise
-                dj.assert(false, 'Invalid table declaration line "%s"', line)
+                error('Invalid table declaration line "%s"', line)
         end
     end
 end
@@ -938,13 +936,14 @@ fieldInfo = regexp(line, cat(2,pat{:}), 'names');
 if isempty(fieldInfo)
     % try no default value
     fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    dj.assert(~isempty(fieldInfo), 'invalid field declaration line "%s"', line)
-    fieldInfo.default = '<<<no default>>>';  % special value indicating no default
+    assert(~isempty(fieldInfo), 'invalid field declaration line "%s"', line)
+    fieldInfo.default = '';  % no default
 end
-dj.assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
-dj.assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
+assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
+assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
     || ~strcmp(fieldInfo.default,'null'), ...
-    'invalidDeclaration:BIGINT attributes cannot be nullable in "%s"', line)
+    'BIGINT attributes cannot be nullable in "%s"', line)
+fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
 fieldInfo.iskey = inKey;
 end
 
@@ -957,10 +956,10 @@ pat = [
     '\((?<attributes>[^\)]+)\)$'          % (attr1, attr2)
     ];
 indexInfo = regexpi(line, pat, 'names');
-dj.assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
+assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
     'Invalid index declaration "%s"', line)
 attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
 indexInfo.attributes = strtrim(attributes{1});
-dj.assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
+assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
     'Duplicate attributes in index declaration "%s"', line)
 end

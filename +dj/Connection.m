@@ -25,9 +25,9 @@ classdef Connection < handle
             % of each new session.
             try
                 mymVersion = mym('version');
-                dj.assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
+                assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
             catch
-                dj.assert(false,'Outdated version of mYm.  Please upgrade to version 2.6 or later')
+                error(false,'Outdated version of mYm.  Please upgrade to version 2.6 or later')
             end
             self.host = host;
             self.user = username;

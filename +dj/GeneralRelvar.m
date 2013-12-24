@@ -126,7 +126,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 columns = {self.header.attributes.name};
                 sel = 1:length(columns);
                 if any([self.header.isBlob])
-                    dj.assert(false, '!viewblobs:excluding blobs from the view')
+                    error('!viewblobs:excluding blobs from the view')
                     columns = columns(~[self.header.isBlob]);
                 end
                 
@@ -184,7 +184,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             n = double(n.n);
         end
         
-        function ret = fetch(self, varargin)
+        function [ret,keys] = fetch(self, varargin)
             % dj.GeneralRelvar/fetch retrieve data from a relation as a struct array
             % SYNTAX:
             %    s = self.fetch       % retrieve primary key attributes only
@@ -226,6 +226,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
                 header.sql, sql, limit));
             ret = dj.struct.fromFields(ret);
+            
+            if nargout>1
+                % return primary key structure array
+                keys = dj.struct.pro(ret,self.primaryKey{:});
+            end
         end
         
         function varargout = fetch1(self, varargin)
@@ -247,13 +252,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [~, args] = makeLimitClause(varargin{:});
             args = args(cellfun(@ischar, args)); % attribute specifiers
             
-            dj.assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
+            assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
                 'The number of fetch1() outputs must match the number of requested attributes')
-            dj.assert(~isempty(args), 'insufficient inputs')
-            dj.assert(~any(strcmp(args,'*')), '"*" is not allwed in fetch1()')
+            assert(~isempty(args), 'insufficient inputs')
+            assert(~any(strcmp(args,'*')), '"*" is not allwed in fetch1()')
             
             s = self.fetch(varargin{:});
-            dj.assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
+            assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
             
             % copy into output arguments
             varargout = cell(length(args));
@@ -281,10 +286,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [limit, args] = makeLimitClause(varargin{:});
             specs = args(cellfun(@ischar, args)); % attribute specifiers
             returnKey = nargout==length(specs)+1;
-            dj.assert(returnKey || (nargout==length(specs) || (nargout==0 && length(specs)==1)), ...
+            assert(returnKey || (nargout==length(specs) || (nargout==0 && length(specs)==1)), ...
                 'The number of fetchn() outputs must match the number of requested attributes')
-            dj.assert(~isempty(specs),'insufficient inputs')
-            dj.assert(~any(strcmp(specs,'*')), '"*" is not allwed in fetchn()')
+            assert(~isempty(specs),'insufficient inputs')
+            assert(~any(strcmp(specs,'*')), '"*" is not allwed in fetchn()')
             
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
@@ -574,7 +579,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     pkey = sprintf(',`%s`', header.primaryKey{:});
                     sql = sprintf('%s NATURAL JOIN %s GROUP BY %s', sql, sql2, pkey(2:end));
                     header.project(self.operands(3:end));
-                    assert(~all(arrayfun(@(x) isempty(x.alias), header)),...
+                    assert(~all(arrayfun(@(x) isempty(x.alias), header.attributes)),...
                         'Aggregate opeators must define at least one computation')
                     
                 case 'join'
@@ -587,7 +592,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 otherwise
                     error 'unknown relational operator'
             end
-                       
+            
             % apply restrictions
             if ~isempty(self.restrictions)
                 % clear aliases and enclose
@@ -624,7 +629,7 @@ else
     aliasCount = aliasCount + 1;
 end
 
-dj.assert(all(arrayfun(@(x) isempty(x.alias), header.attributes)), ...
+assert(all(arrayfun(@(x) isempty(x.alias), header.attributes)), ...
     'aliases must be resolved before restriction')
 
 clause = '';
@@ -636,7 +641,7 @@ for arg = restrictions
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
             % union
             s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'UniformOutput', false);
-            dj.assert(~isempty(s));
+            assert(~isempty(s))
             s = sprintf('(%s) OR ', s{:});
             clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
             
@@ -716,7 +721,7 @@ function cond = struct2cond(keys, header)
 % convert the structure array into an SQL condition
 n = length(keys);
 assert(n>=1)
-dj.assert(n<=512, ...
+assert(n<=512, ...
     '!longCondition:consider replacing the long array of keys with a more succinct condition')
 cond = '';
 for key = keys(:)'

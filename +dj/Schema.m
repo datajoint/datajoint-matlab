@@ -19,6 +19,10 @@ classdef Schema < handle
         tableRegexp   % regular expression for legal table names
     end
     
+    properties(Dependent)
+        classNames
+    end
+    
     
     properties(Constant)
         % Table naming convention
@@ -37,7 +41,7 @@ classdef Schema < handle
     
     methods
         function self = Schema(conn, package, dbname)
-            dj.assert(isa(conn, 'dj.Connection'), ...
+            assert(isa(conn, 'dj.Connection'), ...
                 'dj.Schema''s first input must be a dj.Connection')
             self.conn = conn;
             self.package = package;
@@ -53,117 +57,113 @@ classdef Schema < handle
         end
         
         
-        %         function makeClass(self, className)
-        %             % create a base relvar class for the new className in schema directory.
-        %             %
-        %             % Example:
-        %             %    makeClass(v2p.getSchema, 'RegressionModel')
-        %             useGUI = usejava('desktop') || usejava('awt') || usejava('swing');
-        %             className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
-        %             dj.assert(~isempty(className), 'invalid class name')
-        %
-        %             % get the path to the schema package
-        %             filename = fileparts(which(sprintf('%s.getSchema', self.package)));
-        %             dj.assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
-        %
-        %             % if the file already exists, let the user edit it and exit
-        %             filename = fullfile(filename, [className '.m']);
-        %             if exist(filename,'file')
-        %                 fprintf('%s already exists\n', filename)
-        %                 if useGUI
-        %                     edit(filename)
-        %                 end
-        %                 return
-        %             end
-        %
-        %             % if the table exists, create the file that matches its definition
-        %             if ismember([self.package '.' className], self.classNames)
-        %                 existingTable = dj.Table([self.package '.' className]);
-        %                 fprintf('Table %s already exists, Creating matching class\n', ...
-        %                     [self.package '.' className])
-        %                 isAuto = ismember(existingTable.info.tier, {'computed','imported'});
-        %             else
-        %                 existingTable = [];
-        %                 choice = 'x';
-        %                 while length(choice)~=1 || ~ismember(choice,'lmic')
-        %                     choice = lower(input('\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n  > ', 's'));
-        %                 end
-        %                 tier = struct('c','computed','l','lookup','m','manual','i','imported');
-        %                 tier = tier.(choice);
-        %                 isAuto = ismember(tier, {'computed','imported'});
-        %             end
-        %
-        %             % let the user decide if the table is a subtable, which means
-        %             % that it can only be populated together with its parent.
-        %             isSubtable = false;
-        %             if isAuto
-        %                 choice = '';
-        %                 while ~ismember(choice, {'yes','no'})
-        %                     choice = lower(input('Is this a subtable? yes/no > ', 's'));
-        %                 end
-        %                 isSubtable = strcmp('yes',choice);
-        %             end
-        %
-        %             f = fopen(filename,'wt');
-        %             dj.assert(-1 ~= f, 'Could not open %s', filename)
-        %
-        %             % table declaration
-        %             if numel(existingTable)
-        %                 fprintf(f, '%s', existingTable.re);
-        %                 tab = dj.Table([self.package '.' className]);
-        %                 parents = tab.parents;
-        %             else
-        %                 fprintf(f, '%%{\n');
-        %                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
-        %                 fprintf(f, '# add primary key here\n');
-        %                 fprintf(f, '-----\n');
-        %                 fprintf(f, '# add additional attributes\n');
-        %                 fprintf(f, '%%}');
-        %                 parents = [];
-        %             end
-        %             % class definition
-        %             fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
-        %             if isAuto && ~isSubtable
-        %                 fprintf(f, ' & dj.AutoPopulate');
-        %             end
-        %
-        %             % properties
-        %             fprintf(f, '\n\n\tproperties(Constant)\n');
-        %             fprintf(f, '\t\ttable = dj.Table(''%s.%s'')\n', self.package, className);
-        %             if isAuto && ~isSubtable
-        %                 fprintf(f, '\t\tpopRel');
-        %                 for i = 1:length(parents)
-        %                     if i>1
-        %                         fprintf(f, '*');
-        %                     else
-        %                         fprintf(f, ' = ');
-        %                     end
-        %                     fprintf(f, '%s', parents{i});
-        %                 end
-        %                 fprintf(f, '  %% !!! update the populate relation\n');
-        %             end
-        %             fprintf(f, '\tend\n');
-        %
-        %             % metod makeTuples
-        %             if isAuto
-        %                 fprintf(f, '\n\tmethods');
-        %                 if ~isSubtable
-        %                     fprintf(f, '(Access=protected)');
-        %                 end
-        %                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
-        %                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
-        %                 fprintf(f, '\t\t\tself.insert(key)\n');
-        %                 fprintf(f, '\t\tend\n');
-        %                 fprintf(f, '\tend\n');
-        %             end
-        %             fprintf(f, 'end\n');
-        %             fclose(f);
-        %             if useGUI
-        %                 edit(filename)
-        %             else
-        %                 fprintf('Class template written to %s\n', filename)
-        %             end
-        %         end
+        function names = get.classNames(self)
+            names =  self.tableNames.keys;
+        end
+        
+        
+        function makeClass(self, className)
+            % create a base relvar class for the new className in schema directory.
+            %
+            % Example:
+            %    schemaObject.makeClass('RegressionModel')
+            useGUI = usejava('desktop') || usejava('awt') || usejava('swing');
+            className = regexp(className,'^[A-Z][A-Za-z0-9]*$','match','once');
+            assert(~isempty(className), 'invalid class name')
+            
+            % get the path to the schema package
+            filename = fileparts(which(sprintf('%s.getSchema', self.package)));
+            assert(~isempty(filename), 'could not find +%s/getSchema.m', self.package);
+            
+            % if the file already exists, let the user edit it and exit
+            filename = fullfile(filename, [className '.m']);
+            if exist(filename,'file')
+                fprintf('%s already exists\n', filename)
+                if useGUI
+                    edit(filename)
+                end
+                return
+            end
+            
+            % if the table exists, create the file that matches its definition
+             if ismember([self.package '.' className], self.classNames)
+                 existingTable = dj.Table([self.package '.' className]);
+                 fprintf('Table %s already exists, Creating matching class\n', ...
+                     [self.package '.' className])
+                 isAuto = ismember(existingTable.info.tier, {'computed','imported'});
+             else
+                 existingTable = [];
+                 choice = dj.ask(...
+                     '\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n',...
+                     {'L','M','I','C'});
+                tier = struct('c','computed','l','lookup','m','manual','i','imported');
+                tier = tier.(choice);
+                isAuto = ismember(tier, {'computed','imported'});
+            end
+            
+            % let the user decide if the table is a subtable, which means
+            % that it can only be populated together with its parent.
+            isSubtable = isAuto && strcmp('yes', dj.ask('Is this a subtable?'));
+            
+            f = fopen(filename,'wt');
+            assert(-1 ~= f, 'Could not open %s', filename)
+            
+            % table declaration
+            if numel(existingTable)
+                fprintf(f, '%s', existingTable.re);
+                tab = dj.Table([self.package '.' className]);
+                parents = tab.parents;
+            else
+                fprintf(f, '%%{\n');
+                fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
+                fprintf(f, '# add primary key here\n');
+                fprintf(f, '-----\n');
+                fprintf(f, '# add additional attributes\n');
+                fprintf(f, '%%}');
+                parents = [];
+            end
+            % class definition
+            fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
+            if isAuto && ~isSubtable
+                fprintf(f, ' & dj.AutoPopulate');
+            end
+            
+            % properties
+            if isAuto && ~isSubtable
+                fprintf(f, '\n\n\tproperties\n');
+                fprintf(f, '\t\tpopRel');
+                for i = 1:length(parents)
+                    if i>1
+                        fprintf(f, '*');
+                    else
+                        fprintf(f, ' = ');
+                    end
+                    fprintf(f, '%s', parents{i});
+                end
+                fprintf(f, '  %% !!! update the populate relation\n');
+            end
+            fprintf(f, '\tend\n');
+            
+            % metod makeTuples
+            if isAuto
+                fprintf(f, '\n\tmethods');
+                if ~isSubtable
+                    fprintf(f, '(Access=protected)');
+                end
+                fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
+                fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
+                fprintf(f, '\t\t\tself.insert(key)\n');
+                fprintf(f, '\t\tend\n');
+                fprintf(f, '\tend\n');
+            end
+            fprintf(f, 'end\n');
+            fclose(f);
+            if useGUI
+                edit(filename)
+            else
+                fprintf('Class template written to %s\n', filename)
+            end
+        end
         %
         %         function erd(self, subset)
         %             % ERD -- plot the Entity Relationship Diagram of the entire schema
@@ -418,7 +418,7 @@ classdef Schema < handle
             fprintf('%.3g s\nloading field information... ', toc), tic
             for info = dj.struct.fromFields(tableInfo)'
                 tierIdx = ~cellfun(@isempty, regexp(info.name, re, 'once'));
-                dj.assert(sum(tierIdx)==1)
+                assert(sum(tierIdx)==1)
                 info.tier = dj.Schema.allowedTiers{tierIdx};
                 self.tableNames(self.makeClassName(self.dbname, info.name)) = info.name;
                 self.headers(info.name) = dj.Header.initFromDatabase(self,info);
@@ -481,9 +481,9 @@ classdef Schema < handle
             %   toCamelCase('One_Two_Three')  --> !error! upper case only mixes with alphanumericals
             %   toCamelCase('5_two_three')    --> !error! cannot start with a digit
             
-            dj.assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            dj.assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
-            dj.assert(isempty(regexp(str, '[A-Z]', 'once')), ...
+            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
+            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
+            assert(isempty(regexp(str, '[A-Z]', 'once')), ...
                 'underscore_compound_words must not contain uppercase characters')
             str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
         end
@@ -499,10 +499,10 @@ classdef Schema < handle
             %   fromCamelCase('one two three')  --> !error! white space is not allowed
             %   fromCamelCase('ABC')            --> 'a_b_c'
             
-            dj.assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            dj.assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
+            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
+            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
             
-            dj.assert(~isempty(regexp(str, '^[a-zA-Z0-9]*$', 'once')), ...
+            assert(~isempty(regexp(str, '^[a-zA-Z0-9]*$', 'once')), ...
                 'fromCamelCase string can only contain alphanumeric characters');
             str = regexprep(str, '([A-Z])', '_${lower($1)}');
             str = str(1+(str(1)=='_'):end);  % remove leading underscore
