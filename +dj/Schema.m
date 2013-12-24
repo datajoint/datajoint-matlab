@@ -164,227 +164,6 @@ classdef Schema < handle
                 fprintf('Class template written to %s\n', filename)
             end
         end
-        %
-        %         function erd(self, subset)
-        %             % ERD -- plot the Entity Relationship Diagram of the entire schema
-        %             %
-        %             % INPUTS:
-        %             %    subset -- a string array of classNames to include in the diagram
-        %
-        %             % copy relevant information
-        %             C = self.dependencies;
-        %             levels = -self.tableLevels;
-        %             names = self.classNames;
-        %             tiers = {tables.tier};
-        %             tiers = [tiers repmat({'external'},1,length(names)-length(tiers))];
-        %
-        %             if nargin<2
-        %                 % by default show all but the job tables
-        %                 subset = self.classNames(~strcmp(tiers,'job'));
-        %             else
-        %                 % limit the diagram to the specified subset of tables
-        %                 subset(~ismember(subset,self.classNames))=[];
-        %             end
-        %             subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
-        %             levels = levels(subset);
-        %             C = C(subset,subset);  % connectivity matrix
-        %             names = names(subset);
-        %             tiers = tiers(subset);
-        %
-        %             if sum(C)==0
-        %                 disp 'No dependencies found. Nothing to plot'
-        %                 return
-        %             end
-        %
-        %             yi = levels;
-        %             xi = zeros(size(yi));
-        %
-        %             % optimize graph appearance by minimizing disctances.^2 to connected nodes
-        %             % while maximizing distances to nodes on the same level.
-        %             j1 = cell(1,length(xi));
-        %             j2 = cell(1,length(xi));
-        %             for i=1:length(xi)
-        %                 j1{i} = setdiff(find(yi==yi(i)),i);
-        %                 j2{i} = [find(C(i,:)) find(C(:,i)')];
-        %             end
-        %             niter=5e4;
-        %             T0=5; % initial temperature
-        %             cr=6/niter; % cooling rate
-        %             L = inf(size(xi));
-        %             for iter=1:niter
-        %                 i = ceil(rand*length(xi));  % pick a random node
-        %
-        %                 % Compute the cost function Lnew of the increasing xi(i) by dx
-        %                 dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
-        %                 xx=xi(i)+dx;
-        %                 Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
-        %                 if ~isempty(j1{i})
-        %                     Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
-        %                 end
-        %                 7
-        %                 if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
-        %                     xi(i)=xi(i)+dx;
-        %                     L(i) = Lnew;
-        %                 end
-        %             end
-        %             yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
-        %
-        %
-        %             % plot nodes
-        %             plot(xi, yi, 'ko', 'MarkerSize', 10);
-        %             hold on;
-        %             % plot edges
-        %             for i=1:size(C,1)
-        %                 for j=1:size(C,2)
-        %                     switch C(i,j)
-        %                         case 1
-        %                             connectNodes(xi([i j]), yi([i j]), 'k-')
-        %                         case 2
-        %                             connectNodes(xi([i j]), yi([i j]), 'k--')
-        %                     end
-        %                     hold on
-        %                 end
-        %             end
-        %
-        %             % annotate nodes
-        %             fontColor = struct(...
-        %                 'external', [0.0 0.0 0.0], ...
-        %                 'manual',   [0.0 0.6 0.0], ...
-        %                 'lookup',   [0.3 0.4 0.3], ...
-        %                 'imported', [0.0 0.0 1.0], ...
-        %                 'computed', [0.5 0.0 0.0], ...
-        %                 'job',      [1 1 1]);
-        %
-        %             for i=1:length(levels)
-        %                 name = names{i};
-        %                 isExternal = ~strcmp(strtok(name,'.'), self.package);
-        %                 if isExternal
-        %                     edgeColor = [0.3 0.3 0.3];
-        %                     fontSize = 9;
-        %                     name = self.conn.getPackage(name);
-        %                 else
-        %                     if exist(name,'class')
-        %                         rel = feval(name);
-        %                         dj.assert(isa(rel, 'dj.Relvar'))
-        %                         if rel.isSubtable
-        %                             name = [name '*'];  %#ok:AGROW
-        %                         end
-        %                     end
-        %                     name = name(length(self.package)+2:end);  %remove package name
-        %                     edgeColor = 'none';
-        %                     fontSize = 11;
-        %                 end
-        %                 text(xi(i), yi(i), [name '  '], ...
-        %                     'HorizontalAlignment', 'right', 'interpreter', 'none', ...
-        %                     'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
-        %                 hold on;
-        %             end
-        %
-        %             xlim([min(xi)-0.5 max(xi)+0.5]);
-        %             ylim([min(yi)-0.5 max(yi)+0.5]);
-        %             hold off
-        %             axis off
-        %             title(sprintf('%s (%s)', self.package, self.dbname), ...
-        %                 'Interpreter', 'none', 'fontsize', 14,'FontWeight','bold', 'FontName', 'Ariel')
-        %
-        %             function connectNodes(x, y, lineStyle)
-        %                 dj.assert(length(x)==2 && length(y)==2)
-        %                 plot(x, y, 'k.')
-        %                 t = 0:0.05:1;
-        %                 x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
-        %                 y = y(1) + (y(2)-y(1))*t;
-        %                 plot(x, y, lineStyle)
-        %             end
-        %         end
-        %
-        %         function backup(self, backupDir, tiers, restrictor)
-        %             % dj.Schema/backup - saves tables into .mat files
-        %             % SYNTAX:
-        %             %    s.backup(folder)    -- save all lookup and manual tables
-        %             %    s.backup(folder, {'manual'})    -- save all manual tables
-        %             %    s.backup(folder, {'manual','imported'})
-        %             %    s.backup(folder, [], restrictor)  -- backup only tuples that match restrictor
-        %             %
-        %             % Each table must be small enough to be loaded into memory.
-        %             % By default, only lookup and manual tables are saved.
-        %             %
-        %             % restrictor may contain a cell array of conditions. However,
-        %             % string conditions can cause errors for some tables.
-        %             % The best practice is to use a structure or a relvar as a restrictor, e.g.
-        %             % backup(ephys.getSchema, '/backup', [], ephys.Session('session_date > "2012-07-10"'))
-        %
-        %             if nargin<3 || isempty(tiers)
-        %                 tiers = {'lookup','manual'};
-        %             end
-        %             if nargin<4
-        %                 restrictor = {};
-        %             end
-        %             dj.assert(all(ismember(tiers, dj.Schema.allowedTiers)))
-        %             backupDir = fullfile(backupDir, self.dbname);
-        %             if ~exist(backupDir, 'dir')
-        %                 dj.assert(mkdir(backupDir), 'Could not create directory %s', backupDir)
-        %             end
-        %             backupDir = fullfile(backupDir, datestr(now,'yyyy-mm-dd'));
-        %             if ~exist(backupDir,'dir')
-        %                 dj.assert(mkdir(backupDir), 'Could not create directory %s', backupDir)
-        %             end
-        %             ix = find(ismember({tables.tier}, tiers));
-        %             % save in hiearchical order
-        %             [~,order] = sort(self.tableLevels(ix));
-        %             ix = ix(order);
-        %             for iTable = ix(:)'
-        %                 className = self.classNames{iTable};
-        %                 rel = init(dj.BaseRelvar, dj.Table(className)) & restrictor;
-        %                 contents = rel.fetch('*'); %#ok<NASGU>
-        %                 filename = fullfile(backupDir, ...
-        %                     regexprep(self.classNames{iTable}, '^.*\.', ''));
-        %                 fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
-        %                 save(filename, 'contents')
-        %                 fprintf 'done\n'
-        %             end
-        %         end
-        %
-        %         function restore(self, backupDir)
-        %             % restore(schema, backupDir)
-        %             % insert all missing tuples from tables saved in <ClassName>.MAT files in backupDir
-        %             d = dir(fullfile(backupDir,'*.mat'));
-        %
-        %             % instantiate all classes
-        %             classes = cell(length(d),1);
-        %             objects = cell(length(d),1);
-        %             for i=1:length(d)
-        %                 try
-        %                     classes{i} = [self.package '.' regexprep(d(i).name, '\.mat$', '')];
-        %                     objects{i} = eval(classes{i});
-        %                     objects{i}.reload;  %TODO: check this
-        %                 catch err
-        %                     dj.assert(false,['!invalidClass:;' err.message])
-        %                     continue
-        %                 end
-        %             end
-        %             ix = ~cellfun(@isempty, classes);
-        %             classes = classes(ix);
-        %             objects = objects(ix);
-        %             d = d(ix);
-        %
-        %             % sort objects by hiararchical level
-        %             levels = cellfun(@(x) self.tableLevels(strcmp(x, self.classNames)), classes);
-        %             [~, ix] = sort(levels);
-        %             classes = classes(ix);
-        %             objects = objects(ix);
-        %             d = d(ix);
-        %
-        %             % insert tuples
-        %             for i=1:length(classes)
-        %                 s = load(fullfile(backupDir, d(i).name));
-        %                 try
-        %                     fprintf('inserting %d tuples into %s\n', length(s.contents), classes{i})
-        %                     objects{i}.insert(s.contents, 'INSERT IGNORE');
-        %                 catch err
-        %                     dj.assert(false,['!TableDeclarationMismatch:' err.message])
-        %                 end
-        %             end
-        %         end
         
         function headers = get.headers(self)
             self.reload(false)
@@ -395,6 +174,230 @@ classdef Schema < handle
             self.reload(false)
             tableNames = self.tableNames;
         end
+        
+%         function erd(self, subset)
+%             % ERD -- plot the Entity Relationship Diagram of the entire schema
+%             %
+%             % INPUTS:
+%             %    subset -- a string array of classNames to include in the diagram
+%             
+%             % copy relevant information
+%             C = self.dependencies;
+%             levels = -self.tableLevels;
+%             names = self.classNames;
+%             tiers = {self.tables.tier};
+%             tiers = [tiers repmat({'external'},1,length(names)-length(tiers))];
+%             
+%             if nargin<2
+%                 % by default show all but the job tables
+%                 subset = self.classNames(~strcmp(tiers,'job'));
+%             else
+%                 % limit the diagram to the specified subset of tables
+%                 ix = find(~ismember(subset,self.classNames));
+%                 if ~isempty(ix)
+%                     dj.assert(false,'Unknown table %s', subset{ix(1)})
+%                 end
+%             end
+%             subset = cellfun(@(x) find(strcmp(x,self.classNames)), subset);
+%             levels = levels(subset);
+%             C = C(subset,subset);  % connectivity matrix
+%             names = names(subset);
+%             tiers = tiers(subset);
+%             
+%             if sum(C)==0
+%                 disp 'No dependencies found. Nothing to plot'
+%                 return
+%             end
+%             
+%             yi = levels;
+%             xi = zeros(size(yi));
+%             
+%             % optimize graph appearance by minimizing disctances.^2 to connected nodes
+%             % while maximizing distances to nodes on the same level.
+%             j1 = cell(1,length(xi));
+%             j2 = cell(1,length(xi));
+%             for i=1:length(xi)
+%                 j1{i} = setdiff(find(yi==yi(i)),i);
+%                 j2{i} = [find(C(i,:)) find(C(:,i)')];
+%             end
+%             niter=5e4;
+%             T0=5; % initial temperature
+%             cr=6/niter; % cooling rate
+%             L = inf(size(xi));
+%             for iter=1:niter
+%                 i = ceil(rand*length(xi));  % pick a random node
+%                 
+%                 % Compute the cost function Lnew of the increasing xi(i) by dx
+%                 dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
+%                 xx=xi(i)+dx;
+%                 Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
+%                 if ~isempty(j1{i})
+%                     Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
+%                 end
+%                 
+%                 if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
+%                     xi(i)=xi(i)+dx;
+%                     L(i) = Lnew;
+%                 end
+%             end
+%             yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
+%             
+%             
+%             % plot nodes
+%             plot(xi, yi, 'ko', 'MarkerSize', 10);
+%             hold on;
+%             % plot edges
+%             for i=1:size(C,1)
+%                 for j=1:size(C,2)
+%                     switch C(i,j)
+%                         case 1
+%                             connectNodes(xi([i j]), yi([i j]), 'k-')
+%                         case 2
+%                             connectNodes(xi([i j]), yi([i j]), 'k--')
+%                     end
+%                     hold on
+%                 end
+%             end
+%             
+%             % annotate nodes
+%             fontColor = struct(...
+%                 'external', [0.0 0.0 0.0], ...
+%                 'manual',   [0.0 0.6 0.0], ...
+%                 'lookup',   [0.3 0.4 0.3], ...
+%                 'imported', [0.0 0.0 1.0], ...
+%                 'computed', [0.5 0.0 0.0], ...
+%                 'job',      [1 1 1]);
+%             
+%             for i=1:length(levels)
+%                 name = names{i};
+%                 isExternal = ~strcmp(strtok(name,'.'), self.package);
+%                 if isExternal
+%                     edgeColor = [0.3 0.3 0.3];
+%                     fontSize = 9;
+%                     name = self.conn.getPackage(name);
+%                 else
+%                     if exist(name,'class')
+%                         rel = feval(name);
+%                         dj.assert(isa(rel, 'dj.Relvar'))
+%                         if rel.isSubtable
+%                             name = [name '*'];  %#ok:AGROW
+%                         end
+%                     end
+%                     name = name(length(self.package)+2:end);  %remove package name
+%                     edgeColor = 'none';
+%                     fontSize = 11;
+%                 end
+%                 text(xi(i), yi(i), [name '  '], ...
+%                     'HorizontalAlignment', 'right', 'interpreter', 'none', ...
+%                     'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
+%                 hold on;
+%             end
+%             
+%             xlim([min(xi)-0.5 max(xi)+0.5]);
+%             ylim([min(yi)-0.5 max(yi)+0.5]);
+%             hold off
+%             axis off
+%             title(sprintf('%s (%s)', self.package, self.dbname), ...
+%                 'Interpreter', 'none', 'fontsize', 14,'FontWeight','bold', 'FontName', 'Ariel')
+%             
+%             function connectNodes(x, y, lineStyle)
+%                 dj.assert(length(x)==2 && length(y)==2)
+%                 plot(x, y, 'k.')
+%                 t = 0:0.05:1;
+%                 x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
+%                 y = y(1) + (y(2)-y(1))*t;
+%                 plot(x, y, lineStyle)
+%             end
+%         end
+%         
+%         function backup(self, backupDir, tiers, restrictor)
+%             % dj.Schema/backup - saves tables into .mat files
+%             % SYNTAX:
+%             %    s.backup(folder)    -- save all lookup and manual tables
+%             %    s.backup(folder, {'manual'})    -- save all manual tables
+%             %    s.backup(folder, {'manual','imported'})
+%             %    s.backup(folder, [], restrictor)  -- backup only tuples that match restrictor
+%             %
+%             % Each table must be small enough to be loaded into memory.
+%             % By default, only lookup and manual tables are saved.
+%             %
+%             % restrictor may contain a cell array of conditions. However,
+%             % string conditions can cause errors for some tables.
+%             % The best practice is to use a structure or a relvar as a restrictor, e.g.
+%             % backup(ephys.getSchema, '/backup', [], ephys.Session('session_date > "2012-07-10"'))
+%             
+%             if nargin<3 || isempty(tiers)
+%                 tiers = {'lookup','manual'};
+%             end
+%             if nargin<4
+%                 restrictor = {};
+%             end
+%             dj.assert(all(ismember(tiers, dj.Schema.allowedTiers)))
+%             backupDir = fullfile(backupDir, self.dbname);
+%             if ~exist(backupDir, 'dir')
+%                 dj.assert(mkdir(backupDir), 'Could not create directory %s', backupDir)
+%             end
+%             backupDir = fullfile(backupDir, datestr(now,'yyyy-mm-dd'));
+%             if ~exist(backupDir,'dir')
+%                 dj.assert(mkdir(backupDir), 'Could not create directory %s', backupDir)
+%             end
+%             ix = find(ismember({self.tables.tier}, tiers));
+%             % save in hiearchical order
+%             [~,order] = sort(self.tableLevels(ix));
+%             ix = ix(order);
+%             for iTable = ix(:)'
+%                 className = self.classNames{iTable};
+%                 rel = init(dj.BaseRelvar, dj.Table(className)) & restrictor;
+%                 contents = rel.fetch('*'); %#ok<NASGU>
+%                 filename = fullfile(backupDir, ...
+%                     regexprep(self.classNames{iTable}, '^.*\.', ''));
+%                 fprintf('Saving %s to %s ...', self.classNames{iTable}, filename)
+%                 save(filename, 'contents')
+%                 fprintf 'done\n'
+%             end
+%         end
+%         
+%         function restore(self, backupDir)
+%             % restore(schema, backupDir)
+%             % insert all missing tuples from tables saved in <ClassName>.MAT files in backupDir
+%             d = dir(fullfile(backupDir,'*.mat'));
+%             
+%             % instantiate all classes
+%             classes = cell(length(d),1);
+%             objects = cell(length(d),1);
+%             for i=1:length(d)
+%                 try
+%                     classes{i} = [self.package '.' regexprep(d(i).name, '\.mat$', '')];
+%                     objects{i} = eval(classes{i});
+%                     objects{i}.header;  % this will trigger the creation of a table if missing.
+%                 catch err
+%                     dj.assert(false,['!invalidClass:' err.message])
+%                     continue
+%                 end
+%             end
+%             ix = ~cellfun(@isempty, classes);
+%             classes = classes(ix);
+%             objects = objects(ix);
+%             d = d(ix);
+%             
+%             % sort objects by hiararchical level
+%             levels = cellfun(@(x) self.tableLevels(strcmp(x, self.classNames)), classes);
+%             [~, ix] = sort(levels);
+%             classes = classes(ix);
+%             objects = objects(ix);
+%             d = d(ix);
+%             
+%             % insert tuples
+%             for i=1:length(classes)
+%                 s = load(fullfile(backupDir, d(i).name));
+%                 try
+%                     fprintf('inserting %d tuples into %s\n', length(s.contents), classes{i})
+%                     objects{i}.insert(s.contents, 'INSERT IGNORE');
+%                 catch err
+%                     dj.assert(false,['!TableDeclarationMismatch:' err.message])
+%                 end
+%             end
+%         end
         
         function reload(self, force)
             force = nargin<2 || force;
