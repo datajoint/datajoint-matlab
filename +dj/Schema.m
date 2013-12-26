@@ -317,6 +317,8 @@ classdef Schema < handle
             if ~self.loaded || (nargin<2 || force)
                 % do not reload unless forced. Default is forced.
                 self.loaded = true;
+                self.headers.remove(self.headers.keys);
+                self.tableNames.remove(self.tableNames.keys);
                 
                 % reload schema information into memory: table names and field named.
                 fprintf('loading table definitions from %s... ', self.dbname)

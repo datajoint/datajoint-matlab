@@ -213,7 +213,7 @@ classdef AutoPopulate < handle
             if isempty(unpopulated)
                 fprintf('%s: Nothing to populate\n', self.table.className)
             else
-                fprintf('\n**%s: Found %d unpopulated keys\n\n', self.table.className, length(unpopulated))
+                fprintf('\n**%s: Found %d unpopulated keys\n\n', self.className, length(unpopulated))
                 
                 self.timeoutAttempt = 1;
                 while ~isempty(unpopulated)
@@ -224,7 +224,7 @@ classdef AutoPopulate < handle
                                 % already populated
                                 self.setJobStatus(key, 'completed');
                             else
-                                fprintf('Populating %s for:\n', self.table.className)
+                                fprintf('Populating %s for:\n', self.className)
                                 disp(key)
                                 try
                                     % Perform or schedule computation
@@ -253,7 +253,7 @@ classdef AutoPopulate < handle
         
         
         function jobKey = makeJobKey(self, key)
-            jobKey = struct('table_name', self.table.className, 'key_hash', dj.DataHash(key));
+            jobKey = struct('table_name', self.className, 'key_hash', dj.DataHash(key));
         end
         
         
@@ -281,7 +281,7 @@ classdef AutoPopulate < handle
                             end
                         end
                         if ~success
-                            fprintf('** %s: skipping already reserved\n', self.table.className)
+                            fprintf('** %s: skipping already reserved\n', self.className)
                             disp(key)
                         end
                 end
@@ -289,16 +289,16 @@ classdef AutoPopulate < handle
             
             
             function jobKey = addJobInfo(jobKey)
-                if all(ismember({'host','pid'},{self.jobs.header.name}))
+                if all(ismember({'host','pid'},self.jobs.header.names))
                     [~,host] = system('hostname');
                     jobKey.host = strtrim(host);
                     jobKey.pid = feature('getpid');
                 end
-                if ismember('error_key', {self.jobs.header.name})
+                if ismember('error_key', self.jobs.header.names)
                     % for backward compatibility with versions prior to 2.6.3
                     jobKey.error_key = key;
                 end
-                if ismember('key', {self.jobs.header.name})
+                if ismember('key', self.jobs.header.names)
                     jobKey.key = key;
                 end
                 
@@ -339,7 +339,7 @@ classdef AutoPopulate < handle
             % Performs sanity checks that are common to populate, parpopulate
             % and batch_populate
             if dj.set('populateCheck')
-                assert(isproperty(self,'popRel'), ...
+                assert(isprop(self,'popRel'), ...
                     'Automatically populated tables must declare a popRel property')
                 assert(isempty(self.restrictions), ...
                     'Cannot populate a restricted relation. Correct syntax -- populate(rel, restriction)')
@@ -349,9 +349,10 @@ classdef AutoPopulate < handle
                     '%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))
                 if self.useReservations
                     abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
-                    assert( ~isempty(abovePopRel), ...
-                        ['!Primary key attribute %s is above popRel''s primary key attributes. '...
+                    if ~isempty(abovePopRel)
+                        error(['!Primary key attribute %s is above popRel''s primary key attributes. '...
                         'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
+                    end
                 end
             end
         end

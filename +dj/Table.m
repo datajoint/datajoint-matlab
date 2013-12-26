@@ -60,8 +60,9 @@ classdef Table < handle
             name = self.className;
             if isempty(name)
                 name = class(self);
-                assert(isa(self,'dj.Relvar') && ~strcmp(name,'dj.Relvar'))   %#ok<STISA>
-                self.className = name;
+                if any(strcmp(name,{'dj.Table','dj.Relvar'}))
+                    name = '';
+                end
             end
         end
         
@@ -587,10 +588,10 @@ classdef Table < handle
                     end
                 end
                 fprintf 'ABOUT TO DROP TABLES: \n'
-                tables = cellfun(@(x) dj.Table(x), self.descendants, 'UniformOutput', false);
+                tables = cellfun(@(x) dj.Relvar(x), self.descendants, 'uni', false);
                 tables = [tables{:}];
                 for table = tables
-                    n = count(init(dj.BaseRelvar,table));
+                    n = table.count;
                     fprintf('%20s (%s,%5d tuples)\n', table.fullTableName, table.info.tier, n)
                     doPrompt = doPrompt || n;   % prompt if not empty
                 end

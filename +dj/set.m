@@ -22,8 +22,8 @@ if nargout
     out = STATE;
 end
 if nargin
-    dj.assert(ischar(name), 'Parameter name must be a string')
-    dj.assert(isfield(STATE,name), 'Parameter name does not exist')
+    assert(ischar(name), 'Parameter name must be a string')
+    assert(isfield(STATE,name), 'Parameter name does not exist')
 end
 if nargin==1
     out = STATE.(name);

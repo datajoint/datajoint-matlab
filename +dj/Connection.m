@@ -109,12 +109,11 @@ classdef Connection < handle
         
         function reload(self)
             % reload all schemas
-            schemas = self.packages.values;
-            for s=schemas(:)'
+            self.clearDependencies
+            for s=self.packages.values
                 reload(feval([s{1} '.getSchema']))
             end
         end
-        
         
         
         function ret = get.isConnected(self)
@@ -182,9 +181,20 @@ classdef Connection < handle
         
         
         function delete(self)
+            self.clearDependencies
             self.close
         end
         
+    end
+    
+    
+    methods(Access=private)
+        function clearDependencies(self)
+            self.children.remove(self.children.keys);
+            self.parents.remove(self.parents.keys);
+            self.references.remove(self.references.keys);
+            self.referencing.remove(self.referencing.keys);
+        end
     end
 end
 

@@ -70,6 +70,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % The total number of tuples is printed at the end.
             nTuples = 0;
             fprintf('\nObject %s\n\n',class(self))
+            if isempty(self.className)
+                return
+            end
             s = sprintf(', %s', self.primaryKey{:});
             fprintf('Primary key: %s\n', s(2:end))
             if isempty(self.nonKeyFields)
@@ -125,23 +128,23 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             else
                 columns = {self.header.attributes.name};
                 sel = 1:length(columns);
-                if any([self.header.isBlob])
-                    error('!viewblobs:excluding blobs from the view')
-                    columns = columns(~[self.header.isBlob]);
+                if ~isempty(self.header.blobNames)
+                    warning 'excluding blobs from the view'
+                    columns = columns(~[self.header.attributes.isBlob]);
                 end
                 
                 % specify table header
                 columnName = columns;
                 for iCol = 1:length(columns)
-                    if self.header(iCol).iskey
+                    if self.header.attributes(iCol).iskey
                         columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
                     else
                         columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
                     end
                 end
                 format = cell(1,length(columns));
-                format([self.header(sel).isString]) = {'char'};
-                format([self.header(sel).isNumeric]) = {'numeric'};
+                format([self.header.attributes(sel).isString]) = {'char'};
+                format([self.header.attributes(sel).isNumeric]) = {'numeric'};
                 
                 % display table
                 data = fetch(self, columns{:});

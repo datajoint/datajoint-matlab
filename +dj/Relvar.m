@@ -60,15 +60,21 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 
                 % compile the list of relvars to be deleted from
                 list = self.descendants;
-                rels = cellfun(@(name) init(dj.BaseRelvar, dj.Table(name)), list, 'UniformOutput', false);
+                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
                 rels = [rels{:}];
                 rels(1) = rels(1) & self.restrictions;
                 
                 % apply proper restrictions
-                restrictByMe = arrayfun(@(rel) any(ismember(rel.tab.references, list)), rels);  % restrict by all association tables
+                restrictByMe = arrayfun(@(rel) ...
+                    any(ismember(...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.references,'uni',false),...
+                    list)),...
+                    rels);  % restrict by all association tables, i.e. tables that make references to other tables
                 restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
                 for i=1:length(rels)
-                    for ix = cellfun(@(child) find(strcmp(child,list)), [rels(i).tab.children rels(i).tab.referencing])
+                    % iterate through all tables that reference rels(i)
+                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), [rels(i).children rels(i).referencing])
+                        % and restrict them by it or its restrictions
                         if restrictByMe(i)
                             rels(ix).restrict(rels(i));
                         else
@@ -82,7 +88,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 for i=1:numel(rels)
                     counts(i) = rels(i).count;
                     if counts(i)
-                        fprintf('\n%8d tuples from %s (%s)', counts(i), rels(i).tab.fullTableName, rels(i).tab.info.tier)
+                        fprintf('\n%8d tuples from %s (%s)', counts(i), rels(i).fullTableName, rels(i).info.tier)
                     end
                 end
                 fprintf \n\n
@@ -95,7 +101,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                     self.schema.conn.startTransaction
                     try
                         for rel = fliplr(rels)
-                            fprintf('Deleting from %s\n', rel.tab.className)
+                            fprintf('Deleting from %s\n', rel.className)
                             rel.delQuick
                         end
                         self.schema.conn.commitTransaction
@@ -122,63 +128,63 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % Duplicates, unmatched attributes, or missing required attributes will
             % cause an error, unless command is specified.
             
-            dj.assert(isstruct(tuples), 'Tuples must be a non-empty structure array')
+            assert(isstruct(tuples), 'Tuples must be a non-empty structure array')
             if isempty(tuples)
                 return
             end
             if nargin<=2
                 command = 'INSERT';
             end
-            dj.assert(any(strcmpi(command,{'INSERT', 'INSERT IGNORE', 'REPLACE'})), ...
+            assert(any(strcmpi(command,{'INSERT', 'INSERT IGNORE', 'REPLACE'})), ...
                 'invalid insert command')
             header = self.header;
             
             % validate header
             fnames = fieldnames(tuples);
-            found = ismember(fnames,{header.name});
-            dj.assert(all(found), 'Field %s is not found in the table %s', ...
+            found = ismember(fnames,header.names);
+            assert(all(found), 'Field %s is not found in the table %s', ...
                 fnames{find(~found,1,'first')}, class(self))
             
             % form query
-            ix = ismember({header.name}, fnames);
+            ix = ismember(header.names, fnames);
             for tuple=tuples(:)'
                 queryStr = '';
                 blobs = {};
                 for i = find(ix)
-                    v = tuple.(header(i).name);
-                    if header(i).isString
-                        dj.assert(ischar(v), ...
+                    v = tuple.(header.attributes(i).name);
+                    if header.attributes(i).isString
+                        assert(ischar(v), ...
                             'The field %s must be a character string', ...
-                            header(i).name)
+                            header.attributes(i).name)
                         if isempty(v)
                             queryStr = sprintf('%s`%s`="",', ...
-                                queryStr, header(i).name);
+                                queryStr, header.attributes(i).name);
                         else
                             queryStr = sprintf('%s`%s`="{S}",', ...
-                                queryStr,header(i).name);
+                                queryStr,header.attributes(i).name);
                             blobs{end+1} = v;  %#ok<AGROW>
                         end
-                    elseif header(i).isBlob
+                    elseif header.attributes(i).isBlob
                         queryStr = sprintf('%s`%s`="{M}",', ...
-                            queryStr,header(i).name);
+                            queryStr,header.attributes(i).name);
                         blobs{end+1} = v;    %#ok<AGROW>
                     else
                         if islogical(v)  % mym doesn't accept logicals - save as unit8 instead
                             v = uint8(v);
                         end
-                        dj.assert(isscalar(v) && isnumeric(v),...
+                        assert(isscalar(v) && isnumeric(v),...
                             'The field %s must be a numeric scalar value', ...
-                            header(i).name)
+                            header.attributes(i).name)
                         if ~isnan(v)  % nans are not passed: assumed missing.
-                            if strcmp(header(i).type, 'bigint')
+                            if strcmp(header.attributes(i).type, 'bigint')
                                 queryStr = sprintf('%s`%s`=%d,',...
-                                    queryStr, header(i).name, v);
-                            elseif strcmp(header(i).type, 'bigint unsigned')
+                                    queryStr, header.attributes(i).name, v);
+                            elseif strcmp(header.attributes(i).type, 'bigint unsigned')
                                 queryStr = sprintf('%s`%s`=%u,',...
-                                    queryStr, header(i).name, v);
+                                    queryStr, header.attributes(i).name, v);
                             else
                                 queryStr = sprintf('%s`%s`=%1.16g,',...
-                                    queryStr, header(i).name, v);
+                                    queryStr, header.attributes(i).name, v);
                             end
                         end
                     end
@@ -217,33 +223,33 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             %   update(v2p.Mice & key, 'mouse_dob',   '2011-01-01')
             %   update(v2p.Scan & key, 'lens')   % set the value to NULL
             
-            dj.assert(count(self)==1, 'Update is only allowed on one tuple at a time')
+            assert(count(self)==1, 'Update is only allowed on one tuple at a time')
             isNull = nargin<3;
             header = self.header;
-            ix = find(strcmp(attrname,{header.name}));
-            dj.assert(numel(ix)==1, 'invalid attribute name')
-            dj.assert(~header(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
+            ix = find(strcmp(attrname,header.names));
+            assert(numel(ix)==1, 'invalid attribute name')
+            assert(~header.attributes(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
             
             switch true
                 case isNull
                     queryStr = 'NULL';
                     value = {};
-                case header(ix).isString
-                    dj.assert(ischar(value), 'Value must be a string')
+                case header.attributes(ix).isString
+                    assert(ischar(value), 'Value must be a string')
                     queryStr = '"{S}"';
                     value = {value};
-                case header(ix).isBlob
-                    if isempty(value) && header(ix).isnullable
+                case header.attributes(ix).isBlob
+                    if isempty(value) && header.attributes(ix).isnullable
                         queryStr = 'NULL';
                         value = {};
                     else
                         queryStr = '"{M}"';
                         value = {value};
                     end
-                case header(ix).isNumeric
-                    dj.assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
+                case header.attributes(ix).isNumeric
+                    assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
                     if isnan(value)
-                        dj.assert(header(ix).isnullable, ...
+                        assert(header.attributes(ix).isnullable, ...
                             'attribute `%s` is not nullable. NaNs not allowed', attrname)
                         queryStr = 'NULL';
                         value = {};
@@ -252,7 +258,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         value = {};
                     end
                 otherwise
-                    dj.assert(false)
+                    error 'invalid upate command'
             end
             
             queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
