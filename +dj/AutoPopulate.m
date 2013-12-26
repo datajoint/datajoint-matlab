@@ -211,7 +211,7 @@ classdef AutoPopulate < handle
             % restrict the popRel to unpopulated tuples
             unpopulated = fetch((unpopulated & varargin) - self);
             if isempty(unpopulated)
-                fprintf('%s: Nothing to populate\n', self.table.className)
+                fprintf('%s: Nothing to populate\n', self.className)
             else
                 fprintf('\n**%s: Found %d unpopulated keys\n\n', self.className, length(unpopulated))
                 
