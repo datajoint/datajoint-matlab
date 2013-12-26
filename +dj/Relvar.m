@@ -4,9 +4,9 @@
 
 
 classdef Relvar < dj.GeneralRelvar & dj.Table
-        
+    
     methods
-        function self = Relvar(varargin) 
+        function self = Relvar(varargin)
             self@dj.Table(varargin{:})
             self.init('table',{self});
         end
@@ -52,7 +52,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         && ~isa(self, 'dj.AutoPopulate')
                     fprintf(['!!! %s is a subtable. For referential integrity, ' ...
                         'delete from its parent instead.\n'], class(self))
-                    if ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
+                    if ~dj.set('suppressPrompt') && ~strcmpi('yes', dj.ask('Proceed anyway?'))
                         disp 'delete cancelled'
                         return
                     end
@@ -89,7 +89,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 rels = rels(counts>0);
                 
                 % confirm and delete
-                if ~dj.set('suppressPrompt') && ~strcmpi('yes', input('Proceed to delete? yes/no >', 's'))
+                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.ask('Proceed to delete?'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
@@ -228,7 +228,6 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 case isNull
                     queryStr = 'NULL';
                     value = {};
-                    
                 case header(ix).isString
                     dj.assert(ischar(value), 'Value must be a string')
                     queryStr = '"{S}"';
@@ -239,15 +238,9 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         value = {};
                     else
                         queryStr = '"{M}"';
-                        if islogical(value)
-                            value = uint8(value);
-                        end
                         value = {value};
                     end
                 case header(ix).isNumeric
-                    if islogical(value)
-                        value = uint8(value);
-                    end
                     dj.assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
                     if isnan(value)
                         dj.assert(header(ix).isnullable, ...
