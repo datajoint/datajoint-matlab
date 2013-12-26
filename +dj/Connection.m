@@ -86,22 +86,22 @@ classdef Connection < handle
                 end
             end
         end
-                
         
-        function className = getPackage(self, className, strict)
-            % convert '$database_name.ClassName' to 'package.ClassName'
-            % If strict, then throw an error if the database_name was not found.
+        
+        function className = tableToClass(self, fullTableName, strict)
+            % convert '`dbname`.`table_name`' to 'package.ClassName'
+            % If strict (false by default), throw error if the dbname is not found.
+            % If not strict and the name is not found, then className=tableName
+            
             strict = nargin>=3 && strict;
-            if className(1)=='$'
-                [schemaName,className] = strtok(className,'.');
-                
-                if self.packages.isKey(schemaName(2:end))
-                    schemaName = self.packages(schemaName(2:end));
-                elseif strict
-                    error('Unknown package for "%s%s". Activate its schema first.', ...
-                        schemaName(2:end), className)
-                end
-                className = [schemaName className];
+            s = regexp(fullTableName, '^`(?<dbname>.+)`.`(?<tablename>[#~\w\d]+)`$','names');
+            assert(~isempty(s), 'invalid table name %s', fullTableName)
+            if self.packages.isKey(s.dbname)
+                className = sprintf('%s.%s',self.packages(s.dbname),dj.toCamelCase(s.tablename));
+            elseif strict
+                error('Unknown package for "%s". Activate its schema first.', fullTableName)
+            else
+                className = fullTableName;
             end
         end
         

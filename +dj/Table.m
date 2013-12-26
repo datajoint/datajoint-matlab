@@ -46,9 +46,10 @@ classdef Table < handle
         declaration     % table declaration
     end
     
-    
     methods
         function self = Table(className)
+            % dj.Table with no arguments is used when dj.Table is inherited by dj.Relvar
+            % dj.Table('pakage.ClassName')  -  initialze with class name.
             if nargin>=1
                 self.className = className;
             end
@@ -167,7 +168,7 @@ classdef Table < handle
             
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.Table(name),level+1), ...
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), ...
                         [table.children table.referencing])
                     map(table.className)=level;
                 end
@@ -269,7 +270,7 @@ classdef Table < handle
                 'class %s does not appear in the class list of the schema', self.className);
             
             % list primary key fields
-            keyFields = {self.tableHeader([self.tableHeader.iskey]).name};
+            keyFields = self.tableHeader.primaryKey;
             
             if ~expandForeignKeys
                 % list parent references
@@ -278,13 +279,13 @@ classdef Table < handle
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
                         % exclude primary key fields of referenced tables from the primary attribute list
-                        keyFields = keyFields(~ismember(keyFields, {t.tableHeader([t.tableHeader.iskey]).name}));
+                        keyFields = keyFields(~ismember(keyFields, t.tableHeader.primaryKey));
                     end
                 end
             end
             
             % additional primary attributes
-            for i=find(ismember({self.tableHeader.name}, keyFields))
+            for i=find(ismember(self.tableHeader.names, keyFields))
                 comment = self.tableHeader(i).comment;
                 str = sprintf('%s\n%-40s# %s', str, ...
                     sprintf('%-16s: %s', self.tableHeader(i).name, self.tableHeader(i).type), comment);
@@ -294,7 +295,7 @@ classdef Table < handle
             str = sprintf('%s\n---', str);
             
             % list dependent attributes
-            dependentFields = {self.tableHeader(~[self.tableHeader.iskey]).name};
+            dependentFields = self.tableHeader.dependentFields;
             
             % list other references
             if ~expandForeignKeys
@@ -303,27 +304,27 @@ classdef Table < handle
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
                         % exclude primary key fields of referenced tables from header
-                        dependentFields = dependentFields(~ismember(dependentFields, {t.tableHeader([t.tableHeader.iskey]).name}));
+                        dependentFields = dependentFields(~ismember(dependentFields, t.tableHeader.primaryKey));
                     end
                 end
             end
             
             % list remaining attributes
-            for i=find(ismember({self.tableHeader.name}, dependentFields))
-                if self.tableHeader(i).isnullable
+            for i=find(ismember(self.tableHeader.names, dependentFields))
+                attr = self.tableHeader.attributes(i);
+                default = attr.default;
+                if attr.isnullable
                     default = '=null';
-                elseif strcmp(char(self.tableHeader(i).default(:)'), '<<<no default>>>')
-                    default = '';
-                elseif self.tableHeader(i).isNumeric || ...
-                        any(strcmp(self.tableHeader(i).default,self.mysql_constants))
-                    default = ['=' self.tableHeader(i).default];
-                else
-                    default = ['="' self.tableHeader(i).default '"'];
+                elseif ~isempty(default)
+                    if attr.isNumeric || any(strcmp(default,self.mysql_constants))
+                        default = ['=' default]; %#ok<AGROW>
+                    else
+                        default = ['="' default '"']; %#ok<AGROW>
+                    end
                 end
-                comment = self.tableHeader(i).comment;
                 str = sprintf('%s\n%-60s# %s', str, ...
-                    sprintf('%-28s: %s', [self.tableHeader(i).name default], self.tableHeader(i).type), ...
-                    comment);
+                    sprintf('%-28s: %s', [attr.name default], attr.type), ...
+                    attr.comment);
             end
             str = sprintf('%s\n', str);
             
@@ -508,7 +509,7 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if ~dj.set('suppressPrompt') ...
-                        && ~strcmpi('yes', input(sprintf('Update table declaration in %s? yes/no > ',path), 's'))
+                        && ~strcmpi('yes', dj.ask(sprintf('Update table declaration in %s?',path)))
                     disp 'No? Table declaration left unpdated.'
                 else
                     % read old file
@@ -544,7 +545,7 @@ classdef Table < handle
         
         function list = getEnumValues(self, attr)
             % returns the list of allowed values for the attribute attr of type enum
-            ix = strcmpi(attr, {self.tableHeader.attributes.name});
+            ix = strcmpi(attr, self.tableHeader.names);
             assert(any(ix), 'Attribute "%s" not found', attr)
             list = regexpi(self.tableHeader.attributes(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
             assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
@@ -579,7 +580,7 @@ classdef Table < handle
                     if ~isa(rel,'dj.AutoPopulate') && ~dj.set('suppressPrompt')
                         fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
                             'drop its parent table instead.\n'], self.className)
-                        if ~strcmpi('yes', input('Proceed anyway? yes/no >','s'))
+                        if ~strcmpi('yes', dj.ask('Proceed anyway?'))
                             fprintf '\ndrop cancelled\n\n'
                             return
                         end
@@ -596,7 +597,7 @@ classdef Table < handle
                 
                 % if any table has data, give option to cancel
                 doPrompt = doPrompt && ~dj.set('suppressPrompt');  % suppress prompt
-                if doPrompt && ~strcmpi('yes', input('Proceed to drop? yes/no >', 's'));
+                if doPrompt && ~strcmpi('yes', dj.ask('Proceed to drop?'))
                     disp 'User cancelled table drop'
                 else
                     try
@@ -653,7 +654,7 @@ classdef Table < handle
             % compile the CREATE TABLE statement
             tableName = [self.schema.prefix, ...
                 dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                dj.Schema.fromCamelCase(tableInfo.className)];
+                dj.fromCamelCase(tableInfo.className)];
             
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
@@ -720,8 +721,7 @@ classdef Table < handle
             % gather implicit indexes due to foreign keys first
             implicitIndexes = {};
             for fkSource = [parents references]
-                isKey = [fkSource{1}.tableHeader.attributes.iskey];
-                implicitIndexes{end+1} = {fkSource{1}.tableHeader.attributes(isKey).name}; %#ok<AGROW>
+                implicitIndexes{end+1} = fkSource{1}.primaryKey; %#ok<AGROW>
             end
             
             for iIndex = 1:numel(indexDefs)
@@ -798,25 +798,24 @@ classdef Table < handle
             % table relationships and should not be shown to the user
             % or modified by the user
             indexInfo = struct('attributes', {}, 'unique', {});
-            for refClassName = [self.references self.parents]
-                refObj = dj.Table(self.schema.conn.getPackage(refClassName{1},true));
-                indexInfo(end+1).attributes = ...
-                    {refObj.tableHader([refObj.tableHeader.iskey]).name};  %#ok<AGROW>
+            for refTable = [self.references self.parents]
+                refObj = dj.Table(self.schema.conn.tableToClass(refTable{1},true));
+                indexInfo(end+1).attributes = refObj.tableHeader.primaryKey;  %#ok<AGROW>
             end
         end
         
         
         
-        function [classNames,tables] = sortForeignKeys(self, classNames)
+        function [classNames,tables] = sortForeignKeys(self, tableNames)
             % sort referenced tables so that they reproduce the correct
             % order of primary key attributes
-            tables = cellfun(@(x) dj.Table(self.schema.conn.getPackage(x,true)), classNames,'uni',false);
+            tables = cellfun(@(x) dj.Table(self.schema.conn.tableToClass(x,true)), tableNames, 'uni', false);
             tables = [tables{:}];
             if isempty(tables)
                 classNames = {};
             else
-                fkFields = arrayfun(@(x) {x.tableHeader([x.tableHeader.iskey]).name}, tables,'uni',false);
-                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.tableHeader.name})), s), fkFields, 'uni', false);
+                fkFields = arrayfun(@(x) {x.tableHeader.attributes([x.tableHeader.attributes.iskey]).name}, tables,'uni',false);
+                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.tableHeader.attributes.name})), s), fkFields, 'uni', false);
                 m = max(cellfun(@max, fkOrder));
                 [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
                 tables = tables(fkOrder);

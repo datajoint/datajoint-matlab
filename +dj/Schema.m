@@ -335,12 +335,12 @@ classdef Schema < handle
                     tierIdx = ~cellfun(@isempty, regexp(info.name, re, 'once'));
                     assert(sum(tierIdx)==1)
                     info.tier = dj.Schema.allowedTiers{tierIdx};
-                    self.tableNames(self.makeClassName(self.dbname, info.name)) = info.name;
+                    self.tableNames(sprintf('%s.%s',self.package,dj.toCamelCase(info.name(length(self.prefix)+1:end)))) = info.name;
                     self.headers(info.name) = dj.Header.initFromDatabase(self,info);
                 end
                 
                 fprintf('%.3g s\nloading dependencies... ', toc), tic
-                self.conn.loadDependencies(self)                
+                self.conn.loadDependencies(self)
                 fprintf('%.3g s\n',toc)
             end
         end
@@ -362,69 +362,12 @@ classdef Schema < handle
                 for key=schema.headers.keys
                     table = schema.headers(key{1});
                     fprintf('%20s %10s  %s\n', ...
-                        dj.Schema.toCamelCase(table.info.name),...
+                        dj.toCamelCase(table.info.name),...
                         table.info.tier, table.info.comment)
                 end
                 fprintf('\n<a href="matlab:erd(%s.getSchema)">%s</a>\n', ...
                     self(i).package, 'Show entity relationship diagram')
             end
-        end
-    end
-    
-    
-    methods(Access = private)
-        function str = makeClassName(self, db, tab)
-            % produce class name from database and table.
-            
-            % support multiple schemas per database
-            ix = find(tab=='/');
-            if ix
-                db = [db '/' tab(1:ix(1)-1)];
-                tab = tab(ix(1)+1:end);
-            end
-            str = self.conn.getPackage(['$' db '.' dj.Schema.toCamelCase(tab)]);
-        end
-    end
-    
-    
-    methods(Static)
-        function str = toCamelCase(str)
-            % converts underscore_compound_words to CamelCase
-            %
-            % Not always exactly inversible
-            %
-            % Examples:
-            %   toCamelCase('one')            -->  'One'
-            %   toCamelCase('one_two_three')  -->  'OneTwoThree'
-            %   toCamelCase('#$one_two,three') --> 'OneTwoThree'
-            %   toCamelCase('One_Two_Three')  --> !error! upper case only mixes with alphanumericals
-            %   toCamelCase('5_two_three')    --> !error! cannot start with a digit
-            
-            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
-            assert(isempty(regexp(str, '[A-Z]', 'once')), ...
-                'underscore_compound_words must not contain uppercase characters')
-            str = regexprep(str, '(^|[_\W]+)([a-zA-Z])', '${upper($2)}');
-        end
-        
-        
-        
-        function str = fromCamelCase(str)
-            % converts CamelCase to underscore_compound_words.
-            %
-            % Examples:
-            %   fromCamelCase('oneTwoThree')    --> 'one_two_three'
-            %   fromCamelCase('OneTwoThree')    --> 'one_two_three'
-            %   fromCamelCase('one two three')  --> !error! white space is not allowed
-            %   fromCamelCase('ABC')            --> 'a_b_c'
-            
-            assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')
-            assert(~ismember(str(1), '0':'9'), 'string cannot begin with a digit')
-            
-            assert(~isempty(regexp(str, '^[a-zA-Z0-9]*$', 'once')), ...
-                'fromCamelCase string can only contain alphanumeric characters');
-            str = regexprep(str, '([A-Z])', '_${lower($1)}');
-            str = str(1+(str(1)=='_'):end);  % remove leading underscore
         end
     end
 end
