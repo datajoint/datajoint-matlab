@@ -79,7 +79,7 @@ classdef BaseRelvar < dj.GeneralRelvar
                 for i=1:length(rels)
                     for ix = cellfun(@(child) find(strcmp(child,list)), [rels(i).tab.children rels(i).tab.referencing])
                         if restrictByMe(i)
-                            rels(ix).restrict(rels(i));
+                            rels(ix).restrict(pro(rels(i)));
                         else
                             rels(ix).restrict(rels(i).restrictions{:});
                         end
