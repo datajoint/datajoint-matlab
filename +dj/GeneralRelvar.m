@@ -702,8 +702,9 @@ for arg = restrictions
             % semijoin or antijoin
             [condAttrs, condSQL] = cond.compile;
             
-            % isolate previous projection (if not already)
-            if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions)
+            % isolate aggregations and non-trivial projections (if not already)
+            if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions) &&...
+                    ~all(cellfun(@isempty, {cond.header.alias}))
                 [attrStr, condAttrs] = makeAttrList(condAttrs);
                 condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', attrStr, condSQL, aliasCount);
             end
