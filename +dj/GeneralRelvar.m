@@ -120,8 +120,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
         end
         
-        function view(self)
+        function view(self, varargin)
             % dj.Relvar/view - view the data in speadsheet form. Blobs are omitted.
+            % Additional arguments are forwarded to fetch(), e.g. for ORDER BY
+            % and LIMIT clauses.
             if ~self.exists
                 disp 'empty relation'
             else
@@ -146,7 +148,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 format([self.header(sel).isNumeric]) = {'numeric'};
                 
                 % display table
-                data = fetch(self, columns{:});
+                data = fetch(self, columns{:}, varargin{:});
                 hfig = figure('Units', 'normalized', 'Position', [0.1 0.1 0.5 0.4], ...
                     'MenuBar', 'none');
                 uitable(hfig, 'Units', 'normalized', 'Position', [0.0 0.0 1.0 1.0], ...
