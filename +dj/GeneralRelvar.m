@@ -70,9 +70,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % The total number of tuples is printed at the end.
             nTuples = 0;
             fprintf('\nObject %s\n\n',class(self))
-            if isempty(self.className)
-                return
-            end
             s = sprintf(', %s', self.primaryKey{:});
             fprintf('Primary key: %s\n', s(2:end))
             if isempty(self.nonKeyFields)

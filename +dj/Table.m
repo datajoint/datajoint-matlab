@@ -287,9 +287,10 @@ classdef Table < handle
             
             % additional primary attributes
             for i=find(ismember(self.tableHeader.names, keyFields))
-                comment = self.tableHeader(i).comment;
+                comment = self.tableHeader.attributes(i).comment;
                 str = sprintf('%s\n%-40s# %s', str, ...
-                    sprintf('%-16s: %s', self.tableHeader(i).name, self.tableHeader(i).type), comment);
+                    sprintf('%-16s: %s', self.tableHeader.attributes(i).name, ...
+                    self.tableHeader.attributes(i).type), comment);
             end
             
             % dividing line
