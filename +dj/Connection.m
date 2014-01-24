@@ -121,9 +121,9 @@ classdef Connection < handle
             
             if ~ret && self.inTransaction
                 if dj.set('reconnectTimedoutTransaction')
-                    dj.assert(false, '!disconnectedTransaction:Reconnected after server disconnected during a transaction')
+                    warning 'Reconnected after server disconnected during a transaction'
                 else
-                    dj.assert(false, 'disconnectedTransaction:Server disconnected during a transaction')
+                    error 'Server disconnected during a transaction'
                 end
             end
         end
