@@ -32,7 +32,7 @@ classdef Table < handle
         info           % table information
         fullTableName  % `database`.`plain_table_name`
         parents        % names of tables referenced by foregin keys composed exclusively of primary key attributes
-        references     % names of tables referenced by foreign keys composed of primary and non-primary attributes
+        referenced     % names of tables referenced by foreign keys composed of primary and non-primary attributes
         children       % names of tables referencing this table with their primary key attributes
         referencing    % names of tables referencing this table with their primary and non-primary attributes
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
@@ -129,10 +129,10 @@ classdef Table < handle
         end
         
         
-        function list = get.references(self)
+        function list = get.referenced(self)
             self.schema.reload(false)
-            if self.schema.conn.references.isKey(self.fullTableName)
-                list = self.schema.conn.references(self.fullTableName);
+            if self.schema.conn.referenced.isKey(self.fullTableName)
+                list = self.schema.conn.referenced(self.fullTableName);
             else
                 list = {};
             end
@@ -195,51 +195,26 @@ classdef Table < handle
         
         
         
-        function erd(self, depth1, depth2)
+        
+        function erd(self, up, down)
             % dj.Table/erd - plot the entity relationship diagram of tables
             % that are connected to self.
             %
             % SYNTAX
-            %   table.erd([depth1,depth2]])
-            %
-            % depth1 and depth2 specify the connectivity radius upstream
-            % (depth<0) and downstream (depth>0) of this table.
-            % Omitting both depths defaults to table.erd(-2,2).
-            % Omitting any one of the depths sets it to zero.
-            %
-            % Examples:
-            %   t = dj.Table('vis2p.Scans');
-            %   t.erd(-1,1)  % plot immediate ancestors and descendants
-            %   t.erd(-1,0)  % plot only immediate ancestors
-            %   t.erd(-2,2)  % plot two levels in each direction
-            %   t.erd    -- same as t.erd(-2,2)
+            %   table.erd(up, down)
+            %   table.erd  -- equivalent to table.erd(2,2)
             %
             % See also dj.Schema/erd
+            
             self.create
+            if nargin<=2
+                down = 2;
+            end
             if nargin<=1
-                depth1 = -2;
-                depth2 = +2;
+                up = 2;
             end
-            assert(depth1<=0 && depth2>=0);
-            subset = {self.className};
-            tabs = self;
-            for i=1:max(-depth1,depth2)
-                newTabs = {};
-                for tab = tabs
-                    new = [];
-                    if i<=-depth1
-                        new = [new tab.parents tab.references]; %#ok<AGROW>
-                    end
-                    if i<=depth2
-                        new = [new tab.children tab.referencing]; %#ok<AGROW>
-                    end
-                    subset = union(subset, new);
-                    new = new(cellfun(@(x) x(1)~='$',new)); % do not expand unloaded schemas
-                    newTabs = [newTabs cellfun(@(x) dj.Table(x), new, 'UniformOutput', false)]; %#ok<AGROW>
-                end
-                tabs = [newTabs{:}];
-            end
-            self.schema.erd(subset)
+            
+            self.schema.conn.erd({self.fullTableName},up,down)
         end
         
         
@@ -253,7 +228,7 @@ classdef Table < handle
             % str will contain the table declaration string that can be used
             % to create the table using dj.Table.
             %
-            % When the second input expandForeignKeys is false, references
+            % When the second input expandForeignKeys is false, referenced
             % to other tables are not displayed and foreign key attributes
             % are shown as regular attributes.
             %
@@ -274,7 +249,7 @@ classdef Table < handle
             keyFields = self.tableHeader.primaryKey;
             
             if ~expandForeignKeys
-                % list parent references
+                % list parent referenced
                 [classNames,tables] = self.sortForeignKeys(self.parents);
                 if ~isempty(classNames)
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
@@ -299,9 +274,9 @@ classdef Table < handle
             % list dependent attributes
             dependentFields = self.tableHeader.dependentFields;
             
-            % list other references
+            % list other referenced
             if ~expandForeignKeys
-                [classNames,tables] = self.sortForeignKeys(self.references);
+                [classNames,tables] = self.sortForeignKeys(self.referenced);
                 if ~isempty(classNames)
                     str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
                     for t = tables
@@ -647,7 +622,7 @@ classdef Table < handle
             if self.isCreated
                 return
             end
-            [tableInfo, parents, references, fieldDefs, indexDefs] = ...
+            [tableInfo, parents, referenced, fieldDefs, indexDefs] = ...
                 parseDeclaration(self.getDeclaration);
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
@@ -686,9 +661,9 @@ classdef Table < handle
             end
             
             % add secondary foreign key attributes
-            for iRef = 1:length(references)
-                for iField = find([references{iRef}.tableHeader.attributes.iskey])
-                    field = references{iRef}.tableHeader.attributes(iField);
+            for iRef = 1:length(referenced)
+                for iField = find([referenced{iRef}.tableHeader.attributes.iskey])
+                    field = referenced{iRef}.tableHeader.attributes(iField);
                     if ~ismember(field.name, [primaryKeyFields nonKeyFields])
                         nonKeyFields{end+1} = field.name; %#ok<AGROW>
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
@@ -711,7 +686,7 @@ classdef Table < handle
             sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
             
             % add foreign key declarations
-            for ref = [parents references]
+            for ref = [parents referenced]
                 fieldList = sprintf('%s,', ref{1}.primaryKey{:});
                 fieldList(end)=[];
                 sql = sprintf(...
@@ -722,7 +697,7 @@ classdef Table < handle
             % add secondary index declarations
             % gather implicit indexes due to foreign keys first
             implicitIndexes = {};
-            for fkSource = [parents references]
+            for fkSource = [parents referenced]
                 implicitIndexes{end+1} = fkSource{1}.primaryKey; %#ok<AGROW>
             end
             
@@ -800,7 +775,7 @@ classdef Table < handle
             % table relationships and should not be shown to the user
             % or modified by the user
             indexInfo = struct('attributes', {}, 'unique', {});
-            for refTable = [self.references self.parents]
+            for refTable = [self.referenced self.parents]
                 refObj = dj.Table(self.schema.conn.tableToClass(refTable{1},true));
                 indexInfo(end+1).attributes = refObj.tableHeader.primaryKey;  %#ok<AGROW>
             end
@@ -886,9 +861,9 @@ end
 
 
 
-function [tableInfo, parents, references, fieldDefs, indexDefs] = parseDeclaration(declaration)
+function [tableInfo, parents, referenced, fieldDefs, indexDefs] = parseDeclaration(declaration)
 parents = {};
-references = {};
+referenced = {};
 fieldDefs = [];
 indexDefs = [];
 
@@ -917,7 +892,7 @@ assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
     'invalidTableTier:Invalid tier for table ', tableInfo.className)
 
 if nargout > 1
-    % parse field declarations and references
+    % parse field declarations and referenced
     inKey = true;
     for iLine = 2:length(declaration)
         line = declaration{iLine};
@@ -931,7 +906,7 @@ if nargout > 1
                 if inKey
                     parents{end+1} = p;     %#ok:<AGROW>
                 else
-                    references{end+1} = p;   %#ok:<AGROW>
+                    referenced{end+1} = p;   %#ok:<AGROW>
                 end
             case regexpi(line, '^(unique\s+)?index[^:]*$')
                 % parse index definition

@@ -11,7 +11,7 @@ classdef Connection < handle
         % dependency lookups by table name
         children     % maps table names to their children table names   (primary foreign key)
         parents      % maps table names to their parent table names     (primary foreign key)
-        references   % maps table names to their refenced tables    (non-primary foreign key)
+        referenced   % maps table names to their refenced tables    (non-primary foreign key)
         referencing  % maps table names to their referencing tables (non-primary foreign key)
     end
     
@@ -43,7 +43,7 @@ classdef Connection < handle
             end
             self.children    = containers.Map('KeyType','char','ValueType','any');
             self.parents     = containers.Map('KeyType','char','ValueType','any');
-            self.references  = containers.Map('KeyType','char','ValueType','any');
+            self.referenced  = containers.Map('KeyType','char','ValueType','any');
             self.referencing = containers.Map('KeyType','char','ValueType','any');
             self.packages = containers.Map;
         end
@@ -80,7 +80,7 @@ classdef Connection < handle
                         addMember(self.parents, from, s.ref)
                         addMember(self.children, s.ref, from)
                     else
-                        addMember(self.references, from, s.ref)
+                        addMember(self.referenced, from, s.ref)
                         addMember(self.referencing, s.ref, from)
                     end
                 end
@@ -102,6 +102,194 @@ classdef Connection < handle
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
             else
                 className = fullTableName;
+            end
+        end
+        
+        
+        function erd(self, list, up, down)
+            % ERD -- plot the Entity Relationship Diagram
+            %
+            % INPUTS:
+            %    list -- tables to include in the diagram formatted as
+            %    `dbname`.`table_name`
+            
+            if nargin<3
+                up = 0;
+                down = 0;
+            end
+            
+            
+            % get additional tables that are connected to ones on the list:
+            % up the hierarchy
+            temp1 = list;
+            temp = list;
+            for i=1:up
+                temp = cellfun(@(s) ...
+                    [lookup(self.referenced, s) lookup(self.parents,s)], ...
+                    temp, 'uni', false);
+                temp = setdiff([temp{:}],temp1);
+                temp1 = [temp1 temp]; %#ok<AGROW>
+            end
+            % ... and down the hierarchy
+            temp2 = list;
+            temp = list;
+            for i=1:down
+                temp = cellfun(@(s) ...
+                    [lookup(self.referencing, s) lookup(self.children,s)], ...
+                    temp, 'uni', false);
+                temp = setdiff([temp{:}],temp2);
+                temp2 = [temp2 temp]; %#ok<AGROW>
+            end
+            list = union(list, [temp1 temp2]);
+            
+            % determine tiers
+            re = cellfun(@(s) sprintf('`.+`\\.`%s[a-z].*`',s), dj.Schema.tierPrefixes, 'uni', false);
+            tiers = dj.Schema.allowedTiers(cellfun(@(l) find(~cellfun(@isempty, regexp(l, re))),list));
+            j = ~strcmp(tiers,'job');
+            list = list(j);  % exclude jobs
+            tiers = tiers(j);
+            
+            
+            % construct the dependency matrix C(to,from)
+            n = length(list);
+            C = sparse([],[],[],n,n);
+            for i=1:n
+                j = cellfun(@(c) find(strcmp(c,list)), lookup(self.children,list{i}), 'uni', false);
+                C(i,[j{:}])=1; %#ok<SPRIX>
+                j = cellfun(@(c) find(strcmp(c,list)), lookup(self.referencing,list{i}), 'uni', false);
+                C(i,[j{:}])=2; %#ok<SPRIX>
+            end
+            
+            if sum(C(:))==0
+                disp 'No dependencies found. Nothing to plot'
+                return
+            end
+            
+            % compute levels in hierarchy
+            level = zeros(size(list));
+            updated = true;
+            while updated
+                updated = false;
+                for i=1:n
+                    j = find(C(i,:));
+                    if ~isempty(j)
+                        newLevel = max(level(j))+1;
+                        if level(i)~=newLevel
+                            updated = true;
+                            level(i) = newLevel;
+                        end
+                    end
+                end
+            end
+            % tighten up levels
+            updated = true;
+            while updated
+                updated = false;
+                for i=1:n
+                    j = find(C(:,i));
+                    if ~isempty(j)
+                        newLevel = min(level(j))-1;
+                        if newLevel ~= level(i)
+                            updated = true;
+                            level(i) = newLevel;
+                        end
+                    end
+                end
+            end
+            
+            
+            % convert to 'package.ClassName'
+            names = cellfun(@self.tableToClass,list,'uni',false);
+            
+            % plot
+            
+            yi = level;
+            xi = zeros(size(yi));
+            
+            % optimize graph appearance by minimizing disctances.^2 to connected nodes
+            % while maximizing distances to nodes on the same level.
+            j1 = cell(1,length(xi));
+            j2 = cell(1,length(xi));
+            for i=1:length(xi)
+                j1{i} = setdiff(find(yi==yi(i)),i);
+                j2{i} = [find(C(i,:)) find(C(:,i)')];
+            end
+            niter=5e4;
+            T0=5; % initial temperature
+            cr=6/niter; % cooling rate
+            L = inf(size(xi));
+            for iter=1:niter
+                i = ceil(rand*length(xi));  % pick a random node
+                
+                % Compute the cost function Lnew of the increasing xi(i) by dx
+                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
+                xx=xi(i)+dx;
+                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
+                if ~isempty(j1{i})
+                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
+                end
+                
+                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
+                    xi(i)=xi(i)+dx;
+                    L(i) = Lnew;
+                end
+            end
+            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
+            
+            
+            % plot nodes
+            plot(xi, yi, 'ko', 'MarkerSize', 10);
+            hold on;
+            % plot edges
+            for i=1:size(C,1)
+                for j=1:size(C,2)
+                    switch C(i,j)
+                        case 1
+                            connectNodes(xi([i j]), yi([i j]), 'k-')
+                        case 2
+                            connectNodes(xi([i j]), yi([i j]), 'k--')
+                    end
+                    hold on
+                end
+            end
+            
+            % annotate nodes
+            fontColor = struct(...
+                'manual',   [0.0 0.6 0.0], ...
+                'lookup',   [0.3 0.4 0.3], ...
+                'imported', [0.0 0.0 1.0], ...
+                'computed', [0.5 0.0 0.0], ...
+                'job',      [1 1 1]);
+            
+            for i=1:length(level)
+                name = names{i};
+                if exist(name,'class')
+                    rel = feval(name);
+                    assert(isa(rel, 'dj.Relvar'))
+                    if rel.isSubtable
+                        name = [name '*'];  %#ok:AGROW
+                    end
+                end
+                edgeColor = 'none';
+                fontSize = 11;
+                text(xi(i), yi(i), [name '  '], ...
+                    'HorizontalAlignment', 'right', 'interpreter', 'none', ...
+                    'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
+                hold on;
+            end
+            
+            xlim([min(xi)-0.5 max(xi)+0.5]);
+            ylim([min(yi)-0.5 max(yi)+0.5]);
+            hold off
+            axis off
+            
+            function connectNodes(x, y, lineStyle)
+                assert(length(x)==2 && length(y)==2)
+                plot(x, y, 'k.')
+                t = 0:0.05:1;
+                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
+                y = y(1) + (y(2)-y(1))*t;
+                plot(x, y, lineStyle)
             end
         end
         
@@ -192,10 +380,19 @@ classdef Connection < handle
         function clearDependencies(self)
             self.children.remove(self.children.keys);
             self.parents.remove(self.parents.keys);
-            self.references.remove(self.references.keys);
+            self.referenced.remove(self.referenced.keys);
             self.referencing.remove(self.referencing.keys);
         end
     end
+end
+
+
+function ret = lookup(map, key)
+if map.isKey(key)
+    ret = map(key);
+else
+    ret = {};
+end
 end
 
 

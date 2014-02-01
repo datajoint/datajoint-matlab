@@ -1,6 +1,5 @@
 % Relvar: a relational variable associated with a table in the database and a
 % MATLAB class in the schema.
-%
 
 
 classdef Relvar < dj.GeneralRelvar & dj.Table
@@ -67,9 +66,9 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 % apply proper restrictions
                 restrictByMe = arrayfun(@(rel) ...
                     any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.references,'uni',false),...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.referenced,'uni',false),...
                     list)),...
-                    rels);  % restrict by all association tables, i.e. tables that make references to other tables
+                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
                 restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
@@ -265,5 +264,6 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 self.fullTableName, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
         end
+        
     end
 end
