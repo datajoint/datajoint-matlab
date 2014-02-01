@@ -75,7 +75,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                     for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), [rels(i).children rels(i).referencing])
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
-                            rels(ix).restrict(rels(i));
+                            rels(ix).restrict(pro(rels(i)))
                         else
                             rels(ix).restrict(rels(i).restrictions{:});
                         end

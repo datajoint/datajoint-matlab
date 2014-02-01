@@ -689,7 +689,8 @@ for arg = restrictions
             [condHeader, condSQL] = cond.compile;
             
             % isolate previous projection (if not already)
-            if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions)
+            if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions) && ...
+                    ~all(cellfun(@isempty, {cond.header.alias}))
                 condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', ...
                     condHeader.sql, condSQL, aliasCount);
             end
