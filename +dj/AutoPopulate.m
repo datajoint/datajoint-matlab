@@ -350,7 +350,7 @@ classdef AutoPopulate < handle
                 if self.useReservations
                     abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
                     if ~isempty(abovePopRel)
-                        error(['!Primary key attribute %s is above popRel''s primary key attributes. '...
+                        warning(['Primary key attribute %s is above popRel''s primary key attributes. '...
                         'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                     end
                 end
