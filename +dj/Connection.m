@@ -9,10 +9,8 @@ classdef Connection < handle
         packages     % maps database names to package names
         
         % dependency lookups by table name
-        children     % maps table names to their children table names   (primary foreign key)
         parents      % maps table names to their parent table names     (primary foreign key)
         referenced   % maps table names to their refenced tables    (non-primary foreign key)
-        referencing  % maps table names to their referencing tables (non-primary foreign key)
     end
     
     properties(Access = private)
@@ -41,13 +39,10 @@ classdef Connection < handle
             if nargin>=4
                 self.initQuery = initQuery;
             end
-            self.children    = containers.Map('KeyType','char','ValueType','any');
             self.parents     = containers.Map('KeyType','char','ValueType','any');
             self.referenced  = containers.Map('KeyType','char','ValueType','any');
-            self.referencing = containers.Map('KeyType','char','ValueType','any');
             self.packages = containers.Map;
         end
-        
         
         
         function addPackage(self, dbname, package)
@@ -66,26 +61,41 @@ classdef Connection < handle
                 s = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
                 s = strtrim(regexp(s.('Create Table'){1},'\n','split')');
                 s = regexp(s,pat,'names');
-                for s=[s{~cellfun(@isempty,s)}]
+                s = [s{:}];
+                from = sprintf('`%s`.`%s`',schema.dbname,tabName{1});
+                addMember(self.parents, from)
+                addMember(self.referenced, from)
+                for s=s
                     assert(isequal(s.attrs1,s.attrs2),...
                         'Foreign keys must link identically named attributes')
                     s.attrs = strsplit(s.attrs1,', ');
                     s.attrs = cellfun(@(s) s(2:end-1), s.attrs, 'uni',false);
                     isPrimary = all(ismember(s.attrs,schema.headers(tabName{1}).primaryKey));
-                    from = sprintf('`%s`.`%s`',schema.dbname,tabName{1});
                     if isempty(regexp(s.ref,'`\.`','once'))
                         s.ref = sprintf('`%s`.%s',schema.dbname,s.ref);
                     end
                     if isPrimary
                         addMember(self.parents, from, s.ref)
-                        addMember(self.children, s.ref, from)
                     else
                         addMember(self.referenced, from, s.ref)
-                        addMember(self.referencing, s.ref, from)
                     end
                 end
             end
         end
+        
+        
+        function names = children(self, parentTable)
+            keys = self.parents.keys;
+            names = keys(cellfun(@(key) ismember(parentTable, self.parents(key)), keys));
+        end
+        
+        
+        function names = referencing(self, referencedTable)
+            keys = self.referenced.keys;
+            names = keys(cellfun(@(key) ismember(referencedTable, self.referenced(key)), keys));
+        end
+        
+        
         
         
         function className = tableToClass(self, fullTableName, strict)
@@ -118,14 +128,13 @@ classdef Connection < handle
                 down = 0;
             end
             
-            
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             temp1 = list;
             temp = list;
             for i=1:up
                 temp = cellfun(@(s) ...
-                    [lookup(self.referenced, s) lookup(self.parents,s)], ...
+                    [self.referenced(s) self.parents(s)], ...
                     temp, 'uni', false);
                 temp = setdiff([temp{:}],temp1);
                 temp1 = [temp1 temp]; %#ok<AGROW>
@@ -135,7 +144,7 @@ classdef Connection < handle
             temp = list;
             for i=1:down
                 temp = cellfun(@(s) ...
-                    [lookup(self.referencing, s) lookup(self.children,s)], ...
+                    [self.referencing(s) self.children(s)], ...
                     temp, 'uni', false);
                 temp = setdiff([temp{:}],temp2);
                 temp2 = [temp2 temp]; %#ok<AGROW>
@@ -154,9 +163,9 @@ classdef Connection < handle
             n = length(list);
             C = sparse([],[],[],n,n);
             for i=1:n
-                j = cellfun(@(c) find(strcmp(c,list)), lookup(self.children,list{i}), 'uni', false);
+                j = cellfun(@(c) find(strcmp(c,list)), self.children(list{i}), 'uni', false);
                 C(i,[j{:}])=1; %#ok<SPRIX>
-                j = cellfun(@(c) find(strcmp(c,list)), lookup(self.referencing,list{i}), 'uni', false);
+                j = cellfun(@(c) find(strcmp(c,list)), self.referencing(list{i}), 'uni', false);
                 C(i,[j{:}])=2; %#ok<SPRIX>
             end
             
@@ -368,37 +377,39 @@ classdef Connection < handle
         end
         
         
+        
         function delete(self)
             self.clearDependencies
             self.close
         end
         
-    end
-    
-    
-    methods(Access=private)
-        function clearDependencies(self)
-            self.children.remove(self.children.keys);
-            self.parents.remove(self.parents.keys);
-            self.referenced.remove(self.referenced.keys);
-            self.referencing.remove(self.referencing.keys);
+        
+        
+        function clearDependencies(self, schema)
+            if nargin<2
+                % remove all if the schema is not specified
+                self.parents.remove(self.parents.keys);
+                self.referenced.remove(self.referenced.keys);
+            else
+                % remove references from the given schema
+                % self.referenced.remove
+                tableNames = cellfun(@(s) ...
+                    sprintf('`%s`.`%s`', schema.dbname, s), ...
+                    schema.tableNames.values, 'uni', false);
+                self.parents.remove(intersect(self.parents.keys,tableNames));
+                self.referenced.remove(intersect(self.referenced.keys,tableNames));
+            end
         end
     end
 end
 
-
-function ret = lookup(map, key)
-if map.isKey(key)
-    ret = map(key);
-else
-    ret = {};
-end
-end
 
 
 function addMember(map,key,value)
 if ~map.isKey(key)
     map(key) = {};
 end
-map(key) = [map(key) {value}]; %#ok<NASGU>
+if  nargin>=3
+    map(key) = [map(key) {value}]; %#ok<NASGU>
+end
 end

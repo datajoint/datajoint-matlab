@@ -139,8 +139,8 @@ classdef Schema < handle
                     fprintf(f, '%s', parents{i});
                 end
                 fprintf(f, '  %% !!! update the populate relation\n');
+                fprintf(f, '\tend\n');
             end
-            fprintf(f, '\tend\n');
             
             % metod makeTuples
             if isAuto
@@ -154,7 +154,7 @@ classdef Schema < handle
                 fprintf(f, '\t\tend\n');
                 fprintf(f, '\tend\n');
             end
-            fprintf(f, 'end\n');
+            fprintf(f, '\nend');
             fclose(f);
             if useGUI
                 edit(filename)
@@ -177,6 +177,7 @@ classdef Schema < handle
             if ~self.loaded || (nargin<2 || force)
                 % do not reload unless forced. Default is forced.
                 self.loaded = true;
+                self.conn.clearDependencies(self)
                 self.headers.remove(self.headers.keys);
                 self.tableNames.remove(self.tableNames.keys);
                 

@@ -121,41 +121,25 @@ classdef Table < handle
         
         function list = get.parents(self)
             self.schema.reload(false)
-            if self.schema.conn.parents.isKey(self.fullTableName)
-                list = self.schema.conn.parents(self.fullTableName);
-            else
-                list = {};
-            end
+            list = self.schema.conn.parents(self.fullTableName);
         end
         
         
         function list = get.referenced(self)
             self.schema.reload(false)
-            if self.schema.conn.referenced.isKey(self.fullTableName)
-                list = self.schema.conn.referenced(self.fullTableName);
-            else
-                list = {};
-            end
+            list = self.schema.conn.referenced(self.fullTableName);
         end
         
         
         function list = get.children(self)
             self.schema.reload(false)
-            if self.schema.conn.children.isKey(self.fullTableName)
-                list = self.schema.conn.children(self.fullTableName);
-            else
-                list = {};
-            end
+            list = self.schema.conn.children(self.fullTableName);
         end
         
         
         function list = get.referencing(self)
             self.schema.reload(false)
-            if self.schema.conn.referencing.isKey(self.fullTableName)
-                list = self.schema.conn.referencing(self.fullTableName);
-            else
-                list = {};
-            end
+            list = self.schema.conn.referencing(self.fullTableName);
         end
         
         
@@ -178,7 +162,7 @@ classdef Table < handle
         
         
         
-        function showTable(self)
+        function show(self)
             fprintf \n
             for i=1:numel(self)
                 fprintf('DataJoint table\n\n')
@@ -189,7 +173,7 @@ classdef Table < handle
                     self(i).schema.dbname, self(i).plainTableName));
             end
             fprintf('Size on disk %u MB\n', ceil(s.table_size_mb));
-            fprintf('\n<a href="matlab:disp(%s.table.re)">Display declaration</a>. <a href="matlab:%s.table.erd">Plot ERD</a>\n\n',...
+            fprintf('\n<a href="matlab:disp(re(%s))">Display declaration</a>. <a href="matlab:erd(%s)">Plot ERD</a>\n\n',...
                 self.className, self.className)
         end
         
