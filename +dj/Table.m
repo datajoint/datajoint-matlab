@@ -726,6 +726,7 @@ classdef Table < handle
             self.schema.conn.query(sql);
             disp 'table updated'
             self.schema.reload
+            self.tableHeader = [];          % Force update of cached header
             self.syncDef
         end
         
