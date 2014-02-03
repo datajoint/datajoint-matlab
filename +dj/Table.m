@@ -829,10 +829,12 @@ if field.isnullable   % all nullable attributes default to null
 else
     default = 'NOT NULL';
     if ~isempty(field.default)
-        if any(strcmpi(field.default, dj.Table.mysql_constants))
+        % enclose value in quotes (even numeric), except special SQL values
+        % or values already enclosed by the user
+        if any(strcmpi(field.default, dj.Table.mysql_constants)) || ...
+                ismember(field.default(1), {'''', '"'})
             default = sprintf('%s DEFAULT %s', default, field.default);
         else
-            % enclose value in quotes (even numeric), except special SQL values
             default = sprintf('%s DEFAULT "%s"', default, field.default);
         end
     end
