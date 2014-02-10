@@ -130,7 +130,6 @@ classdef Connection < handle
             
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
-            tic
             lastAdded = list;
             while up || down
                 if up
@@ -150,7 +149,6 @@ classdef Connection < handle
                 list = union(list,added);
                 lastAdded = added;
             end
-            toc
             
             % determine tiers
             re = cellfun(@(s) sprintf('`.+`\\.`%s[a-z].*`',s), dj.Schema.tierPrefixes, 'uni', false);
