@@ -98,28 +98,25 @@ classdef struct
         end
         
         
-        function [tab,varargout] = tabulate(s,numField,varargin)
+        function [tab,varargout] = tabulate(s,valueField,varargin)
             % dj.struct.tablulate - convert structure array into a multidimensional array
             %
-            % [tab,v1,..,vn] = dj.struct.tabulate(struc, numField, dim1, ..., dimn)
+            % [tab,v1,..,vn] = dj.struct.tabulate(struc, valueField, idxField1, ..., idxFieldN)
             % creates the (n+1)-dimensional array tab from the structure array
             % where each dimension is indexed by the value of the fields
-            % dim1,...,dimn and stores the values of numField. If multiple
-            % values of numField are present for some combinations of
-            % indexes, an additional dimension is added to store the
-            % repeats.
+            % idxField1,...,idxFieldN and stores the values of valueField. If multiple
+            % values of valueField are present for some combinations of
+            % indexes, they are accumulated along the last dimension
             %
             % v1,...,vn  will contain arrays of unique values for the index
             % fields corresponding to each dimension.
             
             indexFields = varargin;
             assert(isstruct(s) && ~isempty(s))
-            assert(isnumeric(s(1).(numField)))
             n = length(indexFields);
             assert(n>0)
             ix = cell(n,1);
-            v  = cell(n,1);
-            
+            v  = cell(n,1);            
             for i=1:n
                 if isnumeric(s(1).(indexFields{i}))
                     [v{i},~,ix{i}] = unique([s.(indexFields{i})]);
@@ -128,7 +125,7 @@ classdef struct
                 end
             end
             sz = [cellfun(@length,v)' 1];
-            tab = nan(sz);
+            tab = cell(sz);
             m = zeros(sz);
             for i=1:numel(s)
                 ixx = cellfun(@(ix) ix(i), ix, 'uni', false);
@@ -136,13 +133,15 @@ classdef struct
                 m(ixx{:})=j;
                 if j>sz(end)
                     % extend the additional dimension
-                    tab = cat(length(sz), tab, nan([sz(1:end-1) 1]));
+                    tab = cat(length(sz), tab, cell([sz(1:end-1) 1]));
                     sz(end)=sz(end)+1;
                 end
-                value = s(i).(numField);
-                assert(isnumeric(value) && isscalar(value), ...
-                    'tabulated field must be scalar numeric')
-                tab(ixx{:},j)=value;
+                value = s(i).(valueField);
+                tab{ixx{:},j}=value;
+            end
+            if isnumeric(s(1).(valueField))
+                tab(cellfun(@isempty,tab))={nan};  % replace empties with nans
+                tab = cellfun(@double, tab);  % convert all to double. cell2mat does not work if cells are of different types
             end
             varargout = v';
         end
