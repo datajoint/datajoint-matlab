@@ -192,10 +192,12 @@ classdef Table < handle
             
             self.create
             if nargin<=2
-                down = 2;
+                down = dj.set('tableErdRadius');
+                down = down(2);
             end
             if nargin<=1
-                up = 2;
+                up = dj.set('tableErdRadius');
+                up = up(1);
             end
             
             self.schema.conn.erd({self.fullTableName},up,down)

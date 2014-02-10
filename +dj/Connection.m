@@ -130,26 +130,27 @@ classdef Connection < handle
             
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
-            temp1 = list;
-            temp = list;
-            for i=1:up
-                temp = cellfun(@(s) ...
-                    [self.referenced(s) self.parents(s)], ...
-                    temp, 'uni', false);
-                temp = setdiff([temp{:}],temp1);
-                temp1 = [temp1 temp]; %#ok<AGROW>
+            tic
+            lastAdded = list;
+            while up || down
+                if up
+                    temp = cellfun(@(s) ...
+                        [self.referenced(s) self.parents(s)], ...
+                        lastAdded, 'uni', false);
+                    added = setdiff([temp{:}],list);
+                    up = up - 1;
+                end
+                if down
+                    temp = cellfun(@(s) ...
+                        [self.referencing(s) self.children(s)], ...
+                        lastAdded, 'uni', false);
+                    added = union(added,setdiff([temp{:}],list));
+                    down = down - 1;
+                end
+                list = union(list,added);
+                lastAdded = added;
             end
-            % ... and down the hierarchy
-            temp2 = list;
-            temp = list;
-            for i=1:down
-                temp = cellfun(@(s) ...
-                    [self.referencing(s) self.children(s)], ...
-                    temp, 'uni', false);
-                temp = setdiff([temp{:}],temp2);
-                temp2 = [temp2 temp]; %#ok<AGROW>
-            end
-            list = union(list, [temp1 temp2]);
+            toc
             
             % determine tiers
             re = cellfun(@(s) sprintf('`.+`\\.`%s[a-z].*`',s), dj.Schema.tierPrefixes, 'uni', false);
