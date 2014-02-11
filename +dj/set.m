@@ -12,9 +12,11 @@ if isempty(STATE) || (nargin>=1 && strcmpi(name,'restore'))
     STATE = struct(...
         'suppressPrompt', false, ...
         'reconnectTimedoutTransaction', true, ...
-        'populateCheck', true ...
+        'populateCheck', true, ...
+        'tableErdRadius', [2 1] ...
         );
 end
+
 if ~nargin && ~nargout
     disp(STATE)
 end
@@ -22,8 +24,8 @@ if nargout
     out = STATE;
 end
 if nargin
-    dj.assert(ischar(name), 'Parameter name must be a string')
-    dj.assert(isfield(STATE,name), 'Parameter name does not exist')
+    assert(ischar(name), 'Parameter name must be a string')
+    assert(isfield(STATE,name), 'Parameter name does not exist')
 end
 if nargin==1
     out = STATE.(name);
