@@ -116,7 +116,7 @@ classdef struct
             n = length(indexFields);
             assert(n>0)
             ix = cell(n,1);
-            v  = cell(n,1);            
+            v  = cell(n,1);
             for i=1:n
                 if isnumeric(s(1).(indexFields{i}))
                     [v{i},~,ix{i}] = unique([s.(indexFields{i})]);
@@ -139,9 +139,9 @@ classdef struct
                 value = s(i).(valueField);
                 tab{ixx{:},j}=value;
             end
-            if isnumeric(s(1).(valueField))
+            if all(arrayfun(@(s) isnumeric(s.(valueField)) && isscalar(s.(valueField)), s))
                 tab(cellfun(@isempty,tab))={nan};  % replace empties with nans
-                tab = cellfun(@double, tab);  % convert all to double. cell2mat does not work if cells are of different types
+                tab = cellfun(@double, tab);  % convert to double; cell2mat fails when cells of different numeric types
             end
             varargout = v';
         end
