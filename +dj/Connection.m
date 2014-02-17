@@ -128,6 +128,11 @@ classdef Connection < handle
                 down = 0;
             end
             
+            % load all schemas before plotting
+            for s=self.packages.values
+                reload(feval([s{1} '.getSchema']),false)
+            end
+            
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
