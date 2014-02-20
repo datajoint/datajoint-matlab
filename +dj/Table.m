@@ -567,6 +567,12 @@ classdef Table < handle
                         for table = tables(end:-1:1)
                             self.schema.conn.query(sprintf('DROP TABLE %s', table.fullTableName))
                             fprintf('Dropped table %s\n', table.fullTableName)
+                            
+                            % give user the option to delete the classdef file
+                            path = which(self.className);
+                            if exist(path,'file') && strcmpi('yes', dj.ask(sprintf('Do you wish to delete file %s?', path)))
+                                delete(path)
+                            end
                         end
                     catch err
                         self.schema.conn.reload
