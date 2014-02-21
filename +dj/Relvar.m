@@ -3,6 +3,10 @@
 
 
 classdef Relvar < dj.GeneralRelvar & dj.Table
+
+    properties(Dependent, SetAccess = private)
+        lastInsertID        % Value of Last auto_incremented primary key 
+    end
     
     methods
         function self = Relvar(varargin)
@@ -17,6 +21,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 ~isa(self, 'dj.AutoPopulate');
         end
         
+        function id = get.lastInsertID(self)
+            % query MySQL for the last auto_incremented key
+            ret = query(self.schema.conn, 'SELECT last_insert_id() as `lid`');
+            id = ret.lid;
+        end
         
         function delQuick(self)
             % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.
@@ -171,10 +180,13 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         if islogical(v)  % mym doesn't accept logicals - save as unit8 instead
                             v = uint8(v);
                         end
-                        assert(isscalar(v) && isnumeric(v),...
+                        assert((isscalar(v) && isnumeric(v)) || isempty(v),...
                             'The field %s must be a numeric scalar value', ...
                             header.attributes(i).name)
-                        if ~isnan(v)  % nans are not passed: assumed missing.
+                        if isempty(v)
+                            queryStr = sprintf('%s`%s`=NULL,',...
+                                    queryStr, header.attributes(i).name);
+                        elseif ~isnan(v)  % nans are not passed: assumed missing.
                             if strcmp(header.attributes(i).type, 'bigint')
                                 queryStr = sprintf('%s`%s`=%d,',...
                                     queryStr, header.attributes(i).name, v);
