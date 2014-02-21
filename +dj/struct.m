@@ -46,6 +46,77 @@ classdef struct
             
         end
         
+        function ret = leftOuterJoin(s1, s2, fill)
+            % DJ.STRUCT.LEFTOUTERJOIN - Relational left outer join
+            % Required arguments:
+            %   s1      Struct array of tuples
+            %   s2      Struct array of tuples
+            %   fill    Value to use for non-matching tuples. Default = []
+            % Returns a struct array with all the fields of s1 and s2.
+            % Tuples in:
+            %  both s1 and s2: returned like a natural join
+            %   s1 but not s2 : take the fill value for the s2-only fields
+            %   s2 but not s1 : not returned
+            % "fill" can be specified as a scalar or as a struct containing
+            % the s2-only fields
+            assert(isstruct(s1) && isstruct(s2));
+            f1 = fieldnames(s1);
+            f2 = fieldnames(s2);
+            f_common = intersect(f1,f2);
+            f_s1only = setdiff(f1,f2);
+            f_s2only = setdiff(f2,f1);
+            % Check that we have something to do
+            if isempty(s1)
+                args = union(f1,f2)';
+                args = [args ; repmat({{}}, 1, length(args))];
+                ret = struct(args{:});
+                return
+            end 
+            if isempty(f_s2only)
+                ret = s1;
+                return
+            end
+            assert(iscolumn(s1) && (iscolumn(s2) || isempty(s2)));
+            % Check the fill values
+            if nargin < 3
+                fill = [];
+            end
+            if isstruct(fill)
+                % Ensure the fieldnames match up
+                assert(isempty(setxor(f_s2only, fieldnames(fill))));
+            else
+                % Turn fill into a struct array with the s2-only fieldnames
+                args = [f_s2only' ; repmat({fill},1,length(f_s2only)) ];
+                fill = struct(args{:});
+            end
+            % Do the joining
+            ret = struct([]);
+            s2_common = dj.struct.pro(s2, f_common{:});
+            for p1 = s1'
+                % Find the matches in s2
+                p1_common = dj.struct.pro(p1, f_common{:});
+                is_match = arrayfun(@(x) isequal(x,p1_common), s2_common);
+                if any(is_match)
+                    % Copy the matching s2 tuples and add the p1 fields
+                    add = s2(is_match);
+                    for fc=1:numel(f_s1only)
+                        [add.(f_s1only{fc})] = deal(p1.(f_s1only{fc}));
+                    end
+                else
+                    % Copy p1 and add the fill values
+                    add = p1;
+                    for f = f_s2only'
+                        add.(f{1}) = fill.(f{1});
+                    end
+                end
+                % Add the new tuples to the output
+                ret = [ret; add]; %#ok<AGROW>
+                % Go on to the next tuple in s1
+            end
+            % Done!
+        end
+
+
         
         function s = pro(s,varargin)
             % DJ.STRUCT.PRO - the relational projection operator
