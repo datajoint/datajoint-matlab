@@ -1,13 +1,13 @@
 function str = toCamelCase(str)
 % converts underscore_compound_words to CamelCase
 %
-% Not always exactly inversible
+% Not always exactly invertible
 %
 % Examples:
 %   toCamelCase('one')            -->  'One'
 %   toCamelCase('one_two_three')  -->  'OneTwoThree'
 %   toCamelCase('#$one_two,three') --> 'OneTwoThree'
-%   toCamelCase('One_Two_Three')  --> !error! upper case only mixes with alphanumericals
+%   toCamelCase('One_Two_Three')  --> !error! upper case only mixes with alphanumerics
 %   toCamelCase('5_two_three')    --> !error! cannot start with a digit
 
 assert(isempty(regexp(str, '\s', 'once')), 'white space is not allowed')

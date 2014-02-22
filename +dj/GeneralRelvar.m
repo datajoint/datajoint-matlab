@@ -257,7 +257,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
                 'The number of fetch1() outputs must match the number of requested attributes')
             assert(~isempty(args), 'insufficient inputs')
-            assert(~any(strcmp(args,'*')), '"*" is not allwed in fetch1()')
+            assert(~any(strcmp(args,'*')), '"*" is not allowed in fetch1()')
             
             s = self.fetch(varargin{:});
             assert(isscalar(s), 'fetch1 can only retrieve a single existing tuple.')
@@ -291,7 +291,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             assert(returnKey || (nargout==length(specs) || (nargout==0 && length(specs)==1)), ...
                 'The number of fetchn() outputs must match the number of requested attributes')
             assert(~isempty(specs),'insufficient inputs')
-            assert(~any(strcmp(specs,'*')), '"*" is not allwed in fetchn()')
+            assert(~any(strcmp(specs,'*')), '"*" is not allowed in fetchn()')
             
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
@@ -436,7 +436,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % operators and functions.
             %
             % Aggregate: When the second input is another relvar, the computed
-            % axpressions may include aggregation functions on attributes of the
+            % expressions may include aggregation functions on attributes of the
             % other relvar: max, min, sum, avg, variance, std, and count.
             %
             % EXAMPLES:
@@ -541,7 +541,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %   1 - enclose only if some attributes are aliased
             %   2 - enclose if anything but a simple table
             %   3 - enclose if is an aggregate (has a GROUP BY clause)
-            % Of course, we could simply always inclose subexpressions in
+            % Of course, we could simply always enclose subexpressions in
             % parentheses, but we try to keep SQL expressions as simple as
             % possible.
             
@@ -582,7 +582,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     sql = sprintf('%s NATURAL JOIN %s GROUP BY %s', sql, sql2, pkey(2:end));
                     header.project(self.operands(3:end));
                     assert(~all(arrayfun(@(x) isempty(x.alias), header.attributes)),...
-                        'Aggregate opeators must define at least one computation')
+                        'Aggregate operators must define at least one computation')
                     
                 case 'join'
                     [header1, sql1] = compile(self.operands{1},2);

@@ -62,9 +62,9 @@ classdef struct
             assert(isstruct(s1) && isstruct(s2));
             f1 = fieldnames(s1);
             f2 = fieldnames(s2);
-            f_common = intersect(f1,f2);
-            f_s1only = setdiff(f1,f2);
-            f_s2only = setdiff(f2,f1);
+            fcommon = intersect(f1,f2);
+            fs1only = setdiff(f1,f2);
+            fs2only = setdiff(f2,f1);
             % Check that we have something to do
             if isempty(s1)
                 args = union(f1,f2)';
@@ -72,7 +72,7 @@ classdef struct
                 ret = struct(args{:});
                 return
             end 
-            if isempty(f_s2only)
+            if isempty(fs2only)
                 ret = s1;
                 return
             end
@@ -83,29 +83,29 @@ classdef struct
             end
             if isstruct(fill)
                 % Ensure the fieldnames match up
-                assert(isempty(setxor(f_s2only, fieldnames(fill))));
+                assert(isempty(setxor(fs2only, fieldnames(fill))));
             else
                 % Turn fill into a struct array with the s2-only fieldnames
-                args = [f_s2only' ; repmat({fill},1,length(f_s2only)) ];
+                args = [fs2only' ; repmat({fill},1,length(fs2only)) ];
                 fill = struct(args{:});
             end
             % Do the joining
             ret = struct([]);
-            s2_common = dj.struct.pro(s2, f_common{:});
+            s2common = dj.struct.pro(s2, fcommon{:});
             for p1 = s1'
                 % Find the matches in s2
-                p1_common = dj.struct.pro(p1, f_common{:});
-                is_match = arrayfun(@(x) isequal(x,p1_common), s2_common);
-                if any(is_match)
+                p1common = dj.struct.pro(p1, fcommon{:});
+                isMatch = arrayfun(@(x) isequal(x,p1common), s2common);
+                if any(isMatch)
                     % Copy the matching s2 tuples and add the p1 fields
-                    add = s2(is_match);
-                    for fc=1:numel(f_s1only)
-                        [add.(f_s1only{fc})] = deal(p1.(f_s1only{fc}));
+                    add = s2(isMatch);
+                    for fc=1:numel(fs1only)
+                        [add.(fs1only{fc})] = deal(p1.(fs1only{fc}));
                     end
                 else
                     % Copy p1 and add the fill values
                     add = p1;
-                    for f = f_s2only'
+                    for f = fs2only'
                         add.(f{1}) = fill.(f{1});
                     end
                 end

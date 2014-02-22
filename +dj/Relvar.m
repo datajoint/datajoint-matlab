@@ -211,7 +211,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         function inserti(self, tuples)
             % insert tuples but ignore errors. This is useful for rare
-            % applications when duplicate entries should be quitely
+            % applications when duplicate entries should be quietly
             % discarded, for example.
             self.insert(tuples, 'INSERT IGNORE')
         end
@@ -269,7 +269,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         value = {};
                     end
                 otherwise
-                    error 'invalid upate command'
+                    error 'invalid update command'
             end
             
             queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
