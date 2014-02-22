@@ -1,5 +1,5 @@
 % dj.Schema - manages information about database tables and their dependencies
-% Complete documentation is available at <a href=http://code.google.com/p/datajoint/wiki/TableOfContents>Datajoint wiki</a>
+% Complete documentation is available at <a href=https://github.com/datajoint/datajoint-matlab/wiki>Datajoint wiki</a>
 % See also dj.Table, dj.BaseRelvar, dj.GeneralRelvar
 
 classdef Schema < handle
