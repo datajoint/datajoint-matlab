@@ -724,9 +724,10 @@ function cond = struct2cond(keys, header)
 % convert the structure array into an SQL condition
 n = length(keys);
 assert(n>=1)
-assert(n<=512, ...
-    '!longCondition:consider replacing the long array of keys with a more succinct condition')
-cond = '';
+if n>512
+    warning('DataJoint:longCondition', ...
+        'consider replacing the long array of keys with a more succinct condition')
+end
 for key = keys(:)'
     cond = sprintf('%s OR (%s)', cond, makeCond(key));
 end
