@@ -728,6 +728,7 @@ if n>512
     warning('DataJoint:longCondition', ...
         'consider replacing the long array of keys with a more succinct condition')
 end
+cond = '';
 for key = keys(:)'
     cond = sprintf('%s OR (%s)', cond, makeCond(key));
 end
