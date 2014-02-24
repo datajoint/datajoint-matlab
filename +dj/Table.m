@@ -71,8 +71,6 @@ classdef Table < handle
             self.className = className;
             assert(ischar(self.className) && ~isempty(self.className),  ...
                 'dj.Table requres input ''package.ClassName''')
-            assert(self.className(1)~='$', ...
-                'Please activate package for %s', self.className)
             assert(~isempty(regexp(self.className,'^\w+\.[A-Z]\w*','once')), ...
                 'invalid table identification ''%s''. Should be package.ClassName', ...
                 self.className)
@@ -715,7 +713,7 @@ classdef Table < handle
             end
             
             % close the declaration
-            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s$"', sql(1:end-2), tableInfo.comment);
+            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
             
             self.schema.reload   % again, ensure that the table does not already exist
             if ~self.isCreated
