@@ -79,6 +79,9 @@ classdef Connection < handle
                     else
                         addMember(self.referenced, from, s.ref)
                     end
+                    % add empty entries for all referenced tables too
+                    addMember(self.parents, s.ref)
+                    addMember(self.referenced, s.ref)
                 end
             end
         end
@@ -127,12 +130,7 @@ classdef Connection < handle
                 up = 0;
                 down = 0;
             end
-            
-            % load all schemas before plotting
-            for s=self.packages.values
-                reload(feval([s{1} '.getSchema']),false)
-            end
-            
+                        
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
