@@ -87,7 +87,7 @@ classdef Header < matlab.mixin.Copyable
             validFields = [attrs.isNumeric] | [attrs.isString] | [attrs.isBlob];
             if ~all(validFields)
                 ix = find(~validFields, 1, 'first');
-                assert(false,'unsupported field type "%s" in `%s`.`%s`', ...
+                error('unsupported field type "%s" in `%s`.`%s`', ...
                     attrs(ix).type, tableName);
             end
             attrs = rmfield(attrs, 'Extra');
