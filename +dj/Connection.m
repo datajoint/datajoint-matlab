@@ -130,7 +130,7 @@ classdef Connection < handle
                 up = 0;
                 down = 0;
             end
-                        
+            
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
@@ -157,8 +157,12 @@ classdef Connection < handle
             re = cellfun(@(s) sprintf('`.+`\\.`%s[a-z].*`',s), dj.Schema.tierPrefixes, 'uni', false);
             tiers = dj.Schema.allowedTiers(cellfun(@(l) find(~cellfun(@isempty, regexp(l, re))),list));
             j = ~strcmp(tiers,'job');
-            list = list(j);  % exclude jobs
+            list = list(j);  % exclude job tables
             tiers = tiers(j);
+            
+            % print the list of tables included in the plot
+            disp 'Diagrammed tables:'
+            cellfun(@(s) fprintf('%s\n',s), sort(list))
             
             
             % construct the dependency matrix C(to,from)

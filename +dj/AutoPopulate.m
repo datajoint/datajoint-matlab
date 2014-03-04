@@ -312,7 +312,6 @@ classdef AutoPopulate < handle
             assert(~isempty(schemaPath), 'missing function %s.getSchema', self.schema.package)
             path = fullfile(fileparts(schemaPath), 'Jobs.m');
             f = fopen(path,'w');
-            fprintf(f, '%% %s.Jobs -- job reservation table\n\n', self.schema.package);
             fprintf(f, '%%{\n');
             fprintf(f, '%s.Jobs (job)    # the job reservation table\n', self.schema.package);
             fprintf(f, 'table_name : varchar(255) # className of the table\n');
@@ -327,9 +326,6 @@ classdef AutoPopulate < handle
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp       # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
             fprintf(f, 'classdef Jobs < dj.Relvar\n');
-            fprintf(f, '    properties(Constant)\n');
-            fprintf(f, '        table = dj.Table(''%s.Jobs'')\n', self.schema.package);
-            fprintf(f, '    end\n');
             fprintf(f, 'end\n');
             fclose(f);
         end
@@ -351,7 +347,7 @@ classdef AutoPopulate < handle
                     abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
                     if ~isempty(abovePopRel)
                         warning(['Primary key attribute %s is above popRel''s primary key attributes. '...
-                        'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
+                            'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                     end
                 end
             end
