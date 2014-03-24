@@ -160,11 +160,6 @@ classdef Connection < handle
             list = list(j);  % exclude job tables
             tiers = tiers(j);
             
-            % print the list of tables included in the plot
-            disp 'Diagrammed tables:'
-            cellfun(@(s) fprintf('%s\n',s), sort(list))
-            
-            
             % construct the dependency matrix C(to,from)
             n = length(list);
             C = sparse([],[],[],n,n);

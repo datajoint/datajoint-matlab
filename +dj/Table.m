@@ -574,7 +574,7 @@ classdef Table < handle
                     try
                         for table = tables(end:-1:1)
                             self.schema.conn.query(sprintf('DROP TABLE %s', table.fullTableName))
-                            fprintf('Dropped table %s\n', table.fullTableName)                            
+                            fprintf('Dropped table %s\n', table.fullTableName)
                         end
                     catch err
                         self.schema.conn.reload
@@ -898,7 +898,7 @@ if nargout > 1
                 inKey = false;
             case strncmp(line,'->',2)
                 % foreign key
-                p = feval(strtrim(line(3:end)));
+                p = feval(strtrim(strtok(line(3:end),'#')));
                 assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
                 if inKey
                     parents{end+1} = p;     %#ok:<AGROW>
