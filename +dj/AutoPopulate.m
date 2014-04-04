@@ -280,7 +280,7 @@ classdef AutoPopulate < handle
                                 success = false;
                             end
                         end
-                        if ~success
+                        if ~success && dj.set('verbose')
                             fprintf('** %s: skipping already reserved\n', self.className)
                             disp(key)
                         end
@@ -332,8 +332,7 @@ classdef AutoPopulate < handle
         
         
         function populateSanityChecks(self)
-            % Performs sanity checks that are common to populate, parpopulate
-            % and batch_populate
+            % Performs sanity checks that are common to populate, parpopulate and batch_populate
             if dj.set('populateCheck')
                 assert(isprop(self,'popRel'), ...
                     'Automatically populated tables must declare a popRel property')

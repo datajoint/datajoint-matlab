@@ -880,7 +880,7 @@ declaration(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), decla
 pat = {
     '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
     '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
-    '#\s*(?<comment>\S.*\S)$'                 % # comment
+    '#\s*(?<comment>.*)$'                     % # comment
     };
 tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
 assert(numel(tableInfo)==1, ...
@@ -911,7 +911,7 @@ if nargout > 1
                 indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
             case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
                     '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
-                    ':\s*\w[^#]*\S\s*#.*$'])                  % type, comment
+                    ':\s*\w.*$'])                             % type, comment
                 fieldInfo = parseAttrDef(line, inKey);
                 fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
             otherwise
@@ -929,16 +929,22 @@ pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
     '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
     ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-    '#\s*(?<comment>\S.*)$'           % comment
+    '#\s*(?<comment>.*)'              % comment
+    '$'                               % line end
     };
-fieldInfo = regexp(line, cat(2,pat{:}), 'names');
-if isempty(fieldInfo)
-    % try no default value
-    fieldInfo = regexp(line, cat(2,pat{[1 3 4]}), 'names');
-    assert(~isempty(fieldInfo), 'invalid field declaration line "%s"', line)
-    fieldInfo.default = '';  % no default
+for sub = {[1 2 3 4 5] [1 3 4 5] [1 2 3 5] [1 3 5]}
+    fieldInfo = regexp(line, cat(2,pat{sub{:}}), 'names');
+    if ~isempty(fieldInfo)
+        break
+    end
 end
 assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
+if ~isfield(fieldInfo,'comment')
+    fieldInfo.comment = '';
+end
+if ~isfield(fieldInfo,'default')
+    fieldInfo.default = '';
+end
 assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
     || ~strcmp(fieldInfo.default,'null'), ...
     'BIGINT attributes cannot be nullable in "%s"', line)
