@@ -3,9 +3,9 @@
 
 
 classdef Relvar < dj.GeneralRelvar & dj.Table
-
+    
     properties(Dependent, SetAccess = private)
-        lastInsertID        % Value of Last auto_incremented primary key 
+        lastInsertID        % Value of Last auto_incremented primary key
     end
     
     methods
@@ -136,6 +136,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % Duplicates, unmatched attributes, or missing required attributes will
             % cause an error, unless command is specified.
             
+            if isa(tuples,'cell')
+                % if a cell array, convert to structure assuming matching attributes
+                tuples = cell2struct(tuples, self.header.names, 2);
+            end
+            
             assert(isstruct(tuples), 'Tuples must be a non-empty structure array')
             if isempty(tuples)
                 return
@@ -185,7 +190,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                             header.attributes(i).name)
                         if isempty(v)
                             queryStr = sprintf('%s`%s`=NULL,',...
-                                    queryStr, header.attributes(i).name);
+                                queryStr, header.attributes(i).name);
                         elseif ~isnan(v)  % nans are not passed: assumed missing.
                             if strcmp(header.attributes(i).type, 'bigint')
                                 queryStr = sprintf('%s`%s`=%d,',...

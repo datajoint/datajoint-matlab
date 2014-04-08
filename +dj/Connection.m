@@ -212,7 +212,7 @@ classdef Connection < handle
             names = cellfun(@self.tableToClass,list,'uni',false);
             
             % plot
-            
+            cla
             yi = level;
             xi = zeros(size(yi));
             
@@ -292,6 +292,7 @@ classdef Connection < handle
             ylim([min(yi)-0.5 max(yi)+0.5]);
             hold off
             axis off
+            figure(gcf)  % bring to front
             
             function connectNodes(x, y, lineStyle)
                 assert(length(x)==2 && length(y)==2)
@@ -300,7 +301,7 @@ classdef Connection < handle
                 x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
                 y = y(1) + (y(2)-y(1))*t;
                 plot(x, y, lineStyle)
-            end
+            end            
         end
         
         
