@@ -35,6 +35,7 @@ classdef Table < handle
         referenced     % names of tables referenced by foreign keys composed of primary and non-primary attributes
         children       % names of tables referencing this table with their primary key attributes
         referencing    % names of tables referencing this table with their primary and non-primary attributes
+        ancestors      % names of all referenced tables, including self, recursively, in order of dependencies
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
     end
     
@@ -139,6 +140,25 @@ classdef Table < handle
             self.schema.reload(false)
             list = self.schema.conn.referencing(self.fullTableName);
         end
+        
+        
+        function list = get.ancestors(self)
+            map = containers.Map('KeyType','char','ValueType','uint16');
+            recurse(self,0)
+            levels = map.values;
+            [~,order] = sort([levels{:}]);
+            list = map.keys;
+            list = list(order);
+            
+            function recurse(table,level)
+                if ~map.isKey(table.className) || level>map(table.className)
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), ...
+                        [table.parents table.referenced])
+                    map(table.className)=level;
+                end
+            end
+        end
+        
         
         
         function list = get.descendants(self)
