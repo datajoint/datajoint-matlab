@@ -146,7 +146,7 @@ classdef Table < handle
             map = containers.Map('KeyType','char','ValueType','uint16');
             recurse(self,0)
             levels = map.values;
-            [~,order] = sort([levels{:}]);
+            [~,order] = sort([levels{:}],'descend');
             list = map.keys;
             list = list(order);
             

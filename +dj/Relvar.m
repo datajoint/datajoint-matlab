@@ -282,5 +282,16 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             self.schema.conn.query(queryStr, value{:})
         end
         
+        
+        function export(self, declarationFile, dataFile, varargin)
+            [limit, args] = makeLimitClause(varargin{:});
+            self = self.pro(args{:});
+            [header, sql] = self.compile;
+            ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
+                header.sql, sql, limit));
+            ret = dj.struct.fromFields(ret);
+
+        end
+        
     end
 end

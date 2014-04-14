@@ -76,16 +76,29 @@ classdef AutoPopulate < handle
             %   [failedKeys, errs] = populate(tp.OriMaps);  % skip errors and return their list
             %
             % See also dj.AutoPopulate/parpopulate
+           
+            if ~dj.set('populateAncestors')
+                rels = self;
+            else
+                % get all ancestors to be populated before self
+                assert(nargout==0, ...
+                    'parpopulate cannot return output when populateAncestors is true')
+                rels = cellfun(@feval, self.ancestors, 'uni', false);
+                rels = rels(cellfun(@(x) isa(x,'dj.AutoPopulate'), rels));
+            end
             
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
-            self.useReservations = false;
-            self.populateSanityChecks
-            self.executionEngine = @(key, fun, args) fun(args{:});
-            [varargout{1:nargout}] = self.populate_(varargin{:});
+            
+            for i=1:length(rels)
+                rels{i}.useReservations = false;
+                rels{i}.populateSanityChecks
+                rels{i}.executionEngine = @(key, fun, args) fun(args{:});
+                [varargout{1:nargout}] = rels{i}.populate_(varargin{:});
+            end
         end
         
         
-        function varargout = parpopulate(self, varargin)
+        function parpopulate(self, varargin)
             % dj.AutoPopulate/parpopulate works identically to dj.AutoPopulate/populate
             % except that it uses a job reservation mechanism to enable multiple
             % processes to populate the same table in parallel without collision.
@@ -124,12 +137,24 @@ classdef AutoPopulate < handle
             %
             % See also dj.AutoPopulate/populate
             
+            if ~dj.set('populateAncestors')
+                rels = self;
+            else
+                % get all ancestors to be populated before self
+                rels = cellfun(@feval, self.ancestors, 'uni', false);
+                rels = rels(cellfun(@(x) isa(x,'dj.AutoPopulate'), rels));
+            end
+            
             self.schema.conn.cancelTransaction  % rollback any unfinished transaction
-            self.useReservations = true;
-            self.populateSanityChecks
-            self.executionEngine = @(key, fun, args) fun(args{:});
-            [varargout{1:nargout}] = self.populate_(varargin{:});
+            
+            for i=1:length(rels)
+                rels{i}.useReservations = true;
+                rels{i}.populateSanityChecks
+                rels{i}.executionEngine = @(key, fun, args) fun(args{:});
+                rels{i}.populate_(varargin{:});
+            end
         end
+        
         
         function taskCore(self, key)
             % The work unit that is submitted to the cluster
