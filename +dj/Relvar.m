@@ -222,6 +222,14 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         
+        function import(self, inputfile)
+            % dj.Relvar/import -- load data from a .mat file
+            % See also dj.GeneralRelvar/export 
+            s = load(inputfile);
+            self.insert(s.tuples)            
+        end
+        
+        
         function update(self, attrname, value)
             % dj.BaseRelvar/update - update a field in an existing tuple
             %
@@ -280,22 +288,6 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
                 self.fullTableName, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
-        end
-        
-        
-        function export(self, declarationFile, dataFile, varargin)
-            [limit, args] = makeLimitClause(varargin{:});
-            self = self.pro(args{:});
-            [header, sql] = self.compile;
-            ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
-                header.sql, sql, limit));
-            ret = dj.struct.fromFields(ret);
-
-        end
-        
-        
-        
-        
-        
+        end               
     end
 end

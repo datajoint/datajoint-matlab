@@ -312,6 +312,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
+        function export(self, outfile, varargin)
+            % dj.GeneralRelvar/export -- export the contents of the relation into and a .m file
+            % See also dj.Relvar/import
+            tuples = self.fetch(varargin{:}); %#ok<NASGU>
+            save(outfile, 'tuples')
+        end
+        
         
         %%%%%%%%%%%%%%%%%%  RELATIONAL OPERATORS %%%%%%%%%%%%%%%%%%%%%%%%%%
         function restrict(self, varargin)
@@ -832,7 +839,6 @@ if nargin
     end
 end
 end
-
 
 
 function str = escapeString(str)
