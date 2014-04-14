@@ -39,7 +39,7 @@ classdef Table < handle
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
     end
     
-    properties(Constant,Access=private)
+    properties(Constant)
         mysql_constants = {'CURRENT_TIMESTAMP'}
     end
     
@@ -180,21 +180,18 @@ classdef Table < handle
         
         
         
-        function show(self)
-            fprintf \n
-            for i=1:numel(self)
-                fprintf('DataJoint table\n\n')
-                disp(self(i).re(true))
-                s = self(i).schema.conn.query(...
-                    sprintf('SHOW TABLE STATUS FROM `%s` WHERE name="%s"', self(i).schema.dbname, self(i).plainTableName),...
-                    'bigint_to_double');
-                tableSize = (s.Data_length + s.Index_length)/1024/1024;
+        function ret = sizeOnDisk(self)
+            % return the table's size on disk in Mebibytes
+            s = self.schema.conn.query(...
+                sprintf('SHOW TABLE STATUS FROM `%s` WHERE name="%s"', self.schema.dbname, self.plainTableName),...
+                'bigint_to_double');
+            tableSize = (s.Data_length + s.Index_length)/1024/1024;
+            if nargout
+                ret = tableSize;
+            else
                 fprintf('Size on disk %u MB\n', ceil(tableSize))
             end
-            fprintf('\n<a href="matlab:disp(re(%s))">Display declaration</a>. <a href="matlab:erd(%s)">Plot ERD</a>\n\n',...
-                self.className, self.className)
         end
-        
         
         
         
@@ -222,45 +219,30 @@ classdef Table < handle
         end
         
         
-        function str = re(self, expandForeignKeys)
+        function str = re(self)
             % dj.Table/re - "reverse engineer" the table declaration.
             %
             % SYNTAX:
             %   str = table.re
-            %   str = table.re(true)
             %
             % str will contain the table declaration string that can be used
             % to create the table using dj.Table.
-            %
-            % When the second input expandForeignKeys is false, referenced
-            % to other tables are not displayed and foreign key attributes
-            % are shown as regular attributes.
-            %
-            % See also dj.Table
             
-            expandForeignKeys = nargin>=2 && expandForeignKeys;
-            
-            str = '';
-            if ~expandForeignKeys
-                str = sprintf('%%{\n');
-            end
-            str = sprintf('%s%s (%s) # %s', ...
-                str, self.className, self.info.tier, self.info.comment);
+            str = sprintf('%%{\n%s (%s) # %s', ...
+                self.className, self.info.tier, self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
             % list primary key fields
             keyFields = self.tableHeader.primaryKey;
             
-            if ~expandForeignKeys
-                % list parent referenced
-                [classNames,tables] = self.sortForeignKeys(self.parents);
-                if ~isempty(classNames)
-                    str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
-                    for t = tables
-                        % exclude primary key fields of referenced tables from the primary attribute list
-                        keyFields = keyFields(~ismember(keyFields, t.tableHeader.primaryKey));
-                    end
+            % list parent referenced
+            [classNames,tables] = self.sortForeignKeys(self.parents);
+            if ~isempty(classNames)
+                str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
+                for t = tables
+                    % exclude primary key fields of referenced tables from the primary attribute list
+                    keyFields = keyFields(~ismember(keyFields, t.tableHeader.primaryKey));
                 end
             end
             
@@ -284,14 +266,12 @@ classdef Table < handle
             dependentFields = self.tableHeader.dependentFields;
             
             % list other referenced
-            if ~expandForeignKeys
-                [classNames,tables] = self.sortForeignKeys(self.referenced);
-                if ~isempty(classNames)
-                    str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
-                    for t = tables
-                        % exclude primary key fields of referenced tables from header
-                        dependentFields = dependentFields(~ismember(dependentFields, t.tableHeader.primaryKey));
-                    end
+            [classNames,tables] = self.sortForeignKeys(self.referenced);
+            if ~isempty(classNames)
+                str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
+                for t = tables
+                    % exclude primary key fields of referenced tables from header
+                    dependentFields = dependentFields(~ismember(dependentFields, t.tableHeader.primaryKey));
                 end
             end
             
@@ -337,9 +317,7 @@ classdef Table < handle
                 end
             end
             
-            if ~expandForeignKeys
-                str = sprintf('%s%%}\n', str);
-            end
+            str = sprintf('%s%%}\n', str);
         end
         
         

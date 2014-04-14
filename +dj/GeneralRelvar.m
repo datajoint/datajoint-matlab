@@ -514,6 +514,65 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function ret = plus(self, arg)
             ret = self | arg;
         end
+        
+        function ret = show(self)
+            % dj.GeneralRelvar/show - show the relation's header information.
+            % Foreign keys and indexes are not shown.
+            
+            str = '';
+            %
+            % list primary key fields
+            keyFields = self.header.primaryKey;
+            
+            % additional primary attributes
+            for i=find(ismember(self.header.names, keyFields))
+                comment = self.header.attributes(i).comment;
+                if self.header.attributes(i).isautoincrement
+                    autoIncrement = 'AUTO_INCREMENT';
+                else
+                    autoIncrement = '';
+                end
+                str = sprintf('%s\n%-40s # %s', str, ...
+                    sprintf('%-16s: %s %s', self.header.attributes(i).name, ...
+                    self.header.attributes(i).type, autoIncrement), comment);
+            end
+            
+            % dividing line
+            str = sprintf('%s\n---', str);
+            
+            % list dependent attributes
+            dependentFields = self.header.dependentFields;
+            
+            % list remaining attributes
+            for i=find(ismember(self.header.names, dependentFields))
+                attr = self.header.attributes(i);
+                default = attr.default;
+                if attr.isnullable
+                    default = '=null';
+                elseif ~isempty(default)
+                    if attr.isNumeric || any(strcmp(default,dj.Table.mysql_constants))
+                        default = ['=' default]; %#ok<AGROW>
+                    else
+                        default = ['="' default '"']; %#ok<AGROW>
+                    end
+                end
+                if attr.isautoincrement
+                    autoIncrement = 'AUTO_INCREMENT';
+                else
+                    autoIncrement = '';
+                end
+                str = sprintf('%s\n%-60s# %s', str, ...
+                    sprintf('%-28s: %s', [attr.name default], ...
+                    [attr.type ' ' autoIncrement]), attr.comment);
+            end
+            str = sprintf('%s\n', str);
+            
+            if nargout
+                ret = str;
+            else
+                disp(str)
+            end
+        end
     end
     
     
