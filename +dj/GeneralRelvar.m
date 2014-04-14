@@ -215,11 +215,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %    s = R.fetch('*', 'LIMIT 100 OFFSET 200')  % read tuples 200-299
             %    s = R.fetch('*', 'ORDER BY field1 DESC, field 2  LIMIT 100');
             %
-            % The numerical indexing into a relvar is a deviation from
-            % relational theory and should be reserved for special cases
-            % only since the order of tuples in a relation is not
-            % guaranteed.
-            %
             % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
             
             [limit, args] = makeLimitClause(varargin{:});
@@ -312,10 +307,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
-        function export(self, outfile, varargin)
+        function export(self, outfile)
             % dj.GeneralRelvar/export -- export the contents of the relation into and a .m file
             % See also dj.Relvar/import
-            tuples = self.fetch(varargin{:}); %#ok<NASGU>
+            tuples = self.fetch('*'); %#ok<NASGU>
             save(outfile, 'tuples')
         end
         

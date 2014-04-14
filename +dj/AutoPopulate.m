@@ -78,7 +78,7 @@ classdef AutoPopulate < handle
             % See also dj.AutoPopulate/parpopulate
            
             if ~dj.set('populateAncestors')
-                rels = self;
+                rels = {self};
             else
                 % get all ancestors to be populated before self
                 assert(nargout==0, ...
@@ -138,7 +138,7 @@ classdef AutoPopulate < handle
             % See also dj.AutoPopulate/populate
             
             if ~dj.set('populateAncestors')
-                rels = self;
+                rels = {self};
             else
                 % get all ancestors to be populated before self
                 rels = cellfun(@feval, self.ancestors, 'uni', false);
