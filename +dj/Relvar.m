@@ -222,11 +222,17 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         
-        function import(self, inputfile)
-            % dj.Relvar/import -- load data from a .mat file
-            % See also dj.GeneralRelvar/export 
-            s = load(inputfile);
-            self.insert(s.tuples)            
+        function import(self, fileMask)
+            % dj.Relvar/import -- load data from .mat files
+            % See also dj.GeneralRelvar/export
+            countTuples = 0;
+            for f = dir(fileMask)'
+                fprintf('Reading file %s  ', f.name)
+                s = load(f.name);
+                self.insert(s.tuples)
+                countTuples = countTuples + numel(s.tuples);
+                fprintf(' %7d tuples\n', countTuples)
+            end
         end
         
         

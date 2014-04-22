@@ -307,11 +307,52 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
-        function export(self, outfile)
+        function export(self, outfilePrefix, mbytesPerChunk)
             % dj.GeneralRelvar/export -- export the contents of the relation into and a .m file
+            % The data are split into chunks according to mbytesPerChunk.
+            %
             % See also dj.Relvar/import
-            tuples = self.fetch('*'); %#ok<NASGU>
-            save(outfile, 'tuples')
+            
+            if nargin<2
+                outfilePrefix = './temp';
+            end
+            if nargin<3
+                mbytesPerChunk = 50;
+            end
+            tuplesPerChunk = 1;
+            
+            % enclose in transaction to ensure that LIMIT and OFFSET work correctly
+            self.schema.conn.startTransaction
+            
+            savedTuples = 0;
+            savedMegaBytes = 0;
+            total = self.count;
+            fileNumber = 0;
+            while savedTuples < total
+                while true
+                    tuples = self.fetch('*',sprintf('LIMIT %u OFFSET %u', tuplesPerChunk, savedTuples));
+                    mbytes = sizeMB(tuples);
+                    if mbytes > 0.5*mbytesPerChunk || numel(tuples) + savedTuples >= total
+                        break
+                    end
+                    tuplesPerChunk = tuplesPerChunk*2;
+                end
+                fname = sprintf('%s-%04d.mat', outfilePrefix, fileNumber);
+                save(fname, 'tuples')
+                savedMegaBytes = savedMegaBytes + mbytes;
+                savedTuples = savedTuples + numel(tuples);
+                tuplesPerChunk = ceil(mbytesPerChunk/savedMegaBytes*savedTuples);                
+                fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, savedTuples, total, savedMegaBytes)
+                fileNumber = fileNumber + 1;
+            end
+            
+            self.schema.conn.cancelTransaction
+            
+            function mbytes = sizeMB(variable) %#ok<INUSD>
+                mbytes = whos('variable');
+                mbytes = mbytes.bytes/1024/1024;
+            end
+            
         end
         
         

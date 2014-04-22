@@ -9,7 +9,7 @@ switch nargin
     case 1
         entity = varargin{1};
         if any(entity=='.')
-            erd(feval(entity))
+            erd(dj.Relvar(entity))
         else
             erd(feval([entity '.getSchema']))
         end
