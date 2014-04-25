@@ -135,6 +135,7 @@ classdef Connection < handle
             % up the hierarchy
             lastAdded = list;
             while up || down
+                added = [];
                 if up
                     temp = cellfun(@(s) ...
                         [self.referenced(s) self.parents(s)], ...
