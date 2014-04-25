@@ -339,10 +339,14 @@ classdef Connection < handle
                     self.query(self.initQuery);
                 end
             end
+            v = varargin;
+            if dj.set('bigint_to_double')
+                v{end+1} = 'bigint_to_double';
+            end
             if nargout>0
-                ret=mym(self.connId, queryStr, varargin{:});
+                ret=mym(self.connId, queryStr, v{:});
             else
-                mym(self.connId, queryStr, varargin{:});
+                mym(self.connId, queryStr, v{:});
             end
         end
         
