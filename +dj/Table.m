@@ -338,12 +338,24 @@ classdef Table < handle
             self.alter(sprintf('COMMENT="%s"', newComment));
         end
         
-        function addAttribute(self, definition)
+        function addAttribute(self, definition, after)
             % dj.Table/addAttribute - add a new attribute to the
             % table. A full line from the table definition is
             % passed in as "definition".
+            %
+            % The definition can specify where to place the new attribute.
+            % Make after="FIRST" to add the attribute as the first
+            % attribute or "AFTER `attr`" to place it after an existing
+            % attribute.
+            if nargin<3
+                after='';
+            else
+                assert(strcmpi(after,'FIRST') || strncmpi(after,'AFTER',5))
+                after = [' ' after];
+            end
+            
             sql = fieldToSQL(parseAttrDef(definition, false));
-            self.alter(sprintf('ADD COLUMN %s', sql(1:end-2)));
+            self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
         function dropAttribute(self, attrName)
