@@ -110,7 +110,7 @@ classdef Schema < handle
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.re);
                 tab = dj.Table([self.package '.' className]);
-                parents = tab.parents;
+                parents = cellfun(@(x) self.conn.tableToClass(x), tab.parents, 'uni', false);
             else
                 fprintf(f, '%%{\n');
                 fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);

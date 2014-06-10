@@ -1,7 +1,7 @@
 function varargout = version
 % report DataJoint version
 
-v = struct('major',2,'minor',7,'bugfix',5);
+v = struct('major',2,'minor',7,'bugfix',6);
 
 if nargout
     varargout{1}=v;

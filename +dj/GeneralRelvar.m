@@ -322,7 +322,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             tuplesPerChunk = 1;
             
             % enclose in transaction to ensure that LIMIT and OFFSET work correctly
-            self.schema.conn.startTransaction
+            self.conn.startTransaction
             
             savedTuples = 0;
             savedMegaBytes = 0;
@@ -346,7 +346,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 fileNumber = fileNumber + 1;
             end
             
-            self.schema.conn.cancelTransaction
+            self.conn.cancelTransaction
             
             function mbytes = sizeMB(variable) %#ok<INUSD>
                 mbytes = whos('variable');
@@ -543,18 +543,31 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
             end
             ret = init(dj.GeneralRelvar, 'join', {self arg});
-        end
+        end        
         
+        function ret = pair(self, varargin)
+            % dj.GeneralRelvar/pair - a natural join with itself with some
+            % attributes renamed.
+            % This facilitates a common use case when pairs of tuples from the
+            % relation need to be examined.
+            
+            renamedAttrs1 = cellfun(@(s) sprintf('%s->%s1',s,s), varargin,'uni',false);
+            renamedAttrs2 = cellfun(@(s) sprintf('%s->%s2',s,s), varargin,'uni',false);
+            ret = self.pro(renamedAttrs1{:})*self.pro(renamedAttrs2{:});
+        end
         
         
         %%%%% DEPRECATED RELATIIONAL OPERATORS (for backward compatibility)
         function ret = times(self, arg)
+            warning 'The relational operator .* (semijoin) will be removed in a future release.  Please use & instead.'
             ret = self & arg;
         end
         function ret = rdivide(self, arg)
+            warning 'The relational operator / (antijoin) will be removed in a future release.  Please use - instead.'
             ret = self - arg;
         end
         function ret = plus(self, arg)
+            warning 'The relational operator + (union) will be removed in a future release.  Please use | instead'
             ret = self | arg;
         end
         
