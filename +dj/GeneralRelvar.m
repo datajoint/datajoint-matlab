@@ -702,7 +702,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 case 'join'
                     [header1, sql1] = compile(self.operands{1},2);
                     [header2, sql2] = compile(self.operands{2},2);
-                    sql = sprintf('%s NATURAL JOIN %s', sql1, sql2);
+                    sql = sprintf('%s NATURAL JOIN %s as `$t%x`', sql1, sql2, aliasCount);
                     header = join(header1,header2);
                     clear header1 header2 sql1 sql2
                     

@@ -18,8 +18,6 @@
 % Once established during the first invocation, the connection object cannot
 % be changed. To reset the connection, use 'clear functions' or 'clear classes'.
 
-% -- Dimitri Yatsenko, 2012
-
 function connObj = conn(host, user, pass, initQuery)
 
 persistent CONN
