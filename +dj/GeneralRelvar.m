@@ -776,7 +776,7 @@ for arg = restrictions
             clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
         case isstruct(cond)
-            % restriction by a
+            % restriction by a structure array
             cond = dj.struct.pro(cond, header.names{:}); % project onto common attributes
             if isempty(fieldnames(cond))
                 % restrictor has no common attributes:
