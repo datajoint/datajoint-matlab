@@ -234,11 +234,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function summon1(self,varargin)
             % self.summon1('f1','f2') is equivalent to 
             % [f1,f2] = self.fetch1('f1','f2')   
-            
-            v = cell(size(varargin));
-            [v{:}] = self.fetchn(varargin{:});
-            for i=1:length(varargin)
-                assignin('caller',varargin{i}, v{i})
+            if strcmp(varargin{1},'*')
+                names = self.header.names;
+            else
+                names = varargin;
+            end
+            v = cell(size(names));
+            [v{:}] = self.fetch1(names{:});
+            for i=1:length(names)
+                assignin('caller',names{i}, v{i})
             end
         end
         
@@ -246,10 +250,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % self.summon('f1','f2') is equivalent to
             % [f1,f2] = self.fetchn('f1','f2')  
             
-            v = cell(size(varargin));
-            [v{:}] = self.fetchn(varargin{:});
-            for i=1:length(varargin)
-                assignin('caller',varargin{i}, v{i})
+            if strcmp(varargin{1},'*')
+                names = self.header.names;
+            else
+                names = varargin;
+            end
+            v = cell(size(names));
+            [v{:}] = self.fetchn(names{:});
+            for i=1:length(names)
+                assignin('caller',names{i}, v{i})
             end
         end
 
