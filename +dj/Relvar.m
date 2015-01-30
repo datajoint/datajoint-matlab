@@ -155,8 +155,16 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % validate header
             fnames = fieldnames(tuples);
             found = ismember(fnames,header.names);
-            assert(all(found), 'Field %s is not found in the table %s', ...
-                fnames{find(~found,1,'first')}, class(self))
+            if any(~found)
+                if dj.set('ignore_extra_insert_fields')
+                    tuples = rmfield(tuples, fnames(~found));
+                    fnames = fnames(~found);
+                else
+                    throw(MException('DataJoint:invalidInsert',...
+                        'Field %s is not found in the table %s', ...
+                        fnames{find(~found,1,'first')}, class(self)))
+                end
+            end
             
             % form query
             ix = ismember(header.names, fnames);
@@ -182,9 +190,6 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                             queryStr,header.attributes(i).name);
                         blobs{end+1} = v;    %#ok<AGROW>
                     else
-                        if islogical(v)  % mym doesn't accept logicals - save as unit8 instead
-                            v = uint8(v);
-                        end
                         assert((isscalar(v) && isnumeric(v)) || isempty(v),...
                             'The field %s must be a numeric scalar value', ...
                             header.attributes(i).name)
@@ -192,10 +197,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                             queryStr = sprintf('%s`%s`=NULL,',...
                                 queryStr, header.attributes(i).name);
                         elseif ~isnan(v)  % nans are not passed: assumed missing.
-                            if strcmp(header.attributes(i).type, 'bigint')
+                            integerTypes = {'bigint','mediumint','int','smallint','tinyint'};
+                            if any(strcmpi(header.attributes(i).type, integerTypes))
                                 queryStr = sprintf('%s`%s`=%d,',...
                                     queryStr, header.attributes(i).name, v);
-                            elseif strcmp(header.attributes(i).type, 'bigint unsigned')
+                            elseif any(strcmp(header.attributes(i).type, cellfun(@(s) sprintf('%s unsigned',s), integerTypes, 'uni', false)))
                                 queryStr = sprintf('%s`%s`=%u,',...
                                     queryStr, header.attributes(i).name, v);
                             else

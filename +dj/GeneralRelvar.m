@@ -64,8 +64,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
-        function display(self)
-            % dj.GeneralRelvar/display - display the contents of the relation.
+        function disp(self)
+            % dj.GeneralRelvar/disp - display the contents of the relation.
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             nTuples = 0;
@@ -229,6 +229,31 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 keys = dj.struct.pro(ret,self.primaryKey{:});
             end
         end
+        
+        
+        function summon1(self,varargin)
+            % self.summon1('f1','f2') is equivalent to 
+            % [f1,f2] = self.fetch1('f1','f2')   
+            
+            v = cell(size(varargin));
+            [v{:}] = self.fetchn(varargin{:});
+            for i=1:length(varargin)
+                assignin('caller',varargin{i}, v{i})
+            end
+        end
+        
+        function summon(self,varargin)
+            % self.summon('f1','f2') is equivalent to
+            % [f1,f2] = self.fetchn('f1','f2')  
+            
+            v = cell(size(varargin));
+            [v{:}] = self.fetchn(varargin{:});
+            for i=1:length(varargin)
+                assignin('caller',varargin{i}, v{i})
+            end
+        end
+
+        
         
         function varargout = fetch1(self, varargin)
             % dj.GeneralRelvar/fetch1 same as dj.Relvat/fetch but each field is
@@ -757,7 +782,7 @@ for arg = restrictions
     switch true
         case isa(cond, 'dj.GeneralRelvar') && strcmp(cond.operator, 'union')
             % union
-            s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'UniformOutput', false);
+            s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'uni', false);
             assert(~isempty(s))
             s = sprintf('(%s) OR ', s{:});
             clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "

@@ -7,6 +7,10 @@ classdef Header < matlab.mixin.Copyable
         attributes    % array of attributes
     end
     
+    properties(Access=private,Constant)
+        computedTypeString = '<sql_computed>'
+    end
+    
     properties(Dependent)
         names            % all attribute names
         primaryKey       % primary key attribute names
@@ -132,7 +136,7 @@ classdef Header < matlab.mixin.Copyable
                             ix = self.count + 1;
                             self.attributes(ix) = struct(...
                                 'name', toks{1}{2}, ...
-                                'type','<sql_computed>',...
+                                'type',self.computedTypeString,...
                                 'isnullable', false,...
                                 'default', [], ...
                                 'iskey', false, ...
@@ -156,7 +160,7 @@ classdef Header < matlab.mixin.Copyable
         
         
         function ret = join(hdr1,hdr2)
-            % form the header of relational join
+            % form the header of a relational join
             
             % merge primary keys
             ret = dj.Header;
@@ -177,13 +181,26 @@ classdef Header < matlab.mixin.Copyable
             assert(~isempty(self.attributes))
             for i = 1:length(self.attributes)
                 if isempty(self.attributes(i).alias)
-                    sql = sprintf('%s,`%s`', sql, self.names{i});
+%                     if strcmp(self.attributes(i).type,'float')
+%                         sql = sprintf('%s,1.0*`%s` as `%s`', sql, self.names{i}, self.names{i});  % cast to double to avoid rounding problems
+%                     else
+                        sql = sprintf('%s,`%s`', sql, self.names{i});
+%                    end
                 else
-                    sql = sprintf('%s,(%s) AS `%s`', ...
-                        sql, self.attributes(i).alias, self.names{i});
+                    % aliased attributes
+                    if strcmp(self.attributes(i).type,'float')  % cast to double to avoid rounding problems
+                        sql = sprintf('%s,1.0*`%s` AS `%s`', ...
+                            sql, self.attributes(i).alias, self.names{i});
+                    elseif strcmp(self.attributes(i).type,self.computedTypeString)
+                        sql = sprintf('%s,(%s) AS `%s`', ...
+                            sql, self.attributes(i).alias, self.names{i});
+                    else
+                        sql = sprintf('%s,`%s` AS `%s`', ...
+                            sql, self.attributes(i).alias, self.names{i});
+                    end
                 end
             end
-            sql = sql(2:end);
+            sql = sql(2:end); % strip leading comma 
         end
         
         
