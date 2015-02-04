@@ -215,7 +215,7 @@ classdef Table < handle
                 up = up(1);
             end
             
-            self.schema.conn.erd({self.fullTableName},up,down,self.restrictions)
+            self.schema.conn.erd({self.fullTableName},up,down)
         end
         
         

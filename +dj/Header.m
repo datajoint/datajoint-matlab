@@ -167,6 +167,13 @@ classdef Header < matlab.mixin.Copyable
             ret.attributes = [hdr1.attributes([hdr1.attributes.iskey])
                 hdr2.attributes([hdr2.attributes.iskey] & ~ismember(hdr2.names, hdr1.primaryKey))];
             
+            % error if there are any matching dependent attributes
+            commonDependent = intersect(hdr1.dependentFields,hdr2.dependentFields); 
+            if ~isempty(commonDependent)
+                error('Matching dependent attribute `%s` must be projected out or renamed before relations can be joined.',...
+                    commonDependent{1})
+            end
+
             % merge dependent fields
             ret.attributes = [ret.attributes
                 hdr1.attributes(~ismember(hdr1.names, ret.names))];
