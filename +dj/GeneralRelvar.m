@@ -232,8 +232,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         
         function summon1(self,varargin)
-            % self.summon1('f1','f2') is equivalent to 
-            % [f1,f2] = self.fetch1('f1','f2')   
+            % self.summon1('f1','f2') is equivalent to
+            % [f1,f2] = self.fetch1('f1','f2')
             if strcmp(varargin{1},'*')
                 names = self.header.names;
             else
@@ -248,7 +248,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function summon(self,varargin)
             % self.summon('f1','f2') is equivalent to
-            % [f1,f2] = self.fetchn('f1','f2')  
+            % [f1,f2] = self.fetchn('f1','f2')
             
             if strcmp(varargin{1},'*')
                 names = self.header.names;
@@ -261,7 +261,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 assignin('caller',names{i}, v{i})
             end
         end
-
+        
         
         
         function varargout = fetch1(self, varargin)
@@ -375,7 +375,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 save(fname, 'tuples')
                 savedMegaBytes = savedMegaBytes + mbytes;
                 savedTuples = savedTuples + numel(tuples);
-                tuplesPerChunk = ceil(mbytesPerChunk/savedMegaBytes*savedTuples);                
+                tuplesPerChunk = ceil(mbytesPerChunk/savedMegaBytes*savedTuples);
                 fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, savedTuples, total, savedMegaBytes)
                 fileNumber = fileNumber + 1;
             end
@@ -577,7 +577,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
             end
             ret = init(dj.GeneralRelvar, 'join', {self arg});
-        end        
+        end
         
         function ret = pair(self, varargin)
             % dj.GeneralRelvar/pair - a natural join with itself with some
@@ -847,7 +847,11 @@ for arg = restrictions
             end
             
             % common attributes for matching. Blobs are not included
-            commonAttrs = intersect(header.notBlobs, condHeader.notBlobs);
+            commonDependent = intersect(header.dependentFields,condHeader.dependentFields);
+            if ~isempty(commonDependent)
+                error('Cannot restrict by dependent attribute `%s`.  It must be projected out or renamed before restriction.',commonDependent{1})
+            end
+            commonAttrs = intersect(header.names, condHeader.names);
             if isempty(commonAttrs)
                 % no common attributes. Semijoin = original relation, antijoin = empty relation
                 if ~isempty(not)

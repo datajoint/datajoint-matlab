@@ -365,8 +365,6 @@ classdef AutoPopulate < handle
                     'Cannot populate a restricted relation. Correct syntax -- populate(rel, restriction)')
                 assert(isa(self.popRel, 'dj.GeneralRelvar'), ...
                     'property popRel must be a subclass of dj.GeneralRelvar')
-                assert(all(ismember(self.popRel.primaryKey, self.primaryKey)), ...
-                    '%s.popRel''s primary key is too specific, move it higher in data hierarchy', class(self))
                 if self.useReservations
                     abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
                     if ~isempty(abovePopRel)
