@@ -228,6 +228,26 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         
+        function insertParallel(self, varargin)
+            % inserts in a parallel thread.  Requires MATLAB R2013b or later.
+            % Call with no input arguments to initialize the job pool and to
+            % finish the last job.
+            
+            persistent F
+            if ~isempty(F)
+                f = F;
+                F = [];  % clear the task in case there was an error
+                f.fetchOutputs  % wait to complete previous task
+            end
+            
+            if nargin<2
+                gcp;  % initialize parpool
+            else
+                F = parfeval(@self.insert, 0, varargin{:});
+            end
+        end
+        
+        
         function import(self, fileMask)
             % dj.Relvar/import -- load data from .mat files
             % See also dj.GeneralRelvar/export
@@ -300,6 +320,6 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
                 self.fullTableName, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
-        end               
+        end
     end
 end
