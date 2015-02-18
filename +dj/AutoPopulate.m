@@ -135,6 +135,48 @@ classdef AutoPopulate < handle
             [varargout{1:nargout}] = self.populate_(varargin{:});
         end
         
+        function vargout = paramPopulate(self, restrict, appendStruct)
+            % Populate object with parameters
+            %  objName the dj object to populate
+            %  restrict restriction to apply to the popRel
+            %  appendStruct a structure of additional fields to add to popRel
+            %
+            % This is convenient for objects where you want to add parameters
+            % to the primary key that are not in a parent object and allows
+            % specifying which objects to populate via the function call
+            %
+            % If an output argument is passed then it will return these
+            % keys, otherwise it will call makeTuples for each of these keys
+
+            popKeys = fetch(self.popRel & restrict);
+
+            f = fields(appendStruct);
+
+            unpopulated = [];
+            for i = 1:length(popKeys)
+                potential = popKeys(i);
+
+                for j = 1:length(f)
+                    potential.(f{j}) = appendStruct.(f{j});
+                end
+
+                if count(self & potential) == 0
+                    unpopulated = [unpopulated; potential];
+                end
+            end
+
+            if nargout == 1
+                vargout{1} = unpopulated
+                return
+            else
+                for i = 1:length(unpopulated)
+                    disp('Populating parameterized object')
+                    disp(unpopulated(i))
+                    self.makeTuples(unpopulated(i));
+                end
+            end
+        end
+
         function taskCore(self, key)
             % The work unit that is submitted to the cluster
             % or executed locally
