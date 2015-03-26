@@ -76,7 +76,7 @@ classdef AutoPopulate < handle
             %   [failedKeys, errs] = populate(tp.OriMaps);  % skip errors and return their list
             %
             % See also dj.AutoPopulate/parpopulate
-           
+            
             if ~dj.set('populateAncestors')
                 rels = {self};
             else
@@ -226,15 +226,24 @@ classdef AutoPopulate < handle
                 failedKeys = struct([]);
                 errors = struct([]);
             end
-            unpopulated = self.popRel;
             
-            % if the last argument is a function handle, apply it to popRel.
-            if ~isempty(varargin) && isa(varargin{end}, 'function_handle')
-                unpopulated = varargin{end}(unpopulated);
-                varargin{end}=[];
+            popRestricts = varargin;  % restrictions on popRel
+            restricts = self.restrictions;  % restricts on self
+            if isempty(restricts)
+                unpopulated = fetch((self.popRel & popRestricts) - self);
+            else
+                assert(numel(restricts)==1, 'only one restriction is allowed in populated relations')
+                restricts = restricts{1};
+                if isa(restricts, 'dj.GeneralRelvar')
+                    restricts = fetch(restricts);
+                end
+                assert(isstruct(restricts), ...
+                    'populated relvars can be restricted only by other relations, structures, or structure arrays')
+                % the rule for populating restricted relations:
+                unpopulated = dj.struct.join(restricts, fetch((self.popRel & popRestricts & restricts) - (self & restricts)));
             end
+            
             % restrict the popRel to unpopulated tuples
-            unpopulated = fetch((unpopulated & varargin) - self);
             if isempty(unpopulated)
                 fprintf('%s: Nothing to populate\n', self.className)
             else
@@ -357,20 +366,22 @@ classdef AutoPopulate < handle
         
         
         function populateSanityChecks(self)
-            % Performs sanity checks that are common to populate, parpopulate and batch_populate
+            % Performs sanity checks that are common to populate,
+            % parpopulate and batch_populate.
+            % To disable the sanity check: dj.set('populateCheck',false)
             if dj.set('populateCheck')
                 assert(isprop(self,'popRel'), ...
                     'Automatically populated tables must declare a popRel property')
-                assert(isempty(self.restrictions), ...
-                    'Cannot populate a restricted relation. Correct syntax -- populate(rel, restriction)')
                 assert(isa(self.popRel, 'dj.GeneralRelvar'), ...
                     'property popRel must be a subclass of dj.GeneralRelvar')
-                if self.useReservations
-                    abovePopRel = setdiff(self.primaryKey(1:length(self.popRel.primaryKey)), self.popRel.primaryKey);
-                    if ~isempty(abovePopRel)
-                        warning(['Primary key attribute %s is above popRel''s primary key attributes. '...
-                            'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
-                    end
+                abovePopRel = setdiff(self.primaryKey(1:min(end,length(self.popRel.primaryKey))), self.popRel.primaryKey);
+                if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
+                    warning(['The popRel primary key contains extra fields. ' ...
+                        'The popRel''s  primary key is normally a subset of the populated relation''s primary key'])
+                end
+                if ~isempty(abovePopRel)
+                    warning(['Primary key attribute %s is above popRel''s primary key attributes. '...
+                        'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                 end
             end
         end

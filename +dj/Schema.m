@@ -216,7 +216,7 @@ classdef Schema < handle
         end
         
         
-        function display(self)
+        function disp(self)
             self.reload(false)
             for i=1:numel(self)
                 fprintf('\nDataJoint schema %s, stored in MySQL database %s', ...

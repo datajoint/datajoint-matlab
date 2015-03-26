@@ -27,7 +27,7 @@ classdef struct
         
         function ret = join(s1, s2)
             % DJ.STRUCT.JOIN - the relational join of structure arrays s1 and s2
-            assert(isstruct(s1) && isstruct(s2) && size(s1,2)==1 && size(s2,2)==1);
+            assert(isstruct(s1) && isstruct(s2) && size(s1,2)<=1 && size(s2,2)<=1);
             ret = struct([]);
             commonFields = intersect(fieldnames(s1),fieldnames(s2));
             s2only = setdiff(fieldnames(s2),fieldnames(s1));
