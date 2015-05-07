@@ -728,7 +728,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     commonBlobs = intersect(header.blobNames, header2.blobNames);
                     assert(isempty(commonBlobs), 'join cannot be done on blob attributes')
                     pkey = sprintf(',`%s`', header.primaryKey{:});
-                    sql = sprintf('%s NATURAL JOIN %s GROUP BY %s', sql, sql2, pkey(2:end));
+                    sql = sprintf('%s NATURAL LEFT JOIN %s GROUP BY %s', sql, sql2, pkey(2:end));
                     header.project(self.operands(3:end));
                     assert(~all(arrayfun(@(x) isempty(x.alias), header.attributes)),...
                         'Aggregate operators must define at least one computation')
