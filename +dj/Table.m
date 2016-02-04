@@ -613,7 +613,7 @@ classdef Table < handle
             else
                 file = which(self.className);
                 assert(~isempty(file), ...
-                    'MissingTableDefinition:Could not find table definition file %s', file)
+                    'MissingTableDefinition:Could not find table definition file %s', self.className)
                 declaration = readPercentBraceComment(file);
                 assert(~isempty(declaration), ...
                     'MissingTableDefnition:Could not find the table declaration in %s', file)
