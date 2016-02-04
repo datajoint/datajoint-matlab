@@ -324,7 +324,11 @@ classdef AutoPopulate < handle
             
             function jobKey = addJobInfo(jobKey)
                 if all(ismember({'host','pid'},self.jobs.header.names))
-                    host = char(getHostName(java.net.InetAddress.getLocalHost));
+                    try
+                        host = char(getHostName(java.net.InetAddress.getLocalHost));
+                    catch
+                        [~,host] = system('hostname');
+                    end
                     jobKey.host = strtrim(host);
                     jobKey.pid = feature('getpid');
                 end

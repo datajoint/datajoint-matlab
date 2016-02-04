@@ -229,21 +229,26 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function insertParallel(self, varargin)
-            % inserts in a parallel thread.  Requires MATLAB R2013b or later.
-            % Call with no input arguments to initialize the job pool and to
-            % finish the last job.
+            % inserts in a parallel THREAD but waits if the previous insert
+            % has not completed yet.  Thus insertParallel uses at most one
+            % parallel thread.  Call with no arguments to wait for the last
+            % job to complete.
+            % 
+            % Initialize the parallel pool before inserting as parpool('local',1), for example. 
+            %
+            % Requires MATLAB R2013b or later.
             
-            persistent F
-            if ~isempty(F)
-                f = F;
-                F = [];  % clear the task in case there was an error
-                f.fetchOutputs  % wait to complete previous task
-            end
-            
-            if nargin<2
-                gcp;  % initialize parpool
-            else
-                F = parfeval(@self.insert, 0, varargin{:});
+            persistent THREAD
+            if ~isempty(THREAD)
+                thread = THREAD;
+                THREAD = [];  % clear the job in case there was an error
+                thread.fetchOutputs  % wait to complete previous insert
+            end            
+            pool = gcp('nocreate');
+            assert(~isempty(pool), ...
+                'A parallel pool must be created first, e.g. parpool(''local'',1')
+            if nargin>=2
+                THREAD = parfeval(pool, @self.insert, 0, varargin{:});
             end
         end
         
