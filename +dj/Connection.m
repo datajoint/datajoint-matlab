@@ -282,7 +282,7 @@ classdef Connection < handle
                     end
                 end
                 edgeColor = 'none';
-                fontSize = 11;
+                fontSize = dj.set('erdFontSize');
                 text(xi(i), yi(i), [name '  '], ...
                     'HorizontalAlignment', 'right', 'interpreter', 'none', ...
                     'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
