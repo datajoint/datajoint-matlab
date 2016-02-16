@@ -406,7 +406,7 @@ classdef Table < handle
             if isempty(name.name)
                 disp 'No matching foreign key'
             else
-                self.alter(sprintf('DROP FOREIGN KEY %s', name.name{1}));
+                self.alter(sprintf('DROP FOREIGN KEY `%s`', name.name{1}));
             end
         end
         
