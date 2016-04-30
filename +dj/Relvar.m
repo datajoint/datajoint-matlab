@@ -124,6 +124,62 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         
+        function exportCascade(self, path,  mbytesPerFile)
+            % dj.BaseRelvar/export_cascade - export all tuples of the
+            % relation and, recursively, all matching tuples in the
+            % dependent tables.
+            %
+            % See also dj.GeneralRelvar/export
+            
+            if nargin<2
+                path = './temp';
+            end
+            if nargin<3
+                mbytesPerFile = 250;
+            end
+            
+            if ~self.exists
+                disp 'nothing to export'
+            else
+                % compile the list of relvars to be export from
+                list = self.descendants;
+                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
+                rels = [rels{:}];
+                rels(1) = rels(1) & self.restrictions;
+                
+                % apply proper restrictions
+                restrictByMe = arrayfun(@(rel) ...
+                    any(ismember(...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.referenced,'uni',false),...
+                    list)),...
+                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
+                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                counts = zeros(size(rels));
+                for i=1:length(rels)
+                    % iterate through all tables that reference rels(i)
+                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), [rels(i).children rels(i).referencing])
+                        % and restrict them by it or its restrictions
+                        if restrictByMe(i)
+                            rels(ix).restrict(pro(rels(i)))
+                        else
+                            rels(ix).restrict(rels(i).restrictions{:});
+                        end
+                    end
+                    counts(i) = rels(i).count;
+                end
+                
+                % eliminate all empty relations
+                rels = rels(counts>0);
+                
+                % save 
+                for rel = rels
+                    rel.export(fullfile(path, rel.className), mbytesPerFile);
+                end
+            end
+        end
+        
+        
+        
         function insert(self, tuples, command)
             % insert an array of tuples directly into the table
             %
@@ -233,8 +289,8 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % has not completed yet.  Thus insertParallel uses at most one
             % parallel thread.  Call with no arguments to wait for the last
             % job to complete.
-            % 
-            % Initialize the parallel pool before inserting as parpool('local',1), for example. 
+            %
+            % Initialize the parallel pool before inserting as parpool('local',1), for example.
             %
             % Requires MATLAB R2013b or later.
             
@@ -243,7 +299,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 thread = THREAD;
                 THREAD = [];  % clear the job in case there was an error
                 thread.fetchOutputs  % wait to complete previous insert
-            end            
+            end
             pool = gcp('nocreate');
             assert(~isempty(pool), ...
                 'A parallel pool must be created first, e.g. parpool(''local'',1')
@@ -254,7 +310,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function import(self, fileMask)
-            % dj.Relvar/import -- load data from .mat files
+            % dj.Relvar/import -- load data into one table from .mat files
             % See also dj.GeneralRelvar/export
             countTuples = 0;
             for f = dir(fileMask)'
@@ -325,6 +381,52 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
                 self.fullTableName, attrname, queryStr, self.whereClause);
             self.schema.conn.query(queryStr, value{:})
+        end
+    end
+    
+    methods(Static)
+        function importAll(path)
+            % Import all files from path/schema.ClassName-*.mat
+            % The files are first sorted in order of dependencies.
+            % Their contents are then inserted in order of dependencies.
+            
+            s = dir(fullfile(path,'*-*.mat'));
+            if isempty(s)
+                warning 'no matching files found'
+                return
+            end
+            
+            % create all tables
+            disp Declaring..
+            relvars = {};
+            conn = [];
+            for f = {s.name}
+                tableName = f{1}(1:find(f{1}=='-',1,'first')-1);
+                %make sure all schemas are loaded
+                if exist(tableName, 'class')
+                   r = feval(tableName);  % instantiate
+                   conn = r.conn;
+                   relvars{end+1} = r; %#ok<AGROW>
+                   assert(isa(r, 'dj.Relvar'), ...
+                       'class %s must be a Relvar', tableName)
+                   r.info;  % create tables if not yet created                   
+                else
+                    warning('%s is not found', tableName)                   
+                end
+            end
+            
+            % populate tables in order of dependence 
+            disp Inserting..
+            names = cellfun(@(r) r.fullTableName, relvars, 'uni', false);
+            C = conn.makeDependencyMatrix(names);
+            levels = dj.Connection.computeHierarchyLevels(C);
+            for level=0:max(levels)
+                for i=find(levels(:)' == level)
+                    disp(s(i).name)
+                    contents = load(fullfile(path, s(i).name));
+                    relvars{i}.inserti(contents.tuples);
+                end
+            end
         end
     end
 end

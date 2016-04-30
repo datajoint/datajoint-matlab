@@ -231,39 +231,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         
-        function summon1(self,varargin)
-            % self.summon1('f1','f2') is equivalent to
-            % [f1,f2] = self.fetch1('f1','f2')
-            if strcmp(varargin{1},'*')
-                names = self.header.names;
-            else
-                names = varargin;
-            end
-            v = cell(size(names));
-            [v{:}] = self.fetch1(names{:});
-            for i=1:length(names)
-                assignin('caller',names{i}, v{i})
-            end
-        end
-        
-        function summon(self,varargin)
-            % self.summon('f1','f2') is equivalent to
-            % [f1,f2] = self.fetchn('f1','f2')
-            
-            if strcmp(varargin{1},'*')
-                names = self.header.names;
-            else
-                names = varargin;
-            end
-            v = cell(size(names));
-            [v{:}] = self.fetchn(names{:});
-            for i=1:length(names)
-                assignin('caller',names{i}, v{i})
-            end
-        end
-        
-        
-        
         function varargout = fetch1(self, varargin)
             % dj.GeneralRelvar/fetch1 same as dj.Relvat/fetch but each field is
             % retrieved into a separate output variable.
@@ -341,9 +308,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
         end
         
-        function export(self, outfilePrefix, mbytesPerChunk)
+        function export(self, outfilePrefix, mbytesPerFile)
             % dj.GeneralRelvar/export -- export the contents of the relation into and a .m file
-            % The data are split into chunks according to mbytesPerChunk.
+            % The data are split into chunks according to mbytesPerFile.
             %
             % See also dj.Relvar/import
             
@@ -351,9 +318,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 outfilePrefix = './temp';
             end
             if nargin<3
-                mbytesPerChunk = 50;
+                mbytesPerFile = 250;
             end
-            tuplesPerChunk = 1;
+            tuplesPerChunk = 3;
             
             % enclose in transaction to ensure that LIMIT and OFFSET work correctly
             self.conn.startTransaction
@@ -363,19 +330,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             total = self.count;
             fileNumber = 0;
             while savedTuples < total
-                while true
-                    tuples = self.fetch('*',sprintf('LIMIT %u OFFSET %u', tuplesPerChunk, savedTuples));
-                    mbytes = sizeMB(tuples);
-                    if mbytes > 0.5*mbytesPerChunk || numel(tuples) + savedTuples >= total
-                        break
-                    end
-                    tuplesPerChunk = tuplesPerChunk*2;
-                end
+                tuples = self.fetch('*',sprintf('LIMIT %u OFFSET %u', tuplesPerChunk, savedTuples));
+                mbytes = sizeMB(tuples);
                 fname = sprintf('%s-%04d.mat', outfilePrefix, fileNumber);
                 save(fname, 'tuples')
                 savedMegaBytes = savedMegaBytes + mbytes;
                 savedTuples = savedTuples + numel(tuples);
-                tuplesPerChunk = ceil(mbytesPerChunk/savedMegaBytes*savedTuples);
+                tuplesPerChunk = min(5*tuplesPerChunk, ceil(mbytesPerFile/savedMegaBytes*savedTuples));
                 fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, savedTuples, total, savedMegaBytes)
                 fileNumber = fileNumber + 1;
             end
