@@ -171,7 +171,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 % eliminate all empty relations
                 rels = rels(counts>0);
                 
-                % save 
+                % save
                 for rel = rels
                     rel.export(fullfile(path, rel.className), mbytesPerFile);
                 end
@@ -225,12 +225,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % form query
             ix = ismember(header.names, fnames);
             fields = sprintf(',`%s`',header.names{ix});
-            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end)); 
+            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end));
             blobs = {};
             for tuple=tuples(:)'
                 valueStr = '';
                 for i = find(ix)
-                    type = header.attributes(i).type;
                     v = tuple.(header.attributes(i).name);
                     if header.attributes(i).isString
                         assert(ischar(v), ...
@@ -252,8 +251,9 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
                             valueStr = sprintf('%sNULL,', valueStr);
                         elseif isinf(v)
-                            error 'Infinite values are not allowed in numeric fields'                            
+                            error 'Infinite values are not allowed in numeric fields'
                         else  % numeric values
+                            type = header.attributes(i).type;
                             if length(type)>=3 && strcmpi(type(end-2:end),'int')
                                 valueStr = sprintf('%s%d,', valueStr, v);
                             elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
@@ -400,18 +400,18 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 tableName = f{1}(1:find(f{1}=='-',1,'first')-1);
                 %make sure all schemas are loaded
                 if exist(tableName, 'class')
-                   r = feval(tableName);  % instantiate
-                   conn = r.conn;
-                   relvars{end+1} = r; %#ok<AGROW>
-                   assert(isa(r, 'dj.Relvar'), ...
-                       'class %s must be a Relvar', tableName)
-                   r.info;  % create tables if not yet created                   
+                    r = feval(tableName);  % instantiate
+                    conn = r.conn;
+                    relvars{end+1} = r; %#ok<AGROW>
+                    assert(isa(r, 'dj.Relvar'), ...
+                        'class %s must be a Relvar', tableName)
+                    r.info;  % create tables if not yet created
                 else
-                    warning('%s is not found', tableName)                   
+                    warning('%s is not found', tableName)
                 end
             end
             
-            % populate tables in order of dependence 
+            % populate tables in order of dependence
             disp Inserting..
             names = cellfun(@(r) r.fullTableName, relvars, 'uni', false);
             C = conn.makeDependencyMatrix(names);
