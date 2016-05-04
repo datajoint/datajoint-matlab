@@ -197,7 +197,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 tuples = cell2struct(tuples, self.header.names, 2);
             end
             
-            assert(isstruct(tuples), 'Tuples must be a non-empty structure array')
+            assert(isstruct(tuples), 'Tuples must be a structure array')
             if isempty(tuples)
                 return
             end
@@ -224,55 +224,51 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             
             % form query
             ix = ismember(header.names, fnames);
+            fields = sprintf(',`%s`',header.names{ix});
+            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end)); 
+            blobs = {};
             for tuple=tuples(:)'
-                queryStr = '';
-                blobs = {};
+                valueStr = '';
                 for i = find(ix)
+                    type = header.attributes(i).type;
                     v = tuple.(header.attributes(i).name);
                     if header.attributes(i).isString
                         assert(ischar(v), ...
                             'The field %s must be a character string', ...
                             header.attributes(i).name)
                         if isempty(v)
-                            queryStr = sprintf('%s`%s`="",', ...
-                                queryStr, header.attributes(i).name);
+                            valueStr = sprintf('%s"",',valueStr);
                         else
-                            queryStr = sprintf('%s`%s`="{S}",', ...
-                                queryStr,header.attributes(i).name);
+                            valueStr = sprintf('%s"{S}",', valueStr);
                             blobs{end+1} = v;  %#ok<AGROW>
                         end
                     elseif header.attributes(i).isBlob
-                        queryStr = sprintf('%s`%s`="{M}",', ...
-                            queryStr,header.attributes(i).name);
+                        valueStr = sprintf('%s"{M}",', valueStr);
                         blobs{end+1} = v;    %#ok<AGROW>
                     else
-                        assert((isscalar(v) && (isnumeric(v) || islogical(v))) || isempty(v),...
+                        assert((isnumeric(v) || islogical(v)) && (isscalar(v) || isempty(v)),...
                             'The field %s must be a numeric scalar value', ...
                             header.attributes(i).name)
-                        if isempty(v)
-                            queryStr = sprintf('%s`%s`=NULL,',...
-                                queryStr, header.attributes(i).name);
-                        elseif ~isnan(v)  % nans are not passed: assumed missing.
-                            integerTypes = {'bigint','mediumint','int','smallint','tinyint'};
-                            if any(strcmpi(header.attributes(i).type, integerTypes))
-                                queryStr = sprintf('%s`%s`=%d,',...
-                                    queryStr, header.attributes(i).name, v);
-                            elseif any(strcmp(header.attributes(i).type, cellfun(@(s) sprintf('%s unsigned',s), integerTypes, 'uni', false)))
-                                queryStr = sprintf('%s`%s`=%u,',...
-                                    queryStr, header.attributes(i).name, v);
+                        if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
+                            valueStr = sprintf('%sNULL,', valueStr);
+                        elseif isinf(v)
+                            error 'Infinite values are not allowed in numeric fields'                            
+                        else  % numeric values
+                            if length(type)>=3 && strcmpi(type(end-2:end),'int')
+                                valueStr = sprintf('%s%d,', valueStr, v);
+                            elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
+                                valueStr = sprintf('%s%u,', valueStr, v);
                             else
-                                queryStr = sprintf('%s`%s`=%1.16g,',...
-                                    queryStr, header.attributes(i).name, v);
+                                valueStr = sprintf('%s%1.16g,',valueStr, v);
                             end
                         end
                     end
                 end
-                
-                % issue query
-                self.schema.conn.query( sprintf('%s %s SET %s', ...
-                    command, self.fullTableName, ...
-                    queryStr(1:end-1)), blobs{:})
+                command = sprintf('%s(%s),', command, valueStr(1:end-1));
             end
+            % issue query
+            command(end)=0;
+            self.schema.conn.query(command, blobs{:});
         end
         
         
@@ -349,18 +345,18 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             
             switch true
                 case isNull
-                    queryStr = 'NULL';
+                    valueStr = 'NULL';
                     value = {};
                 case header.attributes(ix).isString
                     assert(ischar(value), 'Value must be a string')
-                    queryStr = '"{S}"';
+                    valueStr = '"{S}"';
                     value = {value};
                 case header.attributes(ix).isBlob
                     if isempty(value) && header.attributes(ix).isnullable
-                        queryStr = 'NULL';
+                        valueStr = 'NULL';
                         value = {};
                     else
-                        queryStr = '"{M}"';
+                        valueStr = '"{M}"';
                         value = {value};
                     end
                 case header.attributes(ix).isNumeric
@@ -368,19 +364,19 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                     if isnan(value)
                         assert(header.attributes(ix).isnullable, ...
                             'attribute `%s` is not nullable. NaNs not allowed', attrname)
-                        queryStr = 'NULL';
+                        valueStr = 'NULL';
                         value = {};
                     else
-                        queryStr = sprintf('%1.16g',value);
+                        valueStr = sprintf('%1.16g',value);
                         value = {};
                     end
                 otherwise
                     error 'invalid update command'
             end
             
-            queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
-                self.fullTableName, attrname, queryStr, self.whereClause);
-            self.schema.conn.query(queryStr, value{:})
+            valueStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
+                self.fullTableName, attrname, valueStr, self.whereClause);
+            self.schema.conn.query(valueStr, value{:})
         end
     end
     
