@@ -161,53 +161,13 @@ classdef Connection < handle
             list = list(j);  % exclude job tables
             tiers = tiers(j);
             
-            % construct the dependency matrix C(to,from)
-            n = length(list);
-            C = sparse([],[],[],n,n);
-            for i=1:n
-                j = cellfun(@(c) find(strcmp(c,list)), self.children(list{i}), 'uni', false);
-                C(i,[j{:}])=1; %#ok<SPRIX>
-                j = cellfun(@(c) find(strcmp(c,list)), self.referencing(list{i}), 'uni', false);
-                C(i,[j{:}])=2; %#ok<SPRIX>
-            end
-            
+            C = self.makeDependencyMatrix(list);            
             if sum(C(:))==0
                 disp 'No dependencies found. Nothing to plot'
                 return
             end
             
-            % compute levels in hierarchy
-            level = zeros(size(list));
-            updated = true;
-            while updated
-                updated = false;
-                for i=1:n
-                    j = find(C(i,:));
-                    if ~isempty(j)
-                        newLevel = max(level(j))+1;
-                        if level(i)~=newLevel
-                            updated = true;
-                            level(i) = newLevel;
-                        end
-                    end
-                end
-            end
-            % tighten up levels
-            updated = true;
-            while updated
-                updated = false;
-                for i=1:n
-                    j = find(C(:,i));
-                    if ~isempty(j)
-                        newLevel = min(level(j))-1;
-                        if newLevel ~= level(i)
-                            updated = true;
-                            level(i) = newLevel;
-                        end
-                    end
-                end
-            end
-            
+            level = -self.computeHierarchyLevels(C);
             
             % convert to 'package.ClassName'
             names = cellfun(@self.tableToClass,list,'uni',false);
@@ -245,8 +205,7 @@ classdef Connection < handle
                     L(i) = Lnew;
                 end
             end
-            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level
-            
+            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level            
             
             % plot nodes
             plot(xi, yi, 'ko', 'MarkerSize', 10);
@@ -282,7 +241,7 @@ classdef Connection < handle
                     end
                 end
                 edgeColor = 'none';
-                fontSize = 11;
+                fontSize = dj.set('erdFontSize');
                 text(xi(i), yi(i), [name '  '], ...
                     'HorizontalAlignment', 'right', 'interpreter', 'none', ...
                     'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
@@ -405,6 +364,56 @@ classdef Connection < handle
                     schema.tableNames.values, 'uni', false);
                 self.parents.remove(intersect(self.parents.keys,tableNames));
                 self.referenced.remove(intersect(self.referenced.keys,tableNames));
+            end
+        end
+    
+        function C = makeDependencyMatrix(self, list)
+            n = length(list);
+            C = sparse([],[],[],n,n);
+            for i=1:n
+                j = cellfun(@(c) find(strcmp(c,list)), self.children(list{i}), 'uni', false);
+                C(i,[j{:}])=1; %#ok<SPRIX>
+                j = cellfun(@(c) find(strcmp(c,list)), self.referencing(list{i}), 'uni', false);
+                C(i,[j{:}])=2; %#ok<SPRIX>
+            end
+        end
+    end
+    
+    methods(Static)
+        function level = computeHierarchyLevels(C)
+            % computes levels of nodes from adjacency matrix C.
+            
+            % compute levels in hierarchy
+            n = size(C,1);
+            level = zeros(size(C,1),1);
+            updated = true;
+            while updated
+                updated = false;
+                for i=1:n
+                    j = find(C(:,i));
+                    if ~isempty(j)
+                        newLevel = max(level(j))+1;
+                        if level(i)~=newLevel
+                            updated = true;
+                            level(i) = newLevel;
+                        end
+                    end
+                end
+            end
+            % tighten up levels
+            updated = true;
+            while updated
+                updated = false;
+                for i=1:n
+                    j = find(C(i,:));
+                    if ~isempty(j)
+                        newLevel = min(level(j))-1;
+                        if newLevel ~= level(i)
+                            updated = true;
+                            level(i) = newLevel;
+                        end
+                    end
+                end
             end
         end
     end

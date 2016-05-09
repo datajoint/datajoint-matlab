@@ -124,6 +124,62 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         
+        function exportCascade(self, path,  mbytesPerFile)
+            % dj.BaseRelvar/export_cascade - export all tuples of the
+            % relation and, recursively, all matching tuples in the
+            % dependent tables.
+            %
+            % See also dj.GeneralRelvar/export
+            
+            if nargin<2
+                path = './temp';
+            end
+            if nargin<3
+                mbytesPerFile = 250;
+            end
+            
+            if ~self.exists
+                disp 'nothing to export'
+            else
+                % compile the list of relvars to be export from
+                list = self.descendants;
+                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
+                rels = [rels{:}];
+                rels(1) = rels(1) & self.restrictions;
+                
+                % apply proper restrictions
+                restrictByMe = arrayfun(@(rel) ...
+                    any(ismember(...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.referenced,'uni',false),...
+                    list)),...
+                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
+                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                counts = zeros(size(rels));
+                for i=1:length(rels)
+                    % iterate through all tables that reference rels(i)
+                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), [rels(i).children rels(i).referencing])
+                        % and restrict them by it or its restrictions
+                        if restrictByMe(i)
+                            rels(ix).restrict(pro(rels(i)))
+                        else
+                            rels(ix).restrict(rels(i).restrictions{:});
+                        end
+                    end
+                    counts(i) = rels(i).count;
+                end
+                
+                % eliminate all empty relations
+                rels = rels(counts>0);
+                
+                % save
+                for rel = rels
+                    rel.export(fullfile(path, rel.className), mbytesPerFile);
+                end
+            end
+        end
+        
+        
+        
         function insert(self, tuples, command)
             % insert an array of tuples directly into the table
             %
@@ -141,7 +197,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 tuples = cell2struct(tuples, self.header.names, 2);
             end
             
-            assert(isstruct(tuples), 'Tuples must be a non-empty structure array')
+            assert(isstruct(tuples), 'Tuples must be a structure array')
             if isempty(tuples)
                 return
             end
@@ -168,9 +224,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             
             % form query
             ix = ismember(header.names, fnames);
+            fields = sprintf(',`%s`',header.names{ix});
+            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end));
+            blobs = {};
             for tuple=tuples(:)'
-                queryStr = '';
-                blobs = {};
+                valueStr = '';
                 for i = find(ix)
                     v = tuple.(header.attributes(i).name);
                     if header.attributes(i).isString
@@ -178,45 +236,39 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                             'The field %s must be a character string', ...
                             header.attributes(i).name)
                         if isempty(v)
-                            queryStr = sprintf('%s`%s`="",', ...
-                                queryStr, header.attributes(i).name);
+                            valueStr = sprintf('%s"",',valueStr);
                         else
-                            queryStr = sprintf('%s`%s`="{S}",', ...
-                                queryStr,header.attributes(i).name);
+                            valueStr = sprintf('%s"{S}",', valueStr);
                             blobs{end+1} = v;  %#ok<AGROW>
                         end
                     elseif header.attributes(i).isBlob
-                        queryStr = sprintf('%s`%s`="{M}",', ...
-                            queryStr,header.attributes(i).name);
+                        valueStr = sprintf('%s"{M}",', valueStr);
                         blobs{end+1} = v;    %#ok<AGROW>
                     else
-                        assert((isscalar(v) && (isnumeric(v) || islogical(v))) || isempty(v),...
+                        assert((isnumeric(v) || islogical(v)) && (isscalar(v) || isempty(v)),...
                             'The field %s must be a numeric scalar value', ...
                             header.attributes(i).name)
-                        if isempty(v)
-                            queryStr = sprintf('%s`%s`=NULL,',...
-                                queryStr, header.attributes(i).name);
-                        elseif ~isnan(v)  % nans are not passed: assumed missing.
-                            integerTypes = {'bigint','mediumint','int','smallint','tinyint'};
-                            if any(strcmpi(header.attributes(i).type, integerTypes))
-                                queryStr = sprintf('%s`%s`=%d,',...
-                                    queryStr, header.attributes(i).name, v);
-                            elseif any(strcmp(header.attributes(i).type, cellfun(@(s) sprintf('%s unsigned',s), integerTypes, 'uni', false)))
-                                queryStr = sprintf('%s`%s`=%u,',...
-                                    queryStr, header.attributes(i).name, v);
+                        if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
+                            valueStr = sprintf('%sNULL,', valueStr);
+                        elseif isinf(v)
+                            error 'Infinite values are not allowed in numeric fields'
+                        else  % numeric values
+                            type = header.attributes(i).type;
+                            if length(type)>=3 && strcmpi(type(end-2:end),'int')
+                                valueStr = sprintf('%s%d,', valueStr, v);
+                            elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
+                                valueStr = sprintf('%s%u,', valueStr, v);
                             else
-                                queryStr = sprintf('%s`%s`=%1.16g,',...
-                                    queryStr, header.attributes(i).name, v);
+                                valueStr = sprintf('%s%1.16g,',valueStr, v);
                             end
                         end
                     end
                 end
-                
-                % issue query
-                self.schema.conn.query( sprintf('%s %s SET %s', ...
-                    command, self.fullTableName, ...
-                    queryStr(1:end-1)), blobs{:})
+                command = sprintf('%s(%s),', command, valueStr(1:end-1));
             end
+            % issue query
+            command(end)=0;
+            self.schema.conn.query(command, blobs{:});
         end
         
         
@@ -233,8 +285,8 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % has not completed yet.  Thus insertParallel uses at most one
             % parallel thread.  Call with no arguments to wait for the last
             % job to complete.
-            % 
-            % Initialize the parallel pool before inserting as parpool('local',1), for example. 
+            %
+            % Initialize the parallel pool before inserting as parpool('local',1), for example.
             %
             % Requires MATLAB R2013b or later.
             
@@ -243,7 +295,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 thread = THREAD;
                 THREAD = [];  % clear the job in case there was an error
                 thread.fetchOutputs  % wait to complete previous insert
-            end            
+            end
             pool = gcp('nocreate');
             assert(~isempty(pool), ...
                 'A parallel pool must be created first, e.g. parpool(''local'',1')
@@ -254,7 +306,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function import(self, fileMask)
-            % dj.Relvar/import -- load data from .mat files
+            % dj.Relvar/import -- load data into one table from .mat files
             % See also dj.GeneralRelvar/export
             countTuples = 0;
             for f = dir(fileMask)'
@@ -293,18 +345,18 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             
             switch true
                 case isNull
-                    queryStr = 'NULL';
+                    valueStr = 'NULL';
                     value = {};
                 case header.attributes(ix).isString
                     assert(ischar(value), 'Value must be a string')
-                    queryStr = '"{S}"';
+                    valueStr = '"{S}"';
                     value = {value};
                 case header.attributes(ix).isBlob
                     if isempty(value) && header.attributes(ix).isnullable
-                        queryStr = 'NULL';
+                        valueStr = 'NULL';
                         value = {};
                     else
-                        queryStr = '"{M}"';
+                        valueStr = '"{M}"';
                         value = {value};
                     end
                 case header.attributes(ix).isNumeric
@@ -312,19 +364,65 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                     if isnan(value)
                         assert(header.attributes(ix).isnullable, ...
                             'attribute `%s` is not nullable. NaNs not allowed', attrname)
-                        queryStr = 'NULL';
+                        valueStr = 'NULL';
                         value = {};
                     else
-                        queryStr = sprintf('%1.16g',value);
+                        valueStr = sprintf('%1.16g',value);
                         value = {};
                     end
                 otherwise
                     error 'invalid update command'
             end
             
-            queryStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
-                self.fullTableName, attrname, queryStr, self.whereClause);
-            self.schema.conn.query(queryStr, value{:})
+            valueStr = sprintf('UPDATE %s SET `%s`=%s %s', ...
+                self.fullTableName, attrname, valueStr, self.whereClause);
+            self.schema.conn.query(valueStr, value{:})
+        end
+    end
+    
+    methods(Static)
+        function importAll(path)
+            % Import all files from path/schema.ClassName-*.mat
+            % The files are first sorted in order of dependencies.
+            % Their contents are then inserted in order of dependencies.
+            
+            s = dir(fullfile(path,'*-*.mat'));
+            if isempty(s)
+                warning 'no matching files found'
+                return
+            end
+            
+            % create all tables
+            disp Declaring..
+            relvars = {};
+            conn = [];
+            for f = {s.name}
+                tableName = f{1}(1:find(f{1}=='-',1,'first')-1);
+                %make sure all schemas are loaded
+                if exist(tableName, 'class')
+                    r = feval(tableName);  % instantiate
+                    conn = r.conn;
+                    relvars{end+1} = r; %#ok<AGROW>
+                    assert(isa(r, 'dj.Relvar'), ...
+                        'class %s must be a Relvar', tableName)
+                    r.info;  % create tables if not yet created
+                else
+                    warning('%s is not found', tableName)
+                end
+            end
+            
+            % populate tables in order of dependence
+            disp Inserting..
+            names = cellfun(@(r) r.fullTableName, relvars, 'uni', false);
+            C = conn.makeDependencyMatrix(names);
+            levels = dj.Connection.computeHierarchyLevels(C);
+            for level=0:max(levels)
+                for i=find(levels(:)' == level)
+                    disp(s(i).name)
+                    contents = load(fullfile(path, s(i).name));
+                    relvars{i}.inserti(contents.tuples);
+                end
+            end
         end
     end
 end

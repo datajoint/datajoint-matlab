@@ -206,12 +206,13 @@ classdef AutoPopulate < handle
                 % return remaning items if asked
                 varargout{1} = remaining;
             else
+                fprintf('%s %30s:  ', datestr(now,'yyyy-mm-dd HH:MM:SS'), self.className)
                 total = count(self.popRel&varargin);
                 if ~total
                     disp 'Nothing to populate'
                 else
-                    fprintf('%2.2f%% complete (%d remaining)        Time %s\n', ...
-                        100-100*double(remaining)/double(total), remaining, datestr(now,'HH:MM:SS'))
+                    fprintf('%6.2f%% complete (%d of %d)\n', ...
+                        100-100*double(remaining)/double(total), total-remaining, total)
                 end
             end
         end
