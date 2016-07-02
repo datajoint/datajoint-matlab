@@ -371,9 +371,9 @@ classdef Connection < handle
             n = length(list);
             C = sparse([],[],[],n,n);
             for i=1:n
-                j = cellfun(@(c) find(strcmp(c,list)), self.children(list{i}), 'uni', false);
+                j = cellfun(@(c) find(strcmp(c,list))', self.children(list{i}), 'uni', false);
                 C(i,[j{:}])=1; %#ok<SPRIX>
-                j = cellfun(@(c) find(strcmp(c,list)), self.referencing(list{i}), 'uni', false);
+                j = cellfun(@(c) find(strcmp(c,list))', self.referencing(list{i}), 'uni', false);
                 C(i,[j{:}])=2; %#ok<SPRIX>
             end
         end
