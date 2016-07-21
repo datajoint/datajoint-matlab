@@ -134,17 +134,17 @@ classdef Connection < handle
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
+            assert(up>=0 && down>=0, 'ERD radius must be positive')
             while up || down
-                assert(up>=0 && down>=0, 'ERD radius must be positive')
                 added = [];
-                if up>0
+                if up
                     temp = cellfun(@(s) ...
                         [self.referenced(s) self.parents(s)], ...
                         lastAdded, 'uni', false);
                     added = setdiff([temp{:}],list);
                     up = up - 1;
                 end
-                if down>0
+                if down
                     temp = cellfun(@(s) ...
                         [self.referencing(s) self.children(s)], ...
                         lastAdded, 'uni', false);
