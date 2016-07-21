@@ -134,6 +134,7 @@ classdef Connection < handle
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
+            assert(up>=0 && down>=0, 'ERD radius must be positive')
             while up || down
                 added = [];
                 if up
