@@ -66,8 +66,6 @@ classdef Connection < handle
                 addMember(self.parents, from)
                 addMember(self.referenced, from)
                 for s=s
-                    assert(isequal(s.attrs1,s.attrs2),...
-                        'Foreign keys must link identically named attributes')
                     s.attrs = regexp(s.attrs1,', ', 'split');
                     s.attrs = cellfun(@(s) s(2:end-1), s.attrs, 'uni',false);
                     isPrimary = all(ismember(s.attrs,schema.headers(tabName{1}).primaryKey));
@@ -197,7 +195,8 @@ classdef Connection < handle
                 xx=xi(i)+dx;
                 Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
                 if ~isempty(j1{i})
-                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
+                    d = (xx-xi(j1{i})).^2;
+                    Lnew= Lnew+sum((1+0.075*d)./(0.01+d));  % punish for proximity to same-level nodes
                 end
                 
                 if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
@@ -372,9 +371,10 @@ classdef Connection < handle
             C = sparse([],[],[],n,n);
             for i=1:n
                 j = cellfun(@(c) find(strcmp(c,list))', self.children(list{i}), 'uni', false);
-                C(i,[j{:}])=1; %#ok<SPRIX>
+                j(cellfun(@isempty, j)) = [];
+                C(i,cat(1,j{:}))=1; %#ok<SPRIX>
                 j = cellfun(@(c) find(strcmp(c,list))', self.referencing(list{i}), 'uni', false);
-                C(i,[j{:}])=2; %#ok<SPRIX>
+                C(i,cat(1,j{:}))=2; %#ok<SPRIX>
             end
         end
     end
