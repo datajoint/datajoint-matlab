@@ -66,8 +66,8 @@ classdef Connection < handle
                 addMember(self.parents, from)
                 addMember(self.referenced, from)
                 for s=s
-                    assert(isequal(s.attrs1,s.attrs2),...
-                        'Foreign keys must link identically named attributes')
+                    % assert(isequal(s.attrs1,s.attrs2),...
+                    %    'Foreign keys must link identically named attributes')
                     s.attrs = regexp(s.attrs1,', ', 'split');
                     s.attrs = cellfun(@(s) s(2:end-1), s.attrs, 'uni',false);
                     isPrimary = all(ismember(s.attrs,schema.headers(tabName{1}).primaryKey));
