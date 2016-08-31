@@ -150,7 +150,7 @@ classdef Schema < handle
                 end
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
-                fprintf(f, '\t\t\t%%self.insert(key)     %% This line inserts the key\n');
+                fprintf(f, '\t\t\t%%self.insert(key)\n');
                 fprintf(f, '\t\tend\n');
                 fprintf(f, '\tend\n');
             end
