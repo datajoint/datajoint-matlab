@@ -31,7 +31,10 @@ classdef Connection < handle
                 mymVersion = mym('version');
                 assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
             catch
-                error('Outdated version of mYm.  Please upgrade to version 2.6 or later')
+                error 'Outdated version of mYm.  Please upgrade to version 2.6 or later'
+            end
+            if verLessThan('matlab', '8.6')
+                error 'MATLAB version 8.6 or greater is required'
             end
             self.host = host;
             self.user = username;
@@ -155,114 +158,54 @@ classdef Connection < handle
             % determine tiers
             re = cellfun(@(s) sprintf('`.+`\\.`%s[a-z].*`',s), dj.Schema.tierPrefixes, 'uni', false);
             tiers = dj.Schema.allowedTiers(cellfun(@(l) find(~cellfun(@isempty, regexp(l, re))),list));
+            % exclude job tables
             j = ~strcmp(tiers,'job');
-            list = list(j);  % exclude job tables
+            list = list(j);
             tiers = tiers(j);
             
-            C = self.makeDependencyMatrix(list);            
+            C = self.makeDependencyMatrix(list);
             if sum(C(:))==0
                 disp 'No dependencies found. Nothing to plot'
                 return
             end
-            
-            level = -self.computeHierarchyLevels(C);
-            
-            % convert to 'package.ClassName'
-            names = cellfun(@self.tableToClass,list,'uni',false);
-            
-            % plot
-            cla
-            yi = level;
-            xi = zeros(size(yi));
-            
-            % optimize graph appearance by minimizing disctances.^2 to connected nodes
-            % while maximizing distances to nodes on the same level.
-            j1 = cell(1,length(xi));
-            j2 = cell(1,length(xi));
-            for i=1:length(xi)
-                j1{i} = setdiff(find(yi==yi(i)),i);
-                j2{i} = [find(C(i,:)) find(C(:,i)')];
-            end
-            niter=5e4;
-            T0=5; % initial temperature
-            cr=6/niter; % cooling rate
-            L = inf(size(xi));
-            for iter=1:niter
-                i = ceil(rand*length(xi));  % pick a random node
-                
-                % Compute the cost function Lnew of the increasing xi(i) by dx
-                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
-                xx=xi(i)+dx;
-                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
-                if ~isempty(j1{i})
-                    d = (xx-xi(j1{i})).^2;
-                    Lnew= Lnew+sum((1+0.075*d)./(0.01+d));  % punish for proximity to same-level nodes
-                end
-                
-                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
-                    xi(i)=xi(i)+dx;
-                    L(i) = Lnew;
-                end
-            end
-            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level            
-            
-            % plot nodes
-            plot(xi, yi, 'ko', 'MarkerSize', 10);
-            hold on;
-            % plot edges
-            for i=1:size(C,1)
-                for j=1:size(C,2)
-                    switch C(i,j)
-                        case 1
-                            connectNodes(xi([i j]), yi([i j]), 'k-')
-                        case 2
-                            connectNodes(xi([i j]), yi([i j]), 'k--')
-                    end
-                    hold on
-                end
-            end
-            
-            % annotate nodes
-            fontColor = struct(...
-                'manual',   [0.0 0.6 0.0], ...
-                'lookup',   [0.3 0.4 0.3], ...
-                'imported', [0.0 0.0 1.0], ...
-                'computed', [0.5 0.0 0.0], ...
-                'job',      [1 1 1]);
-            
-            for i=1:length(level)
-                name = names{i};
-                if exist(name,'class')
-                    rel = feval(name);
-                    assert(isa(rel, 'dj.Relvar'))
-                    if rel.isSubtable
-                        name = [name '*'];  %#ok:AGROW
-                    end
-                end
-                edgeColor = 'none';
-                fontSize = dj.set('erdFontSize');
-                text(xi(i), yi(i), [name '  '], ...
-                    'HorizontalAlignment', 'right', 'interpreter', 'none', ...
-                    'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
-                hold on;
-            end
-            
-            xlim([min(xi)-0.5 max(xi)+0.5]);
-            ylim([min(yi)-0.5 max(yi)+0.5]);
-            hold off
+            d = digraph(C, cellfun(@self.tableToClass, list, 'uni', false));
+            d.Nodes.tier = tiers';
+            colormap(0.3+0.7*[
+                0.0 0.5 0.0
+                0.3 0.3 0.3
+                0.0 0.0 1.0
+                1.0 0.0 0.0
+                1.0 1.0 1.0
+                ]);
+            node_color = struct(...
+                'manual',   1, ...
+                'lookup',   2, ...
+                'imported', 3, ...
+                'computed', 4, ...
+                'job',      5);
+            marker = struct(...
+                'manual',   'square', ...
+                'lookup',   'hexagram', ...
+                'imported', 'o', ...
+                'computed', 'pentagram', ...
+                'job',      5);
+            d.Nodes.color = cellfun(@(x) node_color.(x), tiers)';
+            d.Nodes.marker = cellfun(@(x) marker.(x), tiers, 'uni', false)';
+            h = d.plot('layout', 'layered', 'NodeLabel', []);
+            h.NodeCData = d.Nodes.color;
+            caxis([0.5 5.5])
+            h.MarkerSize = 16;
+            h.Marker = d.Nodes.marker;
             axis off
-            figure(gcf)  % bring to front
-            
-            function connectNodes(x, y, lineStyle)
-                assert(length(x)==2 && length(y)==2)
-                plot(x, y, 'k.')
-                t = 0:0.05:1;
-                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
-                y = y(1) + (y(2)-y(1))*t;
-                plot(x, y, lineStyle)
-            end            
+            h.LineWidth = 2;
+            line_styles = {'-', ':'};
+            h.LineStyle = line_styles(d.Edges.Weight);
+            for i=1:d.numnodes
+                text(h.XData(i)+0.1,h.YData(i), d.Nodes.Name(i), ...
+                    'fontsize', 12, 'rotation', -16); 
+            end
+            figure(gcf)   % bring to foreground
         end
-        
         
         
         function reload(self)
@@ -287,7 +230,6 @@ classdef Connection < handle
         end
         
         
-        
         function ret = query(self, queryStr, varargin)
             % dj.Connection/query - query(connection, queryStr, varargin) issue an
             % SQL query and return the result if any.
@@ -310,12 +252,10 @@ classdef Connection < handle
         end
         
         
-        
         function startTransaction(self)
             self.query('START TRANSACTION WITH CONSISTENT SNAPSHOT')
             self.inTransaction = true;
         end
-        
         
         
         function commitTransaction(self)
@@ -325,12 +265,10 @@ classdef Connection < handle
         end
         
         
-        
         function cancelTransaction(self)
             self.inTransaction = false;
             self.query('ROLLBACK')
         end
-        
         
         
         function close(self)
@@ -342,12 +280,10 @@ classdef Connection < handle
         end
         
         
-        
         function delete(self)
             self.clearDependencies
             self.close
         end
-        
         
         
         function clearDependencies(self, schema)
@@ -365,7 +301,8 @@ classdef Connection < handle
                 self.referenced.remove(intersect(self.referenced.keys,tableNames));
             end
         end
-    
+        
+        
         function C = makeDependencyMatrix(self, list)
             n = length(list);
             C = sparse([],[],[],n,n);
@@ -375,45 +312,6 @@ classdef Connection < handle
                 C(i,cat(1,j{:}))=1; %#ok<SPRIX>
                 j = cellfun(@(c) find(strcmp(c,list))', self.referencing(list{i}), 'uni', false);
                 C(i,cat(1,j{:}))=2; %#ok<SPRIX>
-            end
-        end
-    end
-    
-    methods(Static)
-        function level = computeHierarchyLevels(C)
-            % computes levels of nodes from adjacency matrix C.
-            
-            % compute levels in hierarchy
-            n = size(C,1);
-            level = zeros(size(C,1),1);
-            updated = true;
-            while updated
-                updated = false;
-                for i=1:n
-                    j = find(C(:,i));
-                    if ~isempty(j)
-                        newLevel = max(level(j))+1;
-                        if level(i)~=newLevel
-                            updated = true;
-                            level(i) = newLevel;
-                        end
-                    end
-                end
-            end
-            % tighten up levels
-            updated = true;
-            while updated
-                updated = false;
-                for i=1:n
-                    j = find(C(i,:));
-                    if ~isempty(j)
-                        newLevel = min(level(j))-1;
-                        if newLevel ~= level(i)
-                            updated = true;
-                            level(i) = newLevel;
-                        end
-                    end
-                end
             end
         end
     end

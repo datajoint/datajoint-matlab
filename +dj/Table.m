@@ -627,7 +627,7 @@ classdef Table < handle
                 return
             end
             [tableInfo, parents, referenced, fieldDefs, indexDefs] = ...
-                parseDeclaration(self.getDeclaration);
+                parseDeclaration(self.getDeclaration); %#ok<PROP>
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
                 'Table name %s does not match in file %s', cname, self.className)
@@ -642,9 +642,9 @@ classdef Table < handle
             % add inherited primary key attributes
             primaryKeyFields = {};
             nonKeyFields = {};
-            for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.tableHeader.attributes.iskey])
-                    field = parents{iRef}.tableHeader.attributes(iField);
+            for iRef = 1:length(parents) %#ok<PROP>
+                for iField = find([parents{iRef}.tableHeader.attributes.iskey]) %#ok<PROP>
+                    field = parents{iRef}.tableHeader.attributes(iField); %#ok<PROP>
                     if ~ismember(field.name, primaryKeyFields)
                         primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
                         assert(~field.isnullable, 'primary key header cannot be nullable')
@@ -664,10 +664,11 @@ classdef Table < handle
                 end
             end
             
-            % add secondary foreign key attributes
-            for iRef = 1:length(referenced)
-                for iField = find([referenced{iRef}.tableHeader.attributes.iskey])
-                    field = referenced{iRef}.tableHeader.attributes(iField);
+            % add secondary foreign key attributes 
+            for iRef = 1:length(referenced) %#ok<PROP>
+                for iField = find([referenced{iRef}.tableHeader.attributes.iskey]) %#ok<PROP>
+                    field = referenced{iRef}.tableHeader.attributes(iField); %#ok<PROP>
+                    field.isnullable = true;   % make new attribute nullable
                     if ~ismember(field.name, [primaryKeyFields nonKeyFields])
                         nonKeyFields{end+1} = field.name; %#ok<AGROW>
                         sql = sprintf('%s%s', sql, fieldToSQL(field));
@@ -690,7 +691,7 @@ classdef Table < handle
             sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
             
             % add foreign key declarations
-            for ref = [parents referenced]
+            for ref = [parents referenced] %#ok<PROP>
                 fieldList = sprintf('%s,', ref{1}.primaryKey{:});
                 fieldList(end)=[];
                 sql = sprintf(...
@@ -701,7 +702,7 @@ classdef Table < handle
             % add secondary index declarations
             % gather implicit indexes due to foreign keys first
             implicitIndexes = {};
-            for fkSource = [parents referenced]
+            for fkSource = [parents referenced] %#ok<PROP>
                 implicitIndexes{end+1} = fkSource{1}.primaryKey; %#ok<AGROW>
             end
             
@@ -729,8 +730,8 @@ classdef Table < handle
             if ~self.isCreated
                 % execute declaration
                 fprintf \n<SQL>\n
-                disp(sql)
-                fprintf </SQL>\n\n
+                fprinf(sql)
+                fprintf \n</SQL>\n\n
                 self.schema.conn.query(sql);
                 self.schema.reload
             end

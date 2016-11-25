@@ -68,49 +68,37 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/disp - display the contents of the relation.
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
-            nTuples = 0;
-            fprintf('\nObject %s\n\n',class(self))
-            s = sprintf(', %s', self.primaryKey{:});
-            fprintf('Primary key: %s\n', s(2:end))
-            if isempty(self.nonKeyFields)
-                fprintf 'No dependent attributes'
-            else
-                s = sprintf(', %s',self.nonKeyFields{:});
-                fprintf('Dependent attributes: %s', s(2:end))
-            end
-            fprintf '\n\n Contents: \n'
             tic
-            if self.exists
+            nTuples = self.count;
+            fprintf('\nObject %s\n\n',class(self))
+            hdr = self.header;
+            try
+                % tableHeader exists in tables but not in derived relations.
+                fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
+            catch 
+            end
+            if nTuples
                 % print header
-                header = self.header;
-                ix = find( ~[header.attributes.isBlob] );  % header to display
-                fprintf('  %16.16s', header.attributes(ix).name)
-                fprintf \n
-                maxRows = 12;
-                tuples = self.fetch(header.attributes(ix).name, sprintf('LIMIT %d', maxRows+1));
-                nTuples = max(self.count, length(tuples));
-                
-                % print rows
-                for s = tuples(1:min(end,maxRows))'
-                    for iField = ix
-                        v = s.(header.attributes(iField).name);
-                        if isnumeric(v)
-                            if ismember(class(v),{'double','single'})
-                                fprintf('  %16g',v)
-                            else
-                                fprintf('  %16d',v)
-                            end
-                        else
-                            fprintf('  %16.16s',v)
-                        end
+                attrList = cell(size(hdr.attributes));
+                for i = 1:length(hdr.attributes)
+                    if hdr.attributes(i).isBlob
+                        attrList{i} = sprintf('("=BLOB=") -> %s', hdr.names{i});
+                    else
+                        attrList{i} = hdr.names{i};
                     end
-                    fprintf \n
                 end
+                maxRows = 12;
+                tuples = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
+                tabl = struct2table(tuples);
+                funs = {
+                    @(x) x 
+                    @upper
+                    };             
+                tabl.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
+                    tabl.Properties.VariableNames, 'uni', false);
+                disp(tabl)
                 if nTuples > maxRows
-                    for iField = ix
-                        fprintf('  %16s','...')
-                    end
-                    fprintf \n
+                    fprintf '          ...\n\n'
                 end
             end
             
