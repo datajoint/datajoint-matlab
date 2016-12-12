@@ -44,7 +44,7 @@ classdef Table < handle
     end
     
     properties(Access=private)
-        declaration     % table declaration
+        definition     % table definition
     end
     
     methods
@@ -220,12 +220,12 @@ classdef Table < handle
         
         
         function str = re(self)
-            % dj.Table/re - "reverse engineer" the table declaration.
+            % dj.Table/re - "reverse engineer" the table defintion.
             %
             % SYNTAX:
             %   str = table.re
             %
-            % str will contain the table declaration string that can be used
+            % str will contain the table definition string that can be used
             % to create the table using dj.Table.
             
             str = sprintf('%%{\n%s (%s) # %s', ...
@@ -334,7 +334,7 @@ classdef Table < handle
         %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
         function setTableComment(self, newComment)
             % dj.Table/setTableComment - update the table comment
-            % in the table declaration
+            % in the table definition
             self.alter(sprintf('COMMENT="%s"', newComment));
         end
         
@@ -354,7 +354,7 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            sql = fieldToSQL(parseAttrDef(definition, false));
+            sql = fieldToSQL(parseAttrDef(definition));
             self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
@@ -368,7 +368,7 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = fieldToSQL(parseAttrDef(newDefinition, false));
+            sql = fieldToSQL(parseAttrDef(newDefinition));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
         
@@ -479,7 +479,7 @@ classdef Table < handle
         end
         
         function syncDef(self)
-            % dj.Table/syncDef replace the table declaration in the file
+            % dj.Table/syncDef replace the table definition in the file
             % <package>.<className>.m with the actual definition from the database.
             %
             % This method is useful if the table definition has been
@@ -490,8 +490,8 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if ~dj.set('suppressPrompt') ...
-                        && ~strcmpi('yes', dj.ask(sprintf('Update table declaration in %s?',path)))
-                    disp 'No? Table declaration left untouched.'
+                        && ~strcmpi('yes', dj.ask(sprintf('Update table definition in %s?',path)))
+                    disp 'No? Table definition left untouched.'
                 else
                     % read old file
                     f = fopen(path, 'rt');
@@ -605,17 +605,17 @@ classdef Table < handle
         end
         
         
-        function declaration = getDeclaration(self)
+        function definition = getDefinition(self)
             % extract the table declaration with the first percent-brace comment
             % block of the matching .m file.
-            if ~isempty(self.declaration)
-                declaration = self.declaration;
+            if ~isempty(self.definition)
+                definition = self.definition;
             else
                 file = which(self.className);
                 assert(~isempty(file), ...
                     'MissingTableDefinition:Could not find table definition file %s', self.className)
-                declaration = readPercentBraceComment(file);
-                assert(~isempty(declaration), ...
+                definition = readPercentBraceComment(file);
+                assert(~isempty(definition), ...
                     'MissingTableDefnition:Could not find the table declaration in %s', file)
             end
         end
@@ -623,119 +623,111 @@ classdef Table < handle
         
         
         function create(self)
+            % parses the table declration and declares the table
+  
             if self.isCreated
                 return
             end
-            [tableInfo, parents, referenced, fieldDefs, indexDefs] = ...
-                parseDeclaration(self.getDeclaration); %#ok<PROP>
+            self.schema.reload   % ensure that the table does not already exist
+            if self.isCreated
+                return
+            end
+            def = self.getDefinition();
+            
+            % split into a columnwise cell array
+            def = strtrim(regexp(def,'\n','split')');
+            
+            % append the next line to lines that end in a backslash
+            for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', def'))
+                def{i} = [def{i}(1:end-1) ' ' def{i+1}];
+                def(i+1) = '';
+            end
+
+            % remove empty lines and comment lines
+            def(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), def)) = [];
+
+            % parse table schema, name, type, and comment
+            pat = {
+                '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+                '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
+                '#\s*(?<comment>.*)$'                     % # comment
+                };
+            tableInfo = regexp(def{1}, cat(2,pat{:}), 'names');
+            assert(numel(tableInfo)==1, ...
+                'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+            assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+                'invalidTableTier:Invalid tier for table ', tableInfo.className)
             cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
             assert(strcmp(cname, self.className), ...
                 'Table name %s does not match in file %s', cname, self.className)
-            
-            % compile the CREATE TABLE statement
+                
+            % CREATE TABLE
             tableName = [self.schema.prefix, ...
                 dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                 dj.fromCamelCase(tableInfo.className)];
-            
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
-            % add inherited primary key attributes
-            primaryKeyFields = {};
-            nonKeyFields = {};
-            for iRef = 1:length(parents) %#ok<PROP>
-                for iField = find([parents{iRef}.tableHeader.attributes.iskey]) %#ok<PROP>
-                    field = parents{iRef}.tableHeader.attributes(iField); %#ok<PROP>
-                    if ~ismember(field.name, primaryKeyFields)
-                        primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        assert(~field.isnullable, 'primary key header cannot be nullable')
-                        sql = sprintf('%s%s', sql, fieldToSQL(field));
-                    end
-                end
-            end
-            
-            % add the new primary key attribites
-            if ~isempty(fieldDefs)
-                for iField = find([fieldDefs.iskey])
-                    field = fieldDefs(iField);
-                    primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
-                    assert(~strcmpi(field.default,'NULL'), ...
-                        'primary key header cannot be nullable')
-                    sql = sprintf('%s%s', sql, fieldToSQL(field));
-                end
-            end
-            
-            % add secondary foreign key attributes 
-            for iRef = 1:length(referenced) %#ok<PROP>
-                for iField = find([referenced{iRef}.tableHeader.attributes.iskey]) %#ok<PROP>
-                    field = referenced{iRef}.tableHeader.attributes(iField); %#ok<PROP>
-                    field.isnullable = true;   % make new attribute nullable
-                    if ~ismember(field.name, [primaryKeyFields nonKeyFields])
-                        nonKeyFields{end+1} = field.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, fieldToSQL(field));
-                    end
-                end
-            end
-            
-            % add dependent attributes
-            if ~isempty(fieldDefs)
-                for iField = find(~[fieldDefs.iskey])
-                    field = fieldDefs(iField);
-                    nonKeyFields{end+1} = field.name; %#ok<AGROW>
-                    sql = sprintf('%s%s', sql, fieldToSQL(field));
+            % fields and foreign keys
+            inKey = true;
+            primaryFields = {};
+            fields = {};
+            for iLine = 2:length(def)
+                line = def{iLine};
+                switch true
+                    case strncmp(line,'---',3)
+                        inKey = false;
+                        
+                        % foreign key
+                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.*')
+                        line = strtrim(strtok(line, '#'));
+                        parts = strsplit(line, '->');
+                        [attrs, cname] = deal(parts{:});
+                        rel = dj.Relvar(strtrim(cname));
+                        assert(isa(rel, 'dj.Relvar'), 'foreign keys must be base relvars')
+                        [sql, newFields] = makeFK(sql, strtrim(attrs), rel, fields, inKey);
+                        fields = [fields, newFields]; %#ok<AGROW>
+                        if inKey
+                            primaryFields = [primaryFields, newFields]; %#ok<AGROW>
+                        end
+                        
+                        % index
+                    case regexpi(line, '^(unique\s+)?index[^:]*$')
+                        sql = sprintf('%s%s,\n', sql, line);    %  add checks
+                        
+                        % attribute
+                    case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
+                            '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
+                            ':\s*\w.*$'])                             % type, comment
+                        fieldInfo = parseAttrDef(line);
+                        assert(~inKey || ~fieldInfo.isnullable, ...
+                            'primary key attributes cannot be nullable')
+                        if inKey
+                            primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
+                        end
+                        fields{end+1} = fieldInfo.name; %#ok<AGROW>
+                        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));   
+                        
+                    otherwise
+                        error('Invalid table declaration line "%s"', line)
                 end
             end
             
             % add primary key declaration
-            assert(~isempty(primaryKeyFields), 'table must have a primary key')
-            str = sprintf(',`%s`', primaryKeyFields{:});
-            sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
+            assert(~isempty(primaryFields), 'table must have a primary key')
+            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
             
-            % add foreign key declarations
-            for ref = [parents referenced] %#ok<PROP>
-                fieldList = sprintf('%s,', ref{1}.primaryKey{:});
-                fieldList(end)=[];
-                sql = sprintf(...
-                    '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-                    sql, fieldList, ref{1}.fullTableName, fieldList);
-            end
-            
-            % add secondary index declarations
-            % gather implicit indexes due to foreign keys first
-            implicitIndexes = {};
-            for fkSource = [parents referenced] %#ok<PROP>
-                implicitIndexes{end+1} = fkSource{1}.primaryKey; %#ok<AGROW>
-            end
-            
-            for iIndex = 1:numel(indexDefs)
-                assert(all(ismember(indexDefs(iIndex).attributes, ...
-                    [primaryKeyFields, nonKeyFields])), ...
-                    'Index definition contains invalid attribute names');
-                assert(~any(cellfun( ...
-                    @(x) isequal(x, indexDefs(iIndex).attributes), ...
-                    implicitIndexes)), ...
-                    ['The specified set of attributes is implicitly ' ...
-                    'indexed because of a foreign key constraint. '...
-                    'Cannot create additional index.']);
-                fieldList = sprintf('`%s`,', indexDefs(iIndex).attributes{:});
-                fieldList(end)=[];
-                sql = sprintf(...
-                    '%s%s INDEX (%s),\n', ...
-                    sql, indexDefs(iIndex).unique, fieldList);
-            end
-            
-            % close the declaration
+            % finish the declaration
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
             
-            self.schema.reload   % again, ensure that the table does not already exist
-            if ~self.isCreated
-                % execute declaration
-                fprintf \n<SQL>\n
-                fprinf(sql)
-                fprintf \n</SQL>\n\n
-                self.schema.conn.query(sql);
-                self.schema.reload
-            end
+            % execute declaration
+            fprintf \n<SQL>\n
+            fprintf(sql)
+            fprintf \n</SQL>\n\n
+            self.schema.conn.query(sql);
+            self.schema.reload
         end
+
+
         
         function alter(self, alterStatement)
             % dj.Table/alter
@@ -809,8 +801,6 @@ classdef Table < handle
 end
 
 
-
-
 %          LOCAL FUNCTIONS
 
 function str = readPercentBraceComment(filename)
@@ -868,73 +858,35 @@ sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
 end
 
 
-
-function [tableInfo, parents, referenced, fieldDefs, indexDefs] = parseDeclaration(declaration)
-parents = {};
-referenced = {};
-fieldDefs = [];
-indexDefs = [];
-
-% split into a columnwise cell array
-declaration = strtrim(regexp(declaration,'\n','split')');
-
-% append the next line to lines that end in a backslash
-for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', declaration'))
-    declaration{i} = [declaration{i}(1:end-1) ' ' declaration{i+1}];
-    declaration(i+1) = '';
+function [sql, newFields] = makeFK(sql, attrs, rel, existingFields, inKey)
+% add foreign key to SQL table definition
+newFields = {};
+toFields = rel.primaryKey;    % referenced fields
+if isempty(attrs)
+    fromFields = toFields;
+else
+    fromFields = [toFields(ismember(toFields, existingFields)) ...
+        cellfun(@strtrim, strsplit(attrs(2:end-1), ','), 'uni', false)];
+    assert(length(fromFields)==length(toFields), ...
+        'invalid reference %s -> %s', attrs, rel.className)
 end
-
-% remove empty lines and comment lines
-declaration(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), declaration)) = [];
-
-% parse table schema, name, type, and comment
-pat = {
-    '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-    '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
-    '#\s*(?<comment>.*)$'                     % # comment
-    };
-tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-assert(numel(tableInfo)==1, ...
-    'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
-assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-    'invalidTableTier:Invalid tier for table ', tableInfo.className)
-
-if nargout > 1
-    % parse field declarations and referenced
-    inKey = true;
-    for iLine = 2:length(declaration)
-        line = declaration{iLine};
-        switch true
-            case strncmp(line,'---',3)
-                inKey = false;
-            case strncmp(line,'->',2)
-                % foreign key
-                p = dj.Relvar(strtrim(strtok(line(3:end),'#')));
-                assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
-                if inKey
-                    parents{end+1} = p;     %#ok:<AGROW>
-                else
-                    referenced{end+1} = p;   %#ok:<AGROW>
-                end
-            case regexpi(line, '^(unique\s+)?index[^:]*$')
-                % parse index definition
-                indexInfo = parseIndexDef(line);
-                indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
-            case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
-                    '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
-                    ':\s*\w.*$'])                             % type, comment
-                fieldInfo = parseAttrDef(line, inKey);
-                fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
-            otherwise
-                error('Invalid table declaration line "%s"', line)
-        end
+% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
+for i = 1:length(fromFields)
+    if ~ismember(fromFields(i), existingFields)
+        newFields(end+1) = fromFields(i); %#ok<AGROW>
+        fieldInfo = rel.tableHeader.attributes(i);
+        fieldInfo.name = fromFields{i};
+        fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
+        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
     end
 end
+sql = sprintf(...
+    '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
+    sql, backquotedList(fromFields), rel.fullTableName, backquotedList(toFields));
 end
 
 
-
-function fieldInfo = parseAttrDef(line, inKey)
+function fieldInfo = parseAttrDef(line)
 line = strtrim(line);
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
@@ -961,22 +913,11 @@ assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
     || ~strcmp(fieldInfo.default,'null'), ...
     'BIGINT attributes cannot be nullable in "%s"', line)
 fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
-fieldInfo.iskey = inKey;
 end
 
 
 
-function indexInfo = parseIndexDef(line)
-line = strtrim(line);
-pat = [
-    '^(?<unique>UNIQUE)?\s*INDEX\s*' ...  % [UNIQUE] INDEX
-    '\((?<attributes>[^\)]+)\)$'          % (attr1, attr2)
-    ];
-indexInfo = regexpi(line, pat, 'names');
-assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
-    'Invalid index declaration "%s"', line)
-attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
-indexInfo.attributes = strtrim(attributes{1});
-assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
-    'Duplicate attributes in index declaration "%s"', line)
+function str = backquotedList(arr)
+    str = sprintf('`%s`,', arr{:});
+    str(end)=[];
 end

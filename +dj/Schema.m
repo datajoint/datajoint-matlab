@@ -7,7 +7,7 @@ classdef Schema < handle
     properties(SetAccess = private)
         package    % the package (directory starting with a +) that stores schema classes, must be on path
         dbname     % database (schema) name
-        prefix=''  % optional table prefix, allowing multiple schemas per database
+        prefix=''  % optional table prefix, allowing multiple schemas per database -- remove this feature if not used
         conn       % handle to the dj.Connection object
         loaded = false
         tableNames   % tables indexed by classNames
@@ -150,7 +150,7 @@ classdef Schema < handle
                 end
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
-                fprintf(f, '\t\t\tself.insert(key)\n');
+                fprintf(f, '\t\t\t%%self.insert(key)\n');
                 fprintf(f, '\t\tend\n');
                 fprintf(f, '\tend\n');
             end

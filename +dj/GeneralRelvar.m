@@ -75,7 +75,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             try
                 % tableHeader exists in tables but not in derived relations.
                 fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
-            catch 
+            catch
             end
             if nTuples
                 % print header
@@ -91,9 +91,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 tuples = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
                 tabl = struct2table(tuples);
                 funs = {
-                    @(x) x 
+                    @(x) x
                     @upper
-                    };             
+                    };
                 tabl.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
                     tabl.Properties.VariableNames, 'uni', false);
                 disp(tabl)
@@ -162,15 +162,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function yes = exists(self)
             % dj.GeneralRelvar/exists - a fast check whether the relvar
             % contains any tuples
-            [~, sql] = self.compile(3);
-            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql));
+            [~, sql_] = self.compile(3);
+            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql_));
             yes = logical(yes.yes);
         end
         
         function n = count(self)
             % dj.GeneralRelvar/count - the number of tuples in the relation.
-            [~, sql] = self.compile(3);
-            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
+            [~, sql_] = self.compile(3);
+            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql_));
             n = double(n.n);
         end
         
@@ -207,9 +207,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             [limit, args] = makeLimitClause(varargin{:});
             self = self.pro(args{:});
-            [header, sql] = self.compile;
+            [hdr, sql_] = self.compile;
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
-                header.sql, sql, limit));
+                hdr.sql, sql_, limit));
             ret = dj.struct.fromFields(ret);
             
             if nargout>1
@@ -279,9 +279,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
-            [header, sql] = self.compile;
+            [hdr, sql_] = self.compile;
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s%s',...
-                header.sql, sql, limit));
+                hdr.sql, sql_, limit));
             
             % copy into output arguments
             varargout = cell(length(specs));
@@ -609,7 +609,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if nargout
                 ret = str;
             else
-                disp(str)
+                fprintf('%s\n', str)
             end
         end
     end

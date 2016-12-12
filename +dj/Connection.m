@@ -135,6 +135,7 @@ classdef Connection < handle
             % get additional tables that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
+            assert(up>=0 && down>=0, 'ERD radius must be positive')
             while up || down
                 added = [];
                 if up
@@ -202,7 +203,8 @@ classdef Connection < handle
             h.LineStyle = line_styles(d.Edges.Weight);
             for i=1:d.numnodes
                 text(h.XData(i)+0.1,h.YData(i), d.Nodes.Name(i), ...
-                    'fontsize', 12, 'rotation', -16); 
+                    'fontsize', 10, 'rotation', -16, ...
+                    'Interpreter', 'none');
             end
             figure(gcf)   % bring to foreground
         end
