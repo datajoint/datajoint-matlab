@@ -41,7 +41,7 @@ classdef Connection < handle
             if nargin>=4
                 self.initQuery = initQuery;
             end
-            self.foreignKeys  = [];
+            self.foreignKeys  = struct([]);
             self.packages = containers.Map;
         end
         
@@ -81,26 +81,37 @@ classdef Connection < handle
             end
         end
         
+        
         function [names, isprimary] = parents(self, child, primary)
-            ix = strcmp(child, {self.foreignKeys.from});
-            if nargin>2
-                ix = ix & primary == [self.foreignKeys.primary];
-            end
-            names = {self.foreignKeys(ix).ref};
-            if nargout > 1
-                isprimary = [self.foreignKeys(ix).primary];
+            if isempty(self.foreignKeys)
+                names = {};
+                isprimary = [];
+            else
+                ix = strcmp(child, {self.foreignKeys.from});
+                if nargin>2
+                    ix = ix & primary == [self.foreignKeys.primary];
+                end
+                names = {self.foreignKeys(ix).ref};
+                if nargout > 1
+                    isprimary = [self.foreignKeys(ix).primary];
+                end
             end
         end
         
         
         function [names, isprimary] = children(self, parent, primary)
-            ix = strcmp(parent, {self.foreignKeys.ref});
-            if nargin>2
-                ix = ix & primary == [self.foreignKeys.primary];
-            end
-            names = {self.foreignKeys(ix).from};
-            if nargout > 1
-                isprimary = [self.foreignKeys(ix).primary];
+            if isempty(self.foreignKeys)
+                names = {};
+                isprimary = [];
+            else
+                ix = strcmp(parent, {self.foreignKeys.ref});
+                if nargin>2
+                    ix = ix & primary == [self.foreignKeys.primary];
+                end
+                names = {self.foreignKeys(ix).from};
+                if nargout > 1
+                    isprimary = [self.foreignKeys(ix).primary];
+                end
             end
         end
         
@@ -133,7 +144,7 @@ classdef Connection < handle
                 down = 0;
             end
             
-            % get additional tables that are connected to ones on the list:
+            % get additional nodes that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
             assert(up>=0 && down>=0, 'ERD radius must be positive')
@@ -179,23 +190,26 @@ classdef Connection < handle
             h = d.plot('layout', 'layered', 'NodeLabel', []);
             h.NodeCData = tiers;
             caxis([0.5 6.5])
-            h.MarkerSize = 16;
+            h.MarkerSize = 12;
             h.Marker = d.Nodes.marker;
             axis off
-            h.LineWidth = 1;
-            line_styles = {'-', ':'};
-            h.LineStyle = line_styles(2-d.Edges.primary);
             for i=1:d.numnodes
                 if tiers(i)<6
                     text(h.XData(i)+0.1,h.YData(i), self.tableToClass(d.Nodes.Name{i}), ...
-                        'fontsize', 10, 'rotation', -16, ...
+                        'fontsize', 11, 'rotation', -16, ...
                         'Interpreter', 'none');
                 end
             end
-            ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(~d.Edges.multi,:));
-            highlight(h, ee(:,1), ee(:,2), 'LineWidth', 3)
-            ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(d.Edges.aliased,:));
-            highlight(h, ee(:,1), ee(:,2), 'EdgeColor', 'r')
+            if d.numedges
+                line_widths = [1 2];
+                h.LineWidth = line_widths(2-d.Edges.primary);
+                line_styles = {'-', ':'};
+                h.LineStyle = line_styles(2-d.Edges.primary);
+                ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(~d.Edges.multi,:));
+                highlight(h, ee(:,1), ee(:,2), 'LineWidth', 3)
+                ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(d.Edges.aliased,:));
+                highlight(h, ee(:,1), ee(:,2), 'EdgeColor', 'r')
+            end
             figure(gcf)   % bring to foreground
         end
         
@@ -281,7 +295,7 @@ classdef Connection < handle
         function clearDependencies(self, schema)
             if nargin<2
                 % remove all if the schema is not specified
-                self.foreignKeys = [];
+                self.foreignKeys = struct([]);
             elseif ~isempty(self.foreignKeys)
                 % remove references from the given schema
                 % self.referenced.remove
@@ -293,38 +307,46 @@ classdef Connection < handle
         end
         
         
-        function C = makeGraph(self, list)
+        function g = makeGraph(self, list)
             if nargin<=1
                 list = union({self.foreignKeys.from}, {self.foreignKeys.ref});
             end
             [~,i] = unique(list);  
             list = list(ismember(1:length(list), i));  % remove duplicates
-            from = arrayfun(@(item) find(strcmp(item.from, list)), self.foreignKeys, 'uni', false);
-            ref = arrayfun(@(item) find(strcmp(item.ref, list)), self.foreignKeys, 'uni', false);
-            ix =  ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);            
-            primary = [self.foreignKeys(ix).primary];
-            aliased = [self.foreignKeys(ix).aliased];
-            multi = [self.foreignKeys(ix).multi];
-            ref = [ref{ix}];
-            from = [from{ix}];
-            % for every duplicate edge, introduce a new node
-            [~,j] = unique([ref; from]', 'rows');
-            for m = find(~ismember(1:length(ref),j))
-                t = length(list)+1;
-                list{t} = sprintf('%d',t);
-                q = length(ref)+1;
-                ref(q) = ref(m);
-                from(q) = t;
-                ref(m) = t;
-                primary(q) = primary(m);
-                aliased(q) = aliased(m);
-                multi(q) = multi(m);
+            if isempty(self.foreignKeys)
+                ref = [];
+                from = [];
+            else
+                from = arrayfun(@(item) find(strcmp(item.from, list)), self.foreignKeys, 'uni', false);
+                ref = arrayfun(@(item) find(strcmp(item.ref, list)), self.foreignKeys, 'uni', false);
+                ix =  ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);
+                if ~isempty(ref)
+                    primary = [self.foreignKeys(ix).primary];
+                    aliased = [self.foreignKeys(ix).aliased];
+                    multi = [self.foreignKeys(ix).multi];
+                    ref = [ref{ix}];
+                    from = [from{ix}];
+                    % for every renamed edge, introduce a new node
+                    for m = find(aliased)
+                        t = length(list)+1;
+                        list{t} = sprintf('%d',t);
+                        q = length(ref)+1;
+                        ref(q) = ref(m);
+                        from(q) = t;
+                        ref(m) = t;
+                        primary(q) = primary(m);
+                        aliased(q) = aliased(m);
+                        multi(q) = multi(m);
+                    end
+                end
             end
             
-            C = digraph(ref, from, 1:length(ref), list);
-            C.Edges.primary = primary(C.Edges.Weight)';
-            C.Edges.aliased = aliased(C.Edges.Weight)';
-            C.Edges.multi = multi(C.Edges.Weight)';
+            g = digraph(ref, from, 1:length(ref), list);
+            if g.numedges
+                g.Edges.primary = primary(g.Edges.Weight)';
+                g.Edges.aliased = aliased(g.Edges.Weight)';
+                g.Edges.multi = multi(g.Edges.Weight)';
+            end
         end
     end
 end

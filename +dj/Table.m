@@ -127,14 +127,36 @@ classdef Table < handle
         
         
         function list = get.ancestors(self)
-            g = self.schema.conn.makeGraph();
-            list = g.predecessors(self.fullTableName);
+            map = containers.Map('KeyType','char','ValueType','uint16');
+            recurse(self,0)
+            levels = map.values;
+            [~,order] = sort([levels{:}],'descend');
+            list = map.keys;
+            list = list(order);
+            
+            function recurse(table,level)
+                if ~map.isKey(table.className) || level>map(table.className)
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), table.parents())
+                    map(table.className)=level;
+                end
+            end
         end
         
         
         function list = get.descendants(self)
-            g = self.schema.conn.makeGraph();
-            list = g.successors(sefl.fullTableName);
+            map = containers.Map('KeyType','char','ValueType','uint16');
+            recurse(self,0)
+            levels = map.values;
+            [~,order] = sort([levels{:}]);
+            list = map.keys;
+            list = list(order);
+            
+            function recurse(table,level)
+                if ~map.isKey(table.className) || level>map(table.className)
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), table.children())
+                    map(table.className)=level;
+                end
+            end
         end
         
         
