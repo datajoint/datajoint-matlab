@@ -31,10 +31,6 @@ classdef Table < handle
     properties(Dependent, SetAccess = private)
         info           % table information
         fullTableName  % `database`.`plain_table_name`
-        parents        % names of tables referenced by foreign keys composed exclusively of primary key attributes
-        referenced     % names of tables referenced by foreign keys composed of primary and non-primary attributes
-        children       % names of tables referencing this table with their primary key attributes
-        referencing    % names of tables referencing this table with their primary and non-primary attributes
         ancestors      % names of all referenced tables, including self, recursively, in order of dependencies
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
     end
@@ -118,66 +114,28 @@ classdef Table < handle
         end
         
         
-        function list = get.parents(self)
+        function list = parents(self, varargin)
             self.schema.reload(false)
-            list = self.schema.conn.parents(self.fullTableName);
+            list = self.schema.conn.parents(self.fullTableName, varargin{:});
         end
+                
         
-        
-        function list = get.referenced(self)
+        function list = children(self, varargin)
             self.schema.reload(false)
-            list = self.schema.conn.referenced(self.fullTableName);
-        end
-        
-        
-        function list = get.children(self)
-            self.schema.reload(false)
-            list = self.schema.conn.children(self.fullTableName);
-        end
-        
-        
-        function list = get.referencing(self)
-            self.schema.reload(false)
-            list = self.schema.conn.referencing(self.fullTableName);
+            list = self.schema.conn.children(self.fullTableName, varargin{:});
         end
         
         
         function list = get.ancestors(self)
-            map = containers.Map('KeyType','char','ValueType','uint16');
-            recurse(self,0)
-            levels = map.values;
-            [~,order] = sort([levels{:}],'descend');
-            list = map.keys;
-            list = list(order);
-            
-            function recurse(table,level)
-                if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), ...
-                        [table.parents table.referenced])
-                    map(table.className)=level;
-                end
-            end
+            g = self.schema.conn.makeGraph();
+            list = g.predecessors(self.fullTableName);
         end
-        
         
         
         function list = get.descendants(self)
-            map = containers.Map('KeyType','char','ValueType','uint16');
-            recurse(self,0)
-            levels = map.values;
-            [~,order] = sort([levels{:}]);
-            list = map.keys;
-            list = list(order);
-            
-            function recurse(table,level)
-                if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), ...
-                        [table.children table.referencing])
-                    map(table.className)=level;
-                end
-            end
+            g = self.schema.conn.makeGraph();
+            list = g.successors(sefl.fullTableName);
         end
-        
         
         
         function ret = sizeOnDisk(self)
