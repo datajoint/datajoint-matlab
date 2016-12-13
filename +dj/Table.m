@@ -199,6 +199,12 @@ classdef Table < handle
         end
         
         
+        function str = describe(self)
+            % alias for self.re
+            str = self.re();
+        end
+        
+        
         function str = re(self)
             % dj.Table/re - "reverse engineer" the table defintion.
             %
@@ -208,96 +214,63 @@ classdef Table < handle
             % str will contain the table definition string that can be used
             % to create the table using dj.Table.
             
+            % stable header
             str = sprintf('%%{\n%s (%s) # %s', ...
                 self.className, self.info.tier, self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
-            % list primary key fields
-            keyFields = self.tableHeader.primaryKey;
-            
-            % list parent referenced
-            [classNames,tables] = self.sortForeignKeys(self.parents);
-            if ~isempty(classNames)
-                str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
-                for t = tables
-                    % exclude primary key fields of referenced tables from the primary attribute list
-                    keyFields = keyFields(~ismember(keyFields, t.tableHeader.primaryKey));
-                end
+            % get foreign keys
+            fk = self.schema.conn.foreignKeys;
+            if ~isempty(fk)
+                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName), fk));
             end
             
-            % additional primary attributes
-            for i=find(ismember(self.tableHeader.names, keyFields))
-                comment = self.tableHeader.attributes(i).comment;
-                if self.tableHeader.attributes(i).isautoincrement
-                    autoIncrement = 'AUTO_INCREMENT';
-                else
-                    autoIncrement = '';
+            attributes_thus_far = {};
+            inKey = true;
+            for attr = self.tableHeader.attributes'
+                if inKey && ~attr.iskey
+                    str = sprintf('%s\n---', str);
+                    inKey = false;
                 end
-                str = sprintf('%s\n%-40s # %s', str, ...
-                    sprintf('%-16s: %s %s', self.tableHeader.attributes(i).name, ...
-                    self.tableHeader.attributes(i).type, autoIncrement), comment);
-            end
-            
-            % dividing line
-            str = sprintf('%s\n---', str);
-            
-            % list dependent attributes
-            dependentFields = self.tableHeader.dependentFields;
-            
-            % list other referenced
-            [classNames,tables] = self.sortForeignKeys(self.referenced);
-            if ~isempty(classNames)
-                str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
-                for t = tables
-                    % exclude primary key fields of referenced tables from header
-                    dependentFields = dependentFields(~ismember(dependentFields, t.tableHeader.primaryKey));
-                end
-            end
-            
-            % list remaining attributes
-            for i=find(ismember(self.tableHeader.names, dependentFields))
-                attr = self.tableHeader.attributes(i);
-                default = attr.default;
-                if attr.isnullable
-                    default = '=null';
-                elseif ~isempty(default)
-                    if attr.isNumeric || any(strcmp(default,self.mysql_constants))
-                        default = ['=' default]; %#ok<AGROW>
+                doInclude = ~any(arrayfun(@(x) ismember(attr.name, x.attrs), fk));
+                attributes_thus_far{end+1} = attr.name; %#ok<AGROW>
+                resolved = find(arrayfun(@(x) all(ismember(x.attrs, attributes_thus_far)), fk));
+                for i = resolved
+                    if isequal(fk(i).attrs, fk(i).ref_attrs)
+                        str = sprintf('%s\n-> %s', str, ...
+                            self.schema.conn.tableToClass(fk(i).ref));
                     else
-                        default = ['="' default '"']; %#ok<AGROW>
+                        ref_attr = setdiff(fk(i).attrs, fk(i).ref_attrs);
+                        assert(length(ref_attr)==1, ...
+                            'only single-attributes aliases are supported for now')
+                        str = sprintf('%s\n (%s) -> %s', str, ref_attr{1}, ...
+                            self.schema.conn.tableToClass(fk(i).ref));
                     end
                 end
-                if attr.isautoincrement
-                    autoIncrement = 'AUTO_INCREMENT';
-                else
-                    autoIncrement = '';
-                end
-                str = sprintf('%s\n%-60s# %s', str, ...
-                    sprintf('%-28s: %s', [attr.name default], ...
-                    [attr.type ' ' autoIncrement]), attr.comment);
-            end
-            str = sprintf('%s\n', str);
-            
-            % list user-defined secondary indexes
-            allIndexes = self.getDatabaseIndexes;
-            implicitIndexes = self.getImplicitIndexes;
-            for thisIndex=allIndexes
-                % Skip implicit indexes
-                if ~any(arrayfun( ...
-                        @(x) isequal(x.attributes, thisIndex.attributes), ...
-                        implicitIndexes))
-                    attributeList = sprintf('%s,', thisIndex.attributes{:});
-                    if thisIndex.unique
-                        modifier = 'UNIQUE ';
-                    else
-                        modifier = '';
+                fk(resolved) = [];
+                if doInclude
+                    default = attr.default;
+                    if attr.isnullable
+                        default = '=null';
+                    elseif ~isempty(default)
+                        if attr.isNumeric || any(strcmp(default,self.mysql_constants))
+                            default = ['=' default]; %#ok<AGROW>
+                        else
+                            default = ['="' default '"']; %#ok<AGROW>
+                        end
                     end
-                    str = sprintf('%s%sINDEX(%s)\n', str, modifier, attributeList(1:end-1));
+                    if attr.isautoincrement
+                        autoIncrement = 'AUTO_INCREMENT';
+                    else
+                        autoIncrement = '';
+                    end
+                    str = sprintf('%s\n%-60s# %s', str, ...
+                        sprintf('%-28s: %s', [attr.name default], ...
+                        [attr.type ' ' autoIncrement]), attr.comment);
                 end
             end
-            
-            str = sprintf('%s%%}\n', str);
+            str = sprintf('%s\n%%}\n', str);
         end
         
         
@@ -723,6 +696,7 @@ classdef Table < handle
             self.syncDef
         end
         
+        
         function indexInfo = getDatabaseIndexes(self)
             % dj.Table/getDatabaseIndexes
             % Returns all secondary database indexes,
@@ -743,38 +717,6 @@ classdef Table < handle
                 indexInfo(end+1).attributes = {thisIndex.Column_name};  %#ok<AGROW>
                 indexInfo(end).unique = ~thisIndex(1).Non_unique;
                 indexInfo(end).name = indexNames{iIndex};
-            end
-        end
-        
-        
-        function indexInfo = getImplicitIndexes(self)
-            % dj.Table/getImplicitIndexes
-            % Returns database indexes that are implied by
-            % table relationships and should not be shown to the user
-            % or modified by the user
-            indexInfo = struct('attributes', {}, 'unique', {});
-            for refTable = [self.referenced self.parents]
-                refObj = dj.Table(self.schema.conn.tableToClass(refTable{1},true));
-                indexInfo(end+1).attributes = refObj.tableHeader.primaryKey;  %#ok<AGROW>
-            end
-        end
-        
-        
-        
-        function [classNames,tables] = sortForeignKeys(self, tableNames)
-            % sort referenced tables so that they reproduce the correct
-            % order of primary key attributes
-            tables = cellfun(@(x) dj.Table(self.schema.conn.tableToClass(x,true)), tableNames, 'uni', false);
-            tables = [tables{:}];
-            if isempty(tables)
-                classNames = {};
-            else
-                fkFields = arrayfun(@(x) {x.tableHeader.attributes([x.tableHeader.attributes.iskey]).name}, tables,'uni',false);
-                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.tableHeader.attributes.name})), s), fkFields, 'uni', false);
-                m = max(cellfun(@max, fkOrder));
-                [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
-                tables = tables(fkOrder);
-                classNames ={tables.className};
             end
         end
     end
