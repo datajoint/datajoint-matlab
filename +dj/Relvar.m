@@ -50,6 +50,17 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             %
             % See also dj.BaseRelvar/delQuick, dj.Table/drop
             
+            function cleanup(self)
+                if self.schema.conn.inTransaction
+                    fprintf '\n ** delete rolled back due to an interrupt\n'
+                    self.schema.conn.cancelTransaction
+                end
+            end
+            
+            % this is guaranteed to be executed when the function is 
+            % terminated even if by KeyboardInterrupt (CTRL-C)
+            obj = onCleanup(@() cleanup(self));
+            
             self.schema.conn.cancelTransaction  % exit ongoing transaction, if any
             
             if ~self.exists
@@ -115,7 +126,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                         self.schema.conn.commitTransaction
                         disp committed
                     catch err
-                        fprintf '\n ** delete rolled back due to to error\n'
+                        fprintf '\n ** delete rolled back due to an error\n'
                         self.schema.conn.cancelTransaction
                         rethrow(err)
                     end
