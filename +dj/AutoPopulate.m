@@ -161,9 +161,9 @@ classdef AutoPopulate < handle
             % or executed locally
             
             function cleanup(self, key)
+                self.schema.conn.cancelTransaction
                 tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
                 if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
-                    self.schema.conn.cancelTransaction
                     self.setJobStatus(key, 'error', 'Populate interrupted', []);
                 end
             end
