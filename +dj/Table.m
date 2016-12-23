@@ -485,7 +485,10 @@ classdef Table < handle
             % This method is useful if the table definition has been
             % changed by other means than the regular datajoint definition
             % process.
-            path = which(self.className);
+            
+            % escape backslashes in pathname for proper display - only
+            % relevant on Windows
+            path = strrep(which(self.className), '\', '\\');
             if isempty(path)
                 fprintf('File %s.m is not found\n', self.className);
             else
