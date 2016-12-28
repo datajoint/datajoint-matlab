@@ -170,7 +170,7 @@ classdef AutoPopulate < handle
             % this is guaranteed to be executed when the function is 
             % terminated even if by KeyboardInterrupt (CTRL-C)
             % When used with onCleanup,  the function itself cannot contain upvalues
-            obj = onCleanup(@() cleanup(self, key));
+            cleanupObject = onCleanup(@() cleanup(self, key));
             
             self.schema.conn.startTransaction()
             try
