@@ -59,7 +59,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             
             % this is guaranteed to be executed when the function is 
             % terminated even if by KeyboardInterrupt (CTRL-C)
-            obj = onCleanup(@() cleanup(self));
+            cleanupObject = onCleanup(@() cleanup(self));
             
             self.schema.conn.cancelTransaction  % exit ongoing transaction, if any
             
