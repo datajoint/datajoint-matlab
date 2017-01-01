@@ -159,6 +159,19 @@ classdef AutoPopulate < handle
         function taskCore(self, key)
             % The work unit that is submitted to the cluster
             % or executed locally
+            
+            function cleanup(self, key)
+                self.schema.conn.cancelTransaction
+                tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
+                if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
+                    self.setJobStatus(key, 'error', 'Populate interrupted', []);
+                end
+            end
+            % this is guaranteed to be executed when the function is 
+            % terminated even if by KeyboardInterrupt (CTRL-C)
+            % When used with onCleanup,  the function itself cannot contain upvalues
+            cleanupObject = onCleanup(@() cleanup(self, key));
+            
             self.schema.conn.startTransaction()
             try
                 self.makeTuples(key)
