@@ -199,17 +199,18 @@ classdef Table < handle
         end
         
         
-        function str = describe(self)
+        function str = re(self)
             % alias for self.re
-            str = self.re();
+            warning('Deprecated: Use dj.Table/describe instead')
+            str = self.describe;
         end
         
         
-        function str = re(self)
+        function str = describe(self)
             % dj.Table/re - "reverse engineer" the table defintion.
             %
             % SYNTAX:
-            %   str = table.re
+            %   str = table.describe
             %
             % str will contain the table definition string that can be used
             % to create the table using dj.Table.
@@ -382,7 +383,7 @@ classdef Table < handle
                 ['The specified set of attributes is implicitly ' ...
                 'indexed because of a foreign key constraint.']);
             % Prevent interference with existing indexes
-            allIndexes = self.getDatabaseIndexes;
+            allIndexes = self.getIndexes;
             assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
                 allIndexes)), ...
@@ -420,7 +421,7 @@ classdef Table < handle
             
             % Drop specified index(es). There should only be one unless
             % they were redundantly created outside of DataJoint.
-            allIndexes = self.getDatabaseIndexes;
+            allIndexes = self.getIndexes;
             selIndexToDrop = arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), allIndexes);
             if any(selIndexToDrop)
@@ -695,10 +696,11 @@ classdef Table < handle
             self.tableHeader = [];          % Force update of cached header
             self.syncDef
         end
-        
-        
-        function indexInfo = getDatabaseIndexes(self)
-            % dj.Table/getDatabaseIndexes
+    end
+    
+    methods
+        function indexInfo = getIndexes(self)
+            % dj.Table/getIndexes
             % Returns all secondary database indexes,
             % as given by the "SHOW INDEX" query
             indexInfo = struct('attributes', {}, ...

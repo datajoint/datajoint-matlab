@@ -247,6 +247,11 @@ classdef Schema < handle
                 schema.tableNames.values, 'uni', false), self,'uni',false);
             self(1).conn.erd([list{:}], 1, 1)
         end
+        
+        function dropQuick(self)
+            % drop the database and all its tables with no prompt -- use with caution             
+            self.conn.query(sprintf('DROP DATABASE `%s`', self.dbname))
+        end
     end
 end
 
