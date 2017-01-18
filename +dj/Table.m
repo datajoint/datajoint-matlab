@@ -201,7 +201,7 @@ classdef Table < handle
         
         function str = re(self)
             % alias for self.re
-            warning('Deprecated: Use dj.Table/describe instead')
+            warning 'dj.Table/re is deprecated: Use dj.Table/describe instead'
             str = self.describe;
         end
         

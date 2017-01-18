@@ -1,5 +1,5 @@
 function out = set(name, value)
-% dj.set  - display, get, or set a DataJoint setting
+% dj.set  - get or set a DataJoint setting
 %
 % USAGE:
 %    dj.set  - view current settings
@@ -8,8 +8,9 @@ function out = set(name, value)
 %    dj.set('restore') - restore defaults
 
 persistent STATE
-if isempty(STATE) || (nargin>=1 && strcmpi(name,'restore'))
-    STATE = struct(...
+if isempty(STATE) || (nargin==1 && strcmpi(name,'restore'))
+    % default settings
+    STATE = struct( ...
         'suppressPrompt', false, ...
         'reconnectTimedoutTransaction', true, ...
         'populateCheck', true, ...
@@ -18,26 +19,28 @@ if isempty(STATE) || (nargin>=1 && strcmpi(name,'restore'))
         'verbose', false, ...
         'populateAncestors', false, ...
         'bigint_to_double', false, ...
-        'ignore_extra_insert_fields', false ...
-        );
+        'ignore_extra_insert_fields', false);
 end
 
 if ~nargin && ~nargout
     disp(STATE)
-end
-if nargout
+elseif nargout
     out = STATE;
 end
-if nargin
-    assert(ischar(name), 'Parameter name must be a string')
-    assert(isfield(STATE,name), 'Parameter name does not exist')
-end
-if nargin==1
-    out = STATE.(name);
-end
-if nargin==2
-    if nargout
-        out = STATE.(name);
+
+if nargin~=1 || ~strcmpi(name, 'restore')    
+    if nargin
+        assert(ischar(name), 'Setting name must be a string')
+        assert(isfield(STATE,name), 'Setting `%s` does not exist', name)
     end
-    STATE.(name) = value;
+    switch nargin
+        case 1
+            out = STATE.(name);
+        case 2
+            if nargout
+                out = STATE.(name);
+            end
+            STATE.(name) = value;
+    end
+end
 end
