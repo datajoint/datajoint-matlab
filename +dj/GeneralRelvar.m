@@ -68,49 +68,37 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/disp - display the contents of the relation.
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
-            nTuples = 0;
-            fprintf('\nObject %s\n\n',class(self))
-            s = sprintf(', %s', self.primaryKey{:});
-            fprintf('Primary key: %s\n', s(2:end))
-            if isempty(self.nonKeyFields)
-                fprintf 'No dependent attributes'
-            else
-                s = sprintf(', %s',self.nonKeyFields{:});
-                fprintf('Dependent attributes: %s', s(2:end))
-            end
-            fprintf '\n\n Contents: \n'
             tic
-            if self.exists
+            nTuples = self.count;
+            fprintf('\nObject %s\n\n',class(self))
+            hdr = self.header;
+            try
+                % tableHeader exists in tables but not in derived relations.
+                fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
+            catch
+            end
+            if nTuples
                 % print header
-                header = self.header;
-                ix = find( ~[header.attributes.isBlob] );  % header to display
-                fprintf('  %16.16s', header.attributes(ix).name)
-                fprintf \n
-                maxRows = 12;
-                tuples = self.fetch(header.attributes(ix).name, sprintf('LIMIT %d', maxRows+1));
-                nTuples = max(self.count, length(tuples));
-                
-                % print rows
-                for s = tuples(1:min(end,maxRows))'
-                    for iField = ix
-                        v = s.(header.attributes(iField).name);
-                        if isnumeric(v)
-                            if ismember(class(v),{'double','single'})
-                                fprintf('  %16g',v)
-                            else
-                                fprintf('  %16d',v)
-                            end
-                        else
-                            fprintf('  %16.16s',v)
-                        end
+                attrList = cell(size(hdr.attributes));
+                for i = 1:length(hdr.attributes)
+                    if hdr.attributes(i).isBlob
+                        attrList{i} = sprintf('("=BLOB=") -> %s', hdr.names{i});
+                    else
+                        attrList{i} = hdr.names{i};
                     end
-                    fprintf \n
                 end
+                maxRows = 12;
+                tuples = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
+                tabl = struct2table(tuples);
+                funs = {
+                    @(x) x
+                    @upper
+                    };
+                tabl.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
+                    tabl.Properties.VariableNames, 'uni', false);
+                disp(tabl)
                 if nTuples > maxRows
-                    for iField = ix
-                        fprintf('  %16s','...')
-                    end
-                    fprintf \n
+                    fprintf '          ...\n\n'
                 end
             end
             
@@ -174,15 +162,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function yes = exists(self)
             % dj.GeneralRelvar/exists - a fast check whether the relvar
             % contains any tuples
-            [~, sql] = self.compile(3);
-            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql));
+            [~, sql_] = self.compile(3);
+            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql_));
             yes = logical(yes.yes);
         end
         
         function n = count(self)
             % dj.GeneralRelvar/count - the number of tuples in the relation.
-            [~, sql] = self.compile(3);
-            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
+            [~, sql_] = self.compile(3);
+            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql_));
             n = double(n.n);
         end
         
@@ -219,9 +207,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             [limit, args] = makeLimitClause(varargin{:});
             self = self.pro(args{:});
-            [header, sql] = self.compile;
+            [hdr, sql_] = self.compile;
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
-                header.sql, sql, limit));
+                hdr.sql, sql_, limit));
             ret = dj.struct.fromFields(ret);
             
             if nargout>1
@@ -291,9 +279,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             % submit query
             self = self.pro(args{:});  % this copies the object, so now it's a different self
-            [header, sql] = self.compile;
+            [hdr, sql_] = self.compile;
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s%s',...
-                header.sql, sql, limit));
+                hdr.sql, sql_, limit));
             
             % copy into output arguments
             varargout = cell(length(specs));
@@ -621,7 +609,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if nargout
                 ret = str;
             else
-                disp(str)
+                fprintf('%s\n', str)
             end
         end
     end

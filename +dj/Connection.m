@@ -9,8 +9,7 @@ classdef Connection < handle
         packages     % maps database names to package names
         
         % dependency lookups by table name
-        parents      % maps table names to their parent table names     (primary foreign key)
-        referenced   % maps table names to their refenced tables    (non-primary foreign key)
+        foreignKeys   % maps table names to their referenced table names     (primary foreign key)
     end
     
     properties(Access = private)
@@ -31,7 +30,10 @@ classdef Connection < handle
                 mymVersion = mym('version');
                 assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
             catch
-                error('Outdated version of mYm.  Please upgrade to version 2.6 or later')
+                error 'Outdated version of mYm.  Please upgrade to version 2.6 or later'
+            end
+            if verLessThan('matlab', '8.6')
+                error 'MATLAB version 8.6 or greater is required'
             end
             self.host = host;
             self.user = username;
@@ -39,8 +41,7 @@ classdef Connection < handle
             if nargin>=4
                 self.initQuery = initQuery;
             end
-            self.parents     = containers.Map('KeyType','char','ValueType','any');
-            self.referenced  = containers.Map('KeyType','char','ValueType','any');
+            self.foreignKeys  = struct([]);
             self.packages = containers.Map;
         end
         
@@ -53,52 +54,66 @@ classdef Connection < handle
         function loadDependencies(self, schema)
             % load dependencies from SHOW CREATE TABLE
             pat = cat(2,...
-                'FOREIGN KEY\s+\((?<attrs1>[`\w, ]+)\)\s+',...  % attrs1
+                'FOREIGN KEY\s+\((?<attrs>[`\w, ]+)\)\s+',...  % attrs1
                 'REFERENCES\s+(?<ref>[^\s]+)\s+',...        % referenced table name
-                '\((?<attrs2>[`\w, ]+)\)');
+                '\((?<ref_attrs>[`\w, ]+)\)');
             
             for tabName = schema.headers.keys
-                s = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
-                s = strtrim(regexp(s.('Create Table'){1},'\n','split')');
-                s = regexp(s,pat,'names');
-                s = [s{:}];
-                from = sprintf('`%s`.`%s`',schema.dbname,tabName{1});
-                addMember(self.parents, from)
-                addMember(self.referenced, from)
-                for s=s
-                    % assert(isequal(s.attrs1,s.attrs2),...
-                    %    'Foreign keys must link identically named attributes')
-                    s.attrs = regexp(s.attrs1,', ', 'split');
-                    s.attrs = cellfun(@(s) s(2:end-1), s.attrs, 'uni',false);
-                    isPrimary = all(ismember(s.attrs,schema.headers(tabName{1}).primaryKey));
+                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
+                fk = strtrim(regexp(fk.('Create Table'){1},'\n','split')');
+                fk = regexp(fk, pat, 'names');
+                fk = [fk{:}];
+                from = sprintf('`%s`.`%s`', schema.dbname, tabName{1});
+                
+                for s=fk
+                    s.from = from;
+                    s.ref = s.ref;
+                    s.attrs = regexp(s.attrs, '\w+', 'match');
+                    s.ref_attrs = regexp(s.ref_attrs, '\w+', 'match');
+                    s.primary = all(ismember(s.attrs, schema.headers(tabName{1}).primaryKey));
+                    s.multi = ~all(ismember(schema.headers(tabName{1}).primaryKey, s.attrs));
                     if isempty(regexp(s.ref,'`\.`','once'))
                         s.ref = sprintf('`%s`.%s',schema.dbname,s.ref);
                     end
-                    if isPrimary
-                        addMember(self.parents, from, s.ref)
-                    else
-                        addMember(self.referenced, from, s.ref)
-                    end
-                    % add empty entries for all referenced tables too
-                    addMember(self.parents, s.ref)
-                    addMember(self.referenced, s.ref)
+                    s.aliased = ~isequal(s.attrs, s.ref_attrs);
+                    self.foreignKeys = [self.foreignKeys, s];
                 end
             end
         end
         
         
-        function names = children(self, parentTable)
-            keys = self.parents.keys;
-            names = keys(cellfun(@(key) ismember(parentTable, self.parents(key)), keys));
+        function [names, isprimary] = parents(self, child, primary)
+            if isempty(self.foreignKeys)
+                names = {};
+                isprimary = [];
+            else
+                ix = strcmp(child, {self.foreignKeys.from});
+                if nargin>2
+                    ix = ix & primary == [self.foreignKeys.primary];
+                end
+                names = {self.foreignKeys(ix).ref};
+                if nargout > 1
+                    isprimary = [self.foreignKeys(ix).primary];
+                end
+            end
         end
         
         
-        function names = referencing(self, referencedTable)
-            keys = self.referenced.keys;
-            names = keys(cellfun(@(key) ismember(referencedTable, self.referenced(key)), keys));
+        function [names, isprimary] = children(self, parent, primary)
+            if isempty(self.foreignKeys)
+                names = {};
+                isprimary = [];
+            else
+                ix = strcmp(parent, {self.foreignKeys.ref});
+                if nargin>2
+                    ix = ix & primary == [self.foreignKeys.primary];
+                end
+                names = {self.foreignKeys(ix).from};
+                if nargout > 1
+                    isprimary = [self.foreignKeys(ix).primary];
+                end
+            end
         end
-        
-        
         
         
         function className = tableToClass(self, fullTableName, strict)
@@ -108,13 +123,11 @@ classdef Connection < handle
             
             strict = nargin>=3 && strict;
             s = regexp(fullTableName, '^`(?<dbname>.+)`.`(?<tablename>[#~\w\d]+)`$','names');
-            assert(~isempty(s), 'invalid table name %s', fullTableName)
-            if self.packages.isKey(s.dbname)
+            className = fullTableName;
+            if ~isempty(s) && self.packages.isKey(s.dbname)
                 className = sprintf('%s.%s',self.packages(s.dbname),dj.toCamelCase(s.tablename));
             elseif strict
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
-            else
-                className = fullTableName;
             end
         end
         
@@ -131,7 +144,7 @@ classdef Connection < handle
                 down = 0;
             end
             
-            % get additional tables that are connected to ones on the list:
+            % get additional nodes that are connected to ones on the list:
             % up the hierarchy
             lastAdded = list;
             assert(up>=0 && down>=0, 'ERD radius must be positive')
@@ -139,14 +152,14 @@ classdef Connection < handle
                 added = [];
                 if up
                     temp = cellfun(@(s) ...
-                        [self.referenced(s) self.parents(s)], ...
+                        self.parents(s), ...
                         lastAdded, 'uni', false);
                     added = setdiff([temp{:}],list);
                     up = up - 1;
                 end
                 if down
                     temp = cellfun(@(s) ...
-                        [self.referencing(s) self.children(s)], ...
+                        self.children(s), ...
                         lastAdded, 'uni', false);
                     added = union(added,setdiff([temp{:}],list));
                     down = down - 1;
@@ -156,115 +169,49 @@ classdef Connection < handle
             end
             
             % determine tiers
-            re = cellfun(@(s) sprintf('`.+`\\.`%s[a-z].*`',s), dj.Schema.tierPrefixes, 'uni', false);
-            tiers = dj.Schema.allowedTiers(cellfun(@(l) find(~cellfun(@isempty, regexp(l, re))),list));
-            j = ~strcmp(tiers,'job');
-            list = list(j);  % exclude job tables
-            tiers = tiers(j);
+            % exclude job tables
+            j = cellfun(@isempty, regexp(list, '^`[a-z]\w*`\.`~\w+`$'));
+            list = list(j);
             
-            C = self.makeDependencyMatrix(list);            
-            if sum(C(:))==0
-                disp 'No dependencies found. Nothing to plot'
-                return
-            end
-            
-            level = -self.computeHierarchyLevels(C);
-            
-            % convert to 'package.ClassName'
-            names = cellfun(@self.tableToClass,list,'uni',false);
-            
-            % plot
-            cla
-            yi = level;
-            xi = zeros(size(yi));
-            
-            % optimize graph appearance by minimizing disctances.^2 to connected nodes
-            % while maximizing distances to nodes on the same level.
-            j1 = cell(1,length(xi));
-            j2 = cell(1,length(xi));
-            for i=1:length(xi)
-                j1{i} = setdiff(find(yi==yi(i)),i);
-                j2{i} = [find(C(i,:)) find(C(:,i)')];
-            end
-            niter=5e4;
-            T0=5; % initial temperature
-            cr=6/niter; % cooling rate
-            L = inf(size(xi));
-            for iter=1:niter
-                i = ceil(rand*length(xi));  % pick a random node
-                
-                % Compute the cost function Lnew of the increasing xi(i) by dx
-                dx = 5*randn*exp(-cr*iter/2);  % steps don't cools as fast as the annealing schedule
-                xx=xi(i)+dx;
-                Lnew = abs(xx)/10 + sum(abs(xx-xi(j2{i}))); % punish for remoteness from center and from connected nodes
-                if ~isempty(j1{i})
-                    Lnew= Lnew+sum(1./(0.01+(xx-xi(j1{i})).^2));  % punish for propximity to same-level nodes
-                end
-                
-                if L(i) > Lnew + T0*randn*exp(-cr*iter) % simulated annealing
-                    xi(i)=xi(i)+dx;
-                    L(i) = Lnew;
-                end
-            end
-            yi = yi+cos(xi*pi+yi*pi)*0.2;  % stagger y positions at each level            
-            
-            % plot nodes
-            plot(xi, yi, 'ko', 'MarkerSize', 10);
-            hold on;
-            % plot edges
-            for i=1:size(C,1)
-                for j=1:size(C,2)
-                    switch C(i,j)
-                        case 1
-                            connectNodes(xi([i j]), yi([i j]), 'k-')
-                        case 2
-                            connectNodes(xi([i j]), yi([i j]), 'k--')
-                    end
-                    hold on
-                end
-            end
-            
-            % annotate nodes
-            fontColor = struct(...
-                'manual',   [0.0 0.6 0.0], ...
-                'lookup',   [0.3 0.4 0.3], ...
-                'imported', [0.0 0.0 1.0], ...
-                'computed', [0.5 0.0 0.0], ...
-                'job',      [1 1 1]);
-            
-            for i=1:length(level)
-                name = names{i};
-                if exist(name,'class')
-                    rel = feval(name);
-                    assert(isa(rel, 'dj.Relvar'))
-                    if rel.isSubtable
-                        name = [name '*'];  %#ok:AGROW
-                    end
-                end
-                edgeColor = 'none';
-                fontSize = dj.set('erdFontSize');
-                text(xi(i), yi(i), [name '  '], ...
-                    'HorizontalAlignment', 'right', 'interpreter', 'none', ...
-                    'Color', fontColor.(tiers{i}), 'FontSize', fontSize, 'edgeColor', edgeColor);
-                hold on;
-            end
-            
-            xlim([min(xi)-0.5 max(xi)+0.5]);
-            ylim([min(yi)-0.5 max(yi)+0.5]);
-            hold off
+            d = self.makeGraph(list);
+            rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
+            rege{end+1} = '^\d+$';
+            tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'first'), d.Nodes.Name);
+            colormap(0.3+0.7*[
+                0.3 0.3 0.3
+                0.0 0.5 0.0
+                0.0 0.0 1.0
+                1.0 0.0 0.0
+                1.0 1.0 1.0
+                1.0 1.0 1.0
+                ]);
+            marker = {'hexagram' 'square' 'o' 'pentagram' '.' '.'};
+            d.Nodes.marker = marker(tiers)';
+            h = d.plot('layout', 'layered', 'NodeLabel', []);
+            h.NodeCData = tiers;
+            caxis([0.5 6.5])
+            h.MarkerSize = 12;
+            h.Marker = d.Nodes.marker;
             axis off
-            figure(gcf)  % bring to front
-            
-            function connectNodes(x, y, lineStyle)
-                assert(length(x)==2 && length(y)==2)
-                plot(x, y, 'k.')
-                t = 0:0.05:1;
-                x = x(1) + (x(2)-x(1)).*(1-cos(t*pi))/2;
-                y = y(1) + (y(2)-y(1))*t;
-                plot(x, y, lineStyle)
-            end            
+            for i=1:d.numnodes
+                if tiers(i)<6
+                    text(h.XData(i)+0.1,h.YData(i), self.tableToClass(d.Nodes.Name{i}), ...
+                        'fontsize', 11, 'rotation', -16, ...
+                        'Interpreter', 'none');
+                end
+            end
+            if d.numedges
+                line_widths = [1 2];
+                h.LineWidth = line_widths(2-d.Edges.primary);
+                line_styles = {'-', ':'};
+                h.LineStyle = line_styles(2-d.Edges.primary);
+                ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(~d.Edges.multi,:));
+                highlight(h, ee(:,1), ee(:,2), 'LineWidth', 3)
+                ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(d.Edges.aliased,:));
+                highlight(h, ee(:,1), ee(:,2), 'EdgeColor', 'r')
+            end
+            figure(gcf)   % bring to foreground
         end
-        
         
         
         function reload(self)
@@ -289,7 +236,6 @@ classdef Connection < handle
         end
         
         
-        
         function ret = query(self, queryStr, varargin)
             % dj.Connection/query - query(connection, queryStr, varargin) issue an
             % SQL query and return the result if any.
@@ -312,12 +258,10 @@ classdef Connection < handle
         end
         
         
-        
         function startTransaction(self)
             self.query('START TRANSACTION WITH CONSISTENT SNAPSHOT')
             self.inTransaction = true;
         end
-        
         
         
         function commitTransaction(self)
@@ -327,12 +271,10 @@ classdef Connection < handle
         end
         
         
-        
         function cancelTransaction(self)
             self.inTransaction = false;
             self.query('ROLLBACK')
         end
-        
         
         
         function close(self)
@@ -344,89 +286,67 @@ classdef Connection < handle
         end
         
         
-        
         function delete(self)
             self.clearDependencies
             self.close
         end
         
         
-        
         function clearDependencies(self, schema)
             if nargin<2
                 % remove all if the schema is not specified
-                self.parents.remove(self.parents.keys);
-                self.referenced.remove(self.referenced.keys);
-            else
+                self.foreignKeys = struct([]);
+            elseif ~isempty(self.foreignKeys)
                 % remove references from the given schema
                 % self.referenced.remove
                 tableNames = cellfun(@(s) ...
                     sprintf('`%s`.`%s`', schema.dbname, s), ...
                     schema.tableNames.values, 'uni', false);
-                self.parents.remove(intersect(self.parents.keys,tableNames));
-                self.referenced.remove(intersect(self.referenced.keys,tableNames));
+                self.foreignKeys(ismember({self.foreignKeys.from}, tableNames)) = [];
             end
         end
-    
-        function C = makeDependencyMatrix(self, list)
-            n = length(list);
-            C = sparse([],[],[],n,n);
-            for i=1:n
-                j = cellfun(@(c) find(strcmp(c,list)), self.children(list{i}), 'uni', false);
-                C(i,[j{:}])=1; %#ok<SPRIX>
-                j = cellfun(@(c) find(strcmp(c,list)), self.referencing(list{i}), 'uni', false);
-                C(i,[j{:}])=2; %#ok<SPRIX>
+        
+        
+        function g = makeGraph(self, list)
+            if nargin<=1
+                list = union({self.foreignKeys.from}, {self.foreignKeys.ref});
             end
-        end
-    end
-    
-    methods(Static)
-        function level = computeHierarchyLevels(C)
-            % computes levels of nodes from adjacency matrix C.
+            [~,i] = unique(list);  
+            list = list(ismember(1:length(list), i));  % remove duplicates
+            if isempty(self.foreignKeys)
+                ref = [];
+                from = [];
+            else
+                from = arrayfun(@(item) find(strcmp(item.from, list)), self.foreignKeys, 'uni', false);
+                ref = arrayfun(@(item) find(strcmp(item.ref, list)), self.foreignKeys, 'uni', false);
+                ix =  ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);
+                if ~isempty(ref)
+                    primary = [self.foreignKeys(ix).primary];
+                    aliased = [self.foreignKeys(ix).aliased];
+                    multi = [self.foreignKeys(ix).multi];
+                    ref = [ref{ix}];
+                    from = [from{ix}];
+                    % for every renamed edge, introduce a new node
+                    for m = find(aliased)
+                        t = length(list)+1;
+                        list{t} = sprintf('%d',t);
+                        q = length(ref)+1;
+                        ref(q) = ref(m);
+                        from(q) = t;
+                        ref(m) = t;
+                        primary(q) = primary(m);
+                        aliased(q) = aliased(m);
+                        multi(q) = multi(m);
+                    end
+                end
+            end
             
-            % compute levels in hierarchy
-            n = size(C,1);
-            level = zeros(size(C,1),1);
-            updated = true;
-            while updated
-                updated = false;
-                for i=1:n
-                    j = find(C(:,i));
-                    if ~isempty(j)
-                        newLevel = max(level(j))+1;
-                        if level(i)~=newLevel
-                            updated = true;
-                            level(i) = newLevel;
-                        end
-                    end
-                end
-            end
-            % tighten up levels
-            updated = true;
-            while updated
-                updated = false;
-                for i=1:n
-                    j = find(C(i,:));
-                    if ~isempty(j)
-                        newLevel = min(level(j))-1;
-                        if newLevel ~= level(i)
-                            updated = true;
-                            level(i) = newLevel;
-                        end
-                    end
-                end
+            g = digraph(ref, from, 1:length(ref), list);
+            if g.numedges
+                g.Edges.primary = primary(g.Edges.Weight)';
+                g.Edges.aliased = aliased(g.Edges.Weight)';
+                g.Edges.multi = multi(g.Edges.Weight)';
             end
         end
     end
-end
-
-
-
-function addMember(map,key,value)
-if ~map.isKey(key)
-    map(key) = {};
-end
-if  nargin>=3
-    map(key) = [map(key) {value}]; %#ok<NASGU>
-end
 end

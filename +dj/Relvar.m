@@ -425,14 +425,10 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % populate tables in order of dependence
             disp Inserting..
             names = cellfun(@(r) r.fullTableName, relvars, 'uni', false);
-            C = conn.makeDependencyMatrix(names);
-            levels = dj.Connection.computeHierarchyLevels(C);
-            for level=0:max(levels)
-                for i=find(levels(:)' == level)
-                    disp(s(i).name)
-                    contents = load(fullfile(path, s(i).name));
-                    relvars{i}.inserti(contents.tuples);
-                end
+            for i = toposort(conn.makeGraph(names))
+                disp(names{i})
+                contents = load(fullfile(path, names{i}));
+                relvars{i}.inserti(contents.tuples);
             end
         end
     end

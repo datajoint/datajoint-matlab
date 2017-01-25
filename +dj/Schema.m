@@ -7,7 +7,7 @@ classdef Schema < handle
     properties(SetAccess = private)
         package    % the package (directory starting with a +) that stores schema classes, must be on path
         dbname     % database (schema) name
-        prefix=''  % optional table prefix, allowing multiple schemas per database
+        prefix=''  % optional table prefix, allowing multiple schemas per database -- remove this feature if not used
         conn       % handle to the dj.Connection object
         loaded = false
         tableNames   % tables indexed by classNames
@@ -246,6 +246,11 @@ classdef Schema < handle
                 cellfun(@(s) sprintf('`%s`.`%s`', schema.dbname, s), ...
                 schema.tableNames.values, 'uni', false), self,'uni',false);
             self(1).conn.erd([list{:}], 1, 1)
+        end
+        
+        function dropQuick(self)
+            % drop the database and all its tables with no prompt -- use with caution             
+            self.conn.query(sprintf('DROP DATABASE `%s`', self.dbname))
         end
     end
 end

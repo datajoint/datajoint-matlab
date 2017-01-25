@@ -244,7 +244,7 @@ classdef AutoPopulate < handle
             popRestricts = varargin;  % restrictions on popRel
             restricts = self.restrictions;  % restricts on self
             if isempty(restricts)
-                unpopulated = fetch((self.popRel & popRestricts) - self);
+                unpopulated = fetch((self.popRel & popRestricts) - self.pro());
             else
                 assert(numel(restricts)==1, 'only one restriction is allowed in populated relations')
                 restricts = restricts{1};
