@@ -1,0 +1,3 @@
+[submodule "mym"]
+	path = mym
+	url = https://github.com/datajoint/mym
