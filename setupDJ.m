@@ -9,8 +9,14 @@ function setupDJ
         fprintf('mym missing. Downloading...\n');
         target = fullfile(base, 'mym.zip');
         mymURL = 'https://github.com/datajoint/mym/archive/master.zip';
-        websave(target, mymURL);
-        unzip(target);
+        target = websave(target, mymURL);
+        if isunix && ~ismac
+            % on Linux Matlab unzip doesn't work properly so use system
+            % unzip
+            system(['unzip ', target]);
+        else
+            unzip(target);
+        end
         % rename extracted mym-master directory to mym
         movefile(fullfile(base, 'mym-master'), mymdir);
         delete('mym.zip');
