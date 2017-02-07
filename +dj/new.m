@@ -15,7 +15,12 @@ end
 
 schemaFunction = [className(1:p-1) '.getSchema'];
 if isempty(which(schemaFunction))
-    throwAsCaller(MException('DataJoint:makeClass', 'Cannot find %s', schemaFunction))
+    fprintf('Package %s is missing. Calling dj.createSchema...\n', className(1:p-1))
+    % this wouldn't work well if nested package is given
+    dj.createSchema(className(1:p-1))
+    if isempty(which(schemaFunction))
+        throwAsCaller(MException('DataJoint:makeClass', 'Cannot find %s', schemaFunction))
+    end
 end
 
 makeClass(eval(schemaFunction), className(p+1:end))
