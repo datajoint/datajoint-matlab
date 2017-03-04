@@ -1,5 +1,3 @@
 classdef Manual < dj.Relvar 
-    properties(Constant)
-        tier = 'manual'
-    end        
+% Defines a manual table
 end

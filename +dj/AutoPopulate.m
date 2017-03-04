@@ -365,7 +365,7 @@ classdef AutoPopulate < handle
             path = fullfile(fileparts(schemaPath), 'Jobs.m');
             f = fopen(path,'w');
             fprintf(f, '%%{\n');
-            fprintf(f, '%s.Jobs (job)    # the job reservation table\n', self.schema.package);
+            fprintf(f, '%# the job reservation table\n', self.schema.package);
             fprintf(f, 'table_name : varchar(255) # className of the table\n');
             fprintf(f, 'key_hash   : char(32)     # key hash\n');
             fprintf(f, '-----\n');
@@ -377,7 +377,7 @@ classdef AutoPopulate < handle
             fprintf(f, 'pid=0              : int unsigned             # system process id\n');
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp       # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
-            fprintf(f, 'classdef Jobs < dj.Relvar\n');
+            fprintf(f, 'classdef Jobs < dj.Jobs\n');
             fprintf(f, 'end\n');
             fclose(f);
         end

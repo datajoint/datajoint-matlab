@@ -1,5 +1,3 @@
 classdef Lookup < dj.Relvar
-    properties(Constant)
-        tier = 'lookup'
-    end
+    % defines a lookup table
 end

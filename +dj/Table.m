@@ -215,9 +215,8 @@ classdef Table < handle
             % str will contain the table definition string that can be used
             % to create the table using dj.Table.
             
-            % stable header
-            str = sprintf('%%{\n%s (%s) # %s', ...
-                self.className, self.info.tier, self.info.comment);
+            % table header
+            str = sprintf('%%{\n# %s', self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
@@ -471,7 +470,7 @@ classdef Table < handle
                     for i=1:p1-1
                         fprintf(f,'%s\n',lines{i});
                     end
-                    fprintf(f,'%s', self.re);
+                    fprintf(f,'%s', self.describe);
                     for i=p2+1:length(lines)
                         fprintf(f,'%s\n',lines{i});
                     end
@@ -600,23 +599,48 @@ classdef Table < handle
                 def(i+1) = '';
             end
 
-            % remove empty lines and comment lines
-            def(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), def)) = [];
+            % parse table schema, name, type, and comment   
+            specialClass = cellfun(@(c) isa(self, c), dj.Schema.tierClasses);
+            if ~any(specialClass)
+                % Old-style declaration for backward compatibility
 
-            % parse table schema, name, type, and comment
-            pat = {
-                '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-                '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
-                '#\s*(?<comment>.*)$'                     % # comment
-                };
-            tableInfo = regexp(def{1}, cat(2,pat{:}), 'names');
-            assert(numel(tableInfo)==1, ...
-                'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
-            assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-                'invalidTableTier:Invalid tier for table ', tableInfo.className)
-            cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
-            assert(strcmp(cname, self.className), ...
-                'Table name %s does not match in file %s', cname, self.className)
+                % remove empty lines and pure comment lines
+                def(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), def)) = [];
+                firstLine = strtrim(def{1});
+                def = def(2:end);
+                pat = {
+                    '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+                    '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
+                    '#\s*(?<comment>.*)$'                     % # comment
+                    };
+                tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
+                assert(numel(tableInfo)==1, ...
+                    'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+                assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+                    'invalidTableTier:Invalid tier for table ', tableInfo.className)
+                cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
+                assert(strcmp(cname, self.className), ...
+                    'Table name %s does not match in file %s', cname, self.className)
+            else
+                % New-style declaration using special classes for each tier
+                tableInfo = struct;
+                tableInfo.tier = dj.Schema.allowedTiers{specialClass};
+                
+                % remove empty lines 
+                def(cellfun(@(x) isempty(strtrim(x)), def)) = [];
+                if strncmp(def{1}, '#', 1)
+                    tableInfo.comment = def{1}(2:end);
+                    def = def(2:end);
+                else
+                    tableInfo.comment = '';
+                end
+                % remove pure comments 
+                def(cellfun(@(x) strncmp('#',strtrim(x),1), def)) = [];
+                
+                cname = strsplit(self.className, '.');
+                tableInfo.package = strjoin(cname(1:end-1), '.');
+                tableInfo.className = cname{end};
+            end
                 
             % CREATE TABLE
             tableName = [self.schema.prefix, ...
@@ -628,7 +652,7 @@ classdef Table < handle
             inKey = true;
             primaryFields = {};
             fields = {};
-            for iLine = 2:length(def)
+            for iLine = 1:length(def)
                 line = def{iLine};
                 switch true
                     case strncmp(line,'---',3)

@@ -32,6 +32,7 @@ classdef Schema < handle
         %   computed: tableName with '__'
         allowedTiers = {'lookup' 'manual' 'imported' 'computed' 'job'}
         tierPrefixes = {'#', '', '_', '__', '~'}
+        tierClasses = {'dj.Lookup', 'dj.Manual', 'dj.Imported', 'dj.Computed', 'dj.Jobs'}
     end
     
     
@@ -92,65 +93,42 @@ classdef Schema < handle
             else
                 existingTable = [];
                 choice = dj.ask(...
-                    '\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n',...
-                    {'L','M','I','C'});
-                tier = struct('c','computed','l','lookup','m','manual','i','imported');
-                tier = tier.(choice);
-                isAuto = ismember(tier, {'computed','imported'});
+                    '\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n  P=part\n',...
+                    {'L','M','I','C','P'});
+                tierClass = struct(...
+                    'c','dj.Coomputed',...
+                    'l','dj.Lookup',...
+                    'm','dj.Manual',...
+                    'i','dj.Imported',...
+                    'p','dj.Part');
+                tierClass = tierClass.(choice);
+                isAuto = ismember(tierClass, {'dj.Imported', 'dj.Computed'});
             end
-            
-            % let the user decide if the table is a subtable, which means
-            % that it can only be populated together with its parent.
-            isSubtable = isAuto && strcmp('yes', dj.ask('Is this a subtable?'));
-            
+                        
             f = fopen(filename,'wt');
             assert(-1 ~= f, 'Could not open %s', filename)
             
             % table declaration
             if numel(existingTable)
-                fprintf(f, '%s', existingTable.re);
-                tab = dj.Table([self.package '.' className]);
-                parents = cellfun(@(x) self.conn.tableToClass(x), tab.parents, 'uni', false);
+                fprintf(f, '%s', existingTable.describe);
             else
                 fprintf(f, '%%{\n');
-                fprintf(f, '%s.%s (%s) # my newest table\n', self.package, className, tier);
+                fprintf(f, '# my newest table\n');
                 fprintf(f, '# add primary key here\n');
                 fprintf(f, '-----\n');
                 fprintf(f, '# add additional attributes\n');
                 fprintf(f, '%%}');
-                parents = [];
             end
+            
             % class definition
-            fprintf(f, '\n\nclassdef %s < dj.Relvar', className);
-            if isAuto && ~isSubtable
-                fprintf(f, ' & dj.AutoPopulate');
-            end
-            
-            % properties
-            if isAuto && ~isSubtable
-                fprintf(f, '\n\n\tproperties\n');
-                fprintf(f, '\t\tpopRel');
-                for i = 1:length(parents)
-                    if i>1
-                        fprintf(f, '*');
-                    else
-                        fprintf(f, ' = ');
-                    end
-                    fprintf(f, '%s', parents{i});
-                end
-                fprintf(f, '  %% !!! update the populate relation\n');
-                fprintf(f, '\tend\n');
-            end
-            
+            fprintf(f, '\n\nclassdef %s < %s', className, tierClass);
+                        
             % metod makeTuples
             if isAuto
-                fprintf(f, '\n\tmethods');
-                if ~isSubtable
-                    fprintf(f, '(Access=protected)');
-                end
+                fprintf(f, '\n\n\tmethods');
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
-                fprintf(f, '\t\t\t%%self.insert(key)\n');
+                fprintf(f, '\t\t\t self.insert(key)\n');
                 fprintf(f, '\t\tend\n');
                 fprintf(f, '\tend\n');
             end
