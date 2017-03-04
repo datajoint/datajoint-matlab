@@ -33,15 +33,13 @@ classdef Table < handle
         fullTableName  % `database`.`plain_table_name`
         ancestors      % names of all referenced tables, including self, recursively, in order of dependencies
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
+        title          % name as used for reference. Usually class name but not for dj.Part
     end
     
     properties(Constant)
         mysql_constants = {'CURRENT_TIMESTAMP'}
     end
     
-    properties(Access=private)
-        definition     % table definition
-    end
     
     methods
         function self = Table(className)
@@ -60,6 +58,16 @@ classdef Table < handle
                 if any(strcmp(name,{'dj.Table','dj.Relvar'}))
                     name = '';
                 end
+            end
+        end
+        
+        
+        function name = get.title(self)
+            if ~isa(self, 'dj.Part')
+                name = self.className;
+            else
+                assert(logical(numel(self.master_)), 'The part table %s has no master', class(self)) %#ok<MCNPN>
+                name = sprintf('%s.%s', self.master_.className, self.part_name_); %#ok<MCNPN>
             end
         end
         
@@ -90,8 +98,15 @@ classdef Table < handle
         function ret = get.schema(self)
             if isempty(self.schema)
                 assert(~isempty(self.className), 'className not set')
-                schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
-                assert(~isempty(which(schemaFunction)), ['Could not find ' schemaFunction])
+                parts = strsplit(self.className, '.');
+                for i=1:length(parts)-1
+                    schemaFunction = strjoin([parts(1:i) {'getSchema'}], '.');
+                    success = ~isempty(which(schemaFunction));
+                    if success
+                        break
+                    end
+                end
+                assert(success, ['Could not find ' schemaFunction])
                 self.schema = feval(schemaFunction);
                 assert(isa(self.schema, 'dj.Schema'), ...
                     [schemaFunction ' must return an instance of dj.Schema'])
@@ -108,7 +123,7 @@ classdef Table < handle
         function name = get.plainTableName(self)
             if isempty(self.plainTableName)
                 self.create
-                self.plainTableName = self.schema.tableNames(self.className);
+                self.plainTableName = self.schema.tableNames(self.title);
             end
             name = self.plainTableName;
         end
@@ -118,7 +133,7 @@ classdef Table < handle
             self.schema.reload(false)
             list = self.schema.conn.parents(self.fullTableName, varargin{:});
         end
-                
+        
         
         function list = children(self, varargin)
             self.schema.reload(false)
@@ -510,21 +525,8 @@ classdef Table < handle
             else
                 doPrompt = false;  % don't prompt if tables are empty
                 self.schema.conn.cancelTransaction   % exit ongoing transaction
-                % warn user if self is a subtable
-                if ismember(self.info.tier, {'imported','computed'}) && ...
-                        ~isempty(which(self.className))
-                    rel = eval(self.className);
-                    if ~isa(rel,'dj.AutoPopulate') && ~dj.set('suppressPrompt')
-                        fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
-                            'drop its parent table instead.\n'], self.className)
-                        if ~strcmpi('yes', dj.ask('Proceed anyway?'))
-                            fprintf '\ndrop cancelled\n\n'
-                            return
-                        end
-                    end
-                end
                 fprintf 'ABOUT TO DROP TABLES: \n'
-                tables = cellfun(@(x) dj.Relvar(x), self.descendants, 'uni', false);
+                tables = cellfun(@(x) dj.getRel(x), self.descendants, 'uni', false);
                 tables = [tables{:}];
                 for table = tables
                     n = table.count;
@@ -557,30 +559,44 @@ classdef Table < handle
     methods(Access=private)
         
         function yes = isCreated(self)
-            yes = self.schema.tableNames.isKey(self.className);
+            yes = self.schema.tableNames.isKey(self.title);
         end
         
         
         function definition = getDefinition(self)
             % extract the table declaration with the first percent-brace comment
             % block of the matching .m file.
-            if ~isempty(self.definition)
-                definition = self.definition;
-            else
-                file = which(self.className);
-                assert(~isempty(file), ...
-                    'MissingTableDefinition:Could not find table definition file %s', self.className)
-                definition = readPercentBraceComment(file);
-                assert(~isempty(definition), ...
-                    'MissingTableDefnition:Could not find the table declaration in %s', file)
-            end
+            file = which(self.className);
+            assert(~isempty(file), ...
+                'MissingTableDefinition:Could not find table definition file %s', self.className)
+            definition = readPercentBraceComment(file);
+            assert(~isempty(definition), ...
+                'MissingTableDefnition:Could not find the table declaration in %s', file)
         end
         
+                
+        function alter(self, alterStatement)
+            % dj.Table/alter
+            % alter(self, alterStatement)
+            % Executes an ALTER TABLE statement for this table.
+            % The schema is reloaded and syncDef is called.
+            sql = sprintf('ALTER TABLE  %s %s', ...
+                self.fullTableName, alterStatement);
+            self.schema.conn.query(sql);
+            disp 'table updated'
+            self.schema.reload
+            self.tableHeader = [];          % Force update of cached header
+            self.syncDef
+        end
         
+    end
+    
+    
+    methods
         
         function create(self)
             % parses the table declration and declares the table
-  
+            
             if self.isCreated
                 return
             end
@@ -588,6 +604,8 @@ classdef Table < handle
             if self.isCreated
                 return
             end
+            assert(isa(self, 'dj.UserRelation') || isa(self, 'dj.Part'), ...
+                'Cannot create table %s without defining its UserRelation class', self.className)
             def = self.getDefinition();
             
             % split into a columnwise cell array
@@ -598,54 +616,78 @@ classdef Table < handle
                 def{i} = [def{i}(1:end-1) ' ' def{i+1}];
                 def(i+1) = '';
             end
-
-            % parse table schema, name, type, and comment   
-            specialClass = cellfun(@(c) isa(self, c), dj.Schema.tierClasses);
-            if ~any(specialClass)
-                % Old-style declaration for backward compatibility
-
-                % remove empty lines and pure comment lines
-                def(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), def)) = [];
-                firstLine = strtrim(def{1});
-                def = def(2:end);
-                pat = {
-                    '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-                    '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
-                    '#\s*(?<comment>.*)$'                     % # comment
-                    };
-                tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
-                assert(numel(tableInfo)==1, ...
-                    'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
-                assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-                    'invalidTableTier:Invalid tier for table ', tableInfo.className)
-                cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
-                assert(strcmp(cname, self.className), ...
-                    'Table name %s does not match in file %s', cname, self.className)
-            else
-                % New-style declaration using special classes for each tier
-                tableInfo = struct;
-                tableInfo.tier = dj.Schema.allowedTiers{specialClass};
+            
+            % parse table schema, name, type, and comment
+            switch true
                 
-                % remove empty lines 
-                def(cellfun(@(x) isempty(strtrim(x)), def)) = [];
-                if strncmp(def{1}, '#', 1)
-                    tableInfo.comment = def{1}(2:end);
+                case isa(self, 'dj.Part')
+                    % New-style definition of part tables
+                    assert(isa(self.master_, 'dj.Master'), ...
+                        'The master table has not been set for %s', class(self)) %#ok<MCNPN>
+                    tableInfo = struct;
+                    % remove empty lines
+                    def(cellfun(@(x) isempty(x), def)) = [];
+                    if strncmp(def{1}, '#', 1)
+                        tableInfo.comment = strtrim(def{1}(2:end));
+                        def = def(2:end);
+                    else
+                        tableInfo.comment = '';
+                    end
+                    cname = strsplit(class(self.master_), '.'); %#ok<MCNPN>
+                    tableInfo.package = strjoin(cname(1:end-1), '.');
+                    tableInfo.tier = 'part';
+                    tableInfo.className = sprintf('%s.%s', self.master_.className, self.part_name_);                 %#ok<MCNPN>
+                    tableName = sprintf('%s__%s', self.master_.info.name, dj.fromCamelCase(self.part_name_)); %#ok<MCNPN>
+               
+                case isa(self, 'dj.UserRelation')
+                    % New-style declaration using special classes for each tier
+                    tableInfo = struct;
+                    specialClass = find(cellfun(@(c) isa(self, c), dj.Schema.tierClasses));
+                    assert(length(specialClass)==1, 'Unknown type of UserRelation in %s', class(self))
+                    tableInfo.tier = dj.Schema.allowedTiers{specialClass};
+                    % remove empty lines
+                    def(cellfun(@(x) isempty(x), def)) = [];
+                    if strncmp(def{1}, '#', 1)
+                        tableInfo.comment = strtrim(def{1}(2:end));
+                        def = def(2:end);
+                    else
+                        tableInfo.comment = '';
+                    end
+                    % remove pure comments
+                    def(cellfun(@(x) strncmp('#',strtrim(x),1), def)) = [];
+                    
+                    cname = strsplit(self.className, '.');
+                    tableInfo.package = strjoin(cname(1:end-1), '.');
+                    tableInfo.className = cname{end};
+                    tableName = sprintf('%s%s%s', self.schema.prefix, ...
+                        dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
+                        dj.fromCamelCase(tableInfo.className));
+               
+                otherwise
+                    % Old-style declaration for backward compatibility
+                    
+                    % remove empty lines and pure comment lines
+                    def(cellfun(@(x) isempty(x) || strncmp('#',x,1), def)) = [];
+                    firstLine = strtrim(def{1});
                     def = def(2:end);
-                else
-                    tableInfo.comment = '';
-                end
-                % remove pure comments 
-                def(cellfun(@(x) strncmp('#',strtrim(x),1), def)) = [];
-                
-                cname = strsplit(self.className, '.');
-                tableInfo.package = strjoin(cname(1:end-1), '.');
-                tableInfo.className = cname{end};
+                    pat = {
+                        '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+                        '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
+                        '#\s*(?<comment>.*)$'                     % # comment
+                        };
+                    tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
+                    assert(numel(tableInfo)==1, ...
+                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+                    assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+                        'invalidTableTier:Invalid tier for table ', tableInfo.className)
+                    cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
+                    assert(strcmp(cname, self.className), ...
+                        'Table name %s does not match in file %s', cname, self.className)
+                    tableName = sprintf('%s%s%s', self.schema.prefix, ...
+                        dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
+                        dj.fromCamelCase(tableInfo.className));
             end
-                
-            % CREATE TABLE
-            tableName = [self.schema.prefix, ...
-                dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                dj.fromCamelCase(tableInfo.className)];
+            
             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
             
             % fields and foreign keys
@@ -663,8 +705,8 @@ classdef Table < handle
                         line = strtrim(strtok(line, '#'));
                         parts = strsplit(line, '->');
                         [attrs, cname] = deal(parts{:});
-                        rel = dj.Relvar(strtrim(cname));
-                        assert(isa(rel, 'dj.Relvar'), 'foreign keys must be base relvars')
+                        cname = strtrim(cname);
+                        rel = dj.getRel(cname);
                         [sql, newFields] = makeFK(sql, strtrim(attrs), rel, fields, inKey);
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
@@ -686,7 +728,7 @@ classdef Table < handle
                             primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
                         end
                         fields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));   
+                        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
                         
                     otherwise
                         error('Invalid table declaration line "%s"', line)
@@ -707,24 +749,9 @@ classdef Table < handle
             self.schema.conn.query(sql);
             self.schema.reload
         end
-
-
-        
-        function alter(self, alterStatement)
-            % dj.Table/alter
-            % alter(self, alterStatement)
-            % Executes an ALTER TABLE statement for this table.
-            % The schema is reloaded and syncDef is called.
-            sql = sprintf('ALTER TABLE  %s %s', ...
-                self.fullTableName, alterStatement);
-            self.schema.conn.query(sql);
-            disp 'table updated'
-            self.schema.reload
-            self.tableHeader = [];          % Force update of cached header
-            self.syncDef
-        end
     end
-    
+        
+           
     methods
         function indexInfo = getIndexes(self)
             % dj.Table/getIndexes
@@ -869,6 +896,6 @@ end
 
 
 function str = backquotedList(arr)
-    str = sprintf('`%s`,', arr{:});
-    str(end)=[];
+str = sprintf('`%s`,', arr{:});
+str(end)=[];
 end

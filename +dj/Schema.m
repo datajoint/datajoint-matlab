@@ -32,7 +32,7 @@ classdef Schema < handle
         %   computed: tableName with '__'
         allowedTiers = {'lookup' 'manual' 'imported' 'computed' 'job'}
         tierPrefixes = {'#', '', '_', '__', '~'}
-        tierClasses = {'dj.Lookup', 'dj.Manual', 'dj.Imported', 'dj.Computed', 'dj.Jobs'}
+        tierClasses = {'dj.Lookup' 'dj.Manual' 'dj.Imported' 'dj.Computed' 'dj.Jobs'}
     end
     
     

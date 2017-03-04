@@ -1,3 +1,3 @@
-classdef Manual < dj.Relvar 
+classdef Manual < dj.UserRelation
 % Defines a manual table
 end

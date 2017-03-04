@@ -26,7 +26,7 @@
 % job is completed, the entry is removed. When the job ends in error, the
 % status is set to "error" and the error stack is saved.
 
-classdef AutoPopulate < handle
+classdef AutoPopulate < dj.Master
     
     properties(Access=protected)
         useReservations
@@ -240,7 +240,7 @@ classdef AutoPopulate < handle
                 failedKeys = struct([]);
                 errors = struct([]);
             end
-            
+                     
             popRestricts = varargin;  % restrictions on popRel
             restricts = self.restrictions;  % restricts on self
             if isempty(restricts)

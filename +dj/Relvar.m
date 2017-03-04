@@ -11,14 +11,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
     methods
         function self = Relvar(varargin)
             self@dj.Table(varargin{:})
-            self.init('table',{self});
-        end
-        
-        function yes = isSubtable(self)
-            % a subtable is an imported or computed tables that does not
-            % have its own auto-populate functionality.
-            yes = ismember(self.tableHeader.info.tier, {'imported','computed'}) && ...
-                ~isa(self, 'dj.AutoPopulate');
+            self.init('table', {self});  % general relvar node
         end
         
         function id = get.lastInsertID(self)
@@ -28,15 +21,15 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         function delQuick(self)
-            % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.
-            % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
+            % dj.Relvar/delQuick - remove all tuples of the relation from its table.
+            % Unlike dj.Relvar/del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
         
         
         function del(self)
-            % dj.BaseRelvar/del - remove all tuples of the relation from its table
+            % dj.Relvar/del - remove all tuples of the relation from its table
             % and, recursively, all matching tuples in dependent tables.
             %
             % A summary of the data to be removed will be provided followed by
@@ -47,8 +40,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
             %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans
             %                                   that do not have matching tuples in table Cells
-            %
-            % See also dj.BaseRelvar/delQuick, dj.Table/drop
+            % See also dj.Relvar/delQuick, dj.Table/drop
             
             function cleanup(self)
                 if self.schema.conn.inTransaction
@@ -57,7 +49,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 end
             end
             
-            % this is guaranteed to be executed when the function is 
+            % this is guaranteed to be executed when the function is
             % terminated even if by KeyboardInterrupt (CTRL-C)
             cleanupObject = onCleanup(@() cleanup(self));
             
@@ -66,20 +58,9 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             if ~self.exists
                 disp 'nothing to delete'
             else
-                % warn the user if deleting from a subtable
-                if ismember(self.info.tier, {'imported','computed'}) ...
-                        && ~isa(self, 'dj.AutoPopulate')
-                    fprintf(['!!! %s is a subtable. For referential integrity, ' ...
-                        'delete from its parent instead.\n'], class(self))
-                    if ~dj.set('suppressPrompt') && ~strcmpi('yes', dj.ask('Proceed anyway?'))
-                        disp 'delete cancelled'
-                        return
-                    end
-                end
-                
                 % compile the list of relvars to be deleted from
                 list = self.descendants;
-                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
+                rels = cellfun(@(name) dj.getRel(name), list, 'UniformOutput', false);
                 rels = [rels{:}];
                 rels(1) = rels(1) & self.restrictions;
                 
@@ -136,7 +117,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function exportCascade(self, path,  mbytesPerFile)
-            % dj.BaseRelvar/export_cascade - export all tuples of the
+            % dj.Relvar/export_cascade - export all tuples of the
             % relation and, recursively, all matching tuples in the
             % dependent tables.
             %
@@ -154,7 +135,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             else
                 % compile the list of relvars to be export from
                 list = self.descendants;
-                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
+                rels = cellfun(@(name) dj.getRel(name), list, 'UniformOutput', false);
                 rels = [rels{:}];
                 rels(1) = rels(1) & self.restrictions;
                 
@@ -331,7 +312,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function update(self, attrname, value)
-            % dj.BaseRelvar/update - update a field in an existing tuple
+            % dj.Relvar/update - update a field in an existing tuple
             %
             % Relational database maintain referential integrity on the level
             % of a tuple. Therefore, the UPDATE operator can violate referential

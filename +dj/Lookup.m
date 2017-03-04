@@ -1,3 +1,3 @@
-classdef Lookup < dj.Relvar
+classdef Lookup < dj.UserRelation
     % defines a lookup table
 end
