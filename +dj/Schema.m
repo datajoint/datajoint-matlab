@@ -222,7 +222,7 @@ classdef Schema < handle
         function erd(self)
             list = arrayfun(@(schema) ...
                 cellfun(@(s) sprintf('`%s`.`%s`', schema.dbname, s), ...
-                schema.tableNames.values, 'uni', false), self,'uni',false);
+                schema.tableNames.values, 'uni', false), self, 'uni', false);
             self(1).conn.erd([list{:}], 1, 1)
         end
         

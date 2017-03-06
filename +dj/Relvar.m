@@ -60,7 +60,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             else
                 % compile the list of relvars to be deleted from
                 list = self.descendants;
-                rels = cellfun(@(name) dj.getRel(name), list, 'UniformOutput', false);
+                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
                 rels = [rels{:}];
                 rels(1) = rels(1) & self.restrictions;
                 
@@ -135,7 +135,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             else
                 % compile the list of relvars to be export from
                 list = self.descendants;
-                rels = cellfun(@(name) dj.getRel(name), list, 'UniformOutput', false);
+                rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
                 rels = [rels{:}];
                 rels(1) = rels(1) & self.restrictions;
                 

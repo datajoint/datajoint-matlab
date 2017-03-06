@@ -1,9 +1,18 @@
 classdef Part < dj.Relvar
     
-    properties
-        % these properties are set by the Master's constructor
-        master_ 
-        part_name_
+    properties(Abstract, SetAccess=protected)
+        master
+    end
+    
+    methods
+        function self = Part
+            assert(isa(self.master, 'dj.Master'),...
+                'The property master should be of type dj.Master')
+            regexp( 'PatternAag', 'Pattern[A-Z]\w*')
+            assert(~isempty(regexp(class(self), sprintf('^%s[A-Z]', class(self.master)), 'once')), ...
+                'The part class %s must be prefixed with its master %s', ...
+                class(self), class(self.master))
+        end
     end
     
 end
