@@ -271,6 +271,12 @@ classdef AutoPopulate < dj.Master
                 failedKeys = struct([]);
                 errors = struct([]);
             end
+            
+            % create tables of all parts in a master-part relationship to
+            % avoid implicit commits.
+            for part = self.getParts
+                part.create
+            end
                      
             popRestricts = varargin;  % restrictions on keySource
             restricts = self.restrictions;  % restricts on self
