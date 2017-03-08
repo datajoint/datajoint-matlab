@@ -2,18 +2,18 @@
 % to automatically populate its table.
 %
 % Derived classes must also inherit from dj.Relvar and must define the
-% constant property 'popRel' of type dj.GeneralRelvar.
+% constant property 'keySource' of type dj.GeneralRelvar.
 %
 % Derived classes must define the callback function makeTuples(self, key),
 % which computes new tuples for the given key and inserts them into the table as
 % self.insert(tuple).
 %
-% The constant property 'popRel' must be defined in the derived class.
-% dj.AutoPopulate/populate uses self.popRel to generate the list of unpopulated keys
-% for which self.makeTuples() will be invoked. Thus popRel determines the scope
+% The constant property 'keySource' must be defined in the derived class.
+% dj.AutoPopulate/populate uses self.keySource to generate the list of unpopulated keys
+% for which self.makeTuples() will be invoked. Thus keySource determines the scope
 % and granularity of makeTuples calls.
 %
-% Once self.makeTuples and self.popRel are defined, the user may
+% Once self.makeTuples and self.keySource are defined, the user may
 % invoke methods poopulate or parpopulate to automatically populate the table.
 %
 % The method parpopulate works similarly to populate but it uses the job reservation
@@ -26,9 +26,14 @@
 % job is completed, the entry is removed. When the job ends in error, the
 % status is set to "error" and the error stack is saved.
 
-classdef AutoPopulate < handle
+classdef AutoPopulate < dj.Master
+    
+    properties(Dependent)
+        keySource
+    end
     
     properties(Access=protected)
+        keySource_
         useReservations
         executionEngine
         jobs     % the jobs table
@@ -50,20 +55,46 @@ classdef AutoPopulate < handle
     end
     
     methods
+        
+        function rel = get.keySource(self)
+            if numel(self.keySource_)
+                rel = self.keySource_;
+                return
+            end
+            if isprop(self, 'popRel')   % for backward compatibility
+                rel = self.popRel;
+            else
+                % the default key source is the join of the parents
+                parents = self.parents(true);
+                assert(~isempty(parents), ...
+                    'AutoPopulate table %s must have primary dependencies or an explicit keySource', class(self))
+                for i=1:length(parents)
+                    r = feval(self.schema.conn.tableToClass(parents{i}));
+                    if i==1
+                        rel = r;
+                    else
+                        rel = rel * r;
+                    end
+                end
+            end
+            self.keySource_ = rel;
+        end
+        
+        
         function varargout = populate(self, varargin)
             % [failedKeys, errors] = populate(baseRelvar [, restrictors...])
-            % populates a table based on the contents self.popRel
+            % populates a table based on the contents self.keySource
             %
-            % The property self.popRel contains the relation that provides
+            % The property self.keySource contains the relation that provides
             % the keys for which self must be populated.
             %
             % self.populate will call self.makeTuples(key) for every
-            % key in self.popRel that does not already have matching tuples
+            % key in self.keySource that does not already have matching tuples
             % in self.
             %
             % Additional input arguments contain restriction conditions
-            % applied to self.popRel.  Therefore, all keys to be populated
-            % are obtained as fetch((self.popRel - self) & varargin).
+            % applied to self.keySource.  Therefore, all keys to be populated
+            % are obtained as fetch((self.keySource - self) & varargin).
             %
             % Without any output arguments, populate rethrows errors
             % that occur in makeTuples. However, if output arguments are
@@ -214,13 +245,13 @@ classdef AutoPopulate < handle
                     'Cannot populate a restricted relation. Correct syntax: progress(rel, restriction)'))
             end
             
-            remaining = count((self.popRel&varargin) - self);
+            remaining = count((self.keySource&varargin) - self);
             if nargout
                 % return remaning items if asked
                 varargout{1} = remaining;
             else
                 fprintf('%s %30s:  ', datestr(now,'yyyy-mm-dd HH:MM:SS'), self.className)
-                total = count(self.popRel&varargin);
+                total = count(self.keySource&varargin);
                 if ~total
                     disp 'Nothing to populate'
                 else
@@ -241,10 +272,16 @@ classdef AutoPopulate < handle
                 errors = struct([]);
             end
             
-            popRestricts = varargin;  % restrictions on popRel
+            % create tables of all parts in a master-part relationship to
+            % avoid implicit commits.
+            for part = self.getParts
+                part.create
+            end
+                     
+            popRestricts = varargin;  % restrictions on keySource
             restricts = self.restrictions;  % restricts on self
             if isempty(restricts)
-                unpopulated = fetch((self.popRel & popRestricts) - self.pro());
+                unpopulated = fetch((self.keySource & popRestricts) - self.pro());
             else
                 assert(numel(restricts)==1, 'only one restriction is allowed in populated relations')
                 restricts = restricts{1};
@@ -254,10 +291,10 @@ classdef AutoPopulate < handle
                 assert(isstruct(restricts), ...
                     'populated relvars can be restricted only by other relations, structures, or structure arrays')
                 % the rule for populating restricted relations:
-                unpopulated = dj.struct.join(restricts, fetch((self.popRel & popRestricts & restricts) - (self & restricts)));
+                unpopulated = dj.struct.join(restricts, fetch((self.keySource & popRestricts & restricts) - (self & restricts)));
             end
             
-            % restrict the popRel to unpopulated tuples
+            % restrict the keySource to unpopulated tuples
             if isempty(unpopulated)
                 fprintf('%s: Nothing to populate\n', self.className)
             else
@@ -365,7 +402,7 @@ classdef AutoPopulate < handle
             path = fullfile(fileparts(schemaPath), 'Jobs.m');
             f = fopen(path,'w');
             fprintf(f, '%%{\n');
-            fprintf(f, '%s.Jobs (job)    # the job reservation table\n', self.schema.package);
+            fprintf(f, '%# the job reservation table\n', self.schema.package);
             fprintf(f, 'table_name : varchar(255) # className of the table\n');
             fprintf(f, 'key_hash   : char(32)     # key hash\n');
             fprintf(f, '-----\n');
@@ -377,7 +414,7 @@ classdef AutoPopulate < handle
             fprintf(f, 'pid=0              : int unsigned             # system process id\n');
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp       # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
-            fprintf(f, 'classdef Jobs < dj.Relvar\n');
+            fprintf(f, 'classdef Jobs < dj.Jobs\n');
             fprintf(f, 'end\n');
             fclose(f);
         end
@@ -387,18 +424,14 @@ classdef AutoPopulate < handle
             % Performs sanity checks that are common to populate,
             % parpopulate and batch_populate.
             % To disable the sanity check: dj.set('populateCheck',false)
-            if dj.set('populateCheck')
-                assert(isprop(self,'popRel'), ...
-                    'Automatically populated tables must declare a popRel property')
-                assert(isa(self.popRel, 'dj.GeneralRelvar'), ...
-                    'property popRel must be a subclass of dj.GeneralRelvar')
-                abovePopRel = setdiff(self.primaryKey(1:min(end,length(self.popRel.primaryKey))), self.popRel.primaryKey);
-                if ~all(ismember(self.popRel.primaryKey, self.primaryKey))
-                    warning(['The popRel primary key contains extra fields. ' ...
-                        'The popRel''s  primary key is normally a subset of the populated relation''s primary key'])
+            if dj.set('populateCheck')                
+                abovePopRel = setdiff(self.primaryKey(1:min(end,length(self.keySource.primaryKey))), self.keySource.primaryKey);
+                if ~all(ismember(self.keySource.primaryKey, self.primaryKey))
+                    warning(['The keySource primary key contains extra fields. ' ...
+                        'The keySource''s  primary key is normally a subset of the populated relation''s primary key'])
                 end
                 if ~isempty(abovePopRel)
-                    warning(['Primary key attribute %s is above popRel''s primary key attributes. '...
+                    warning(['Primary key attribute %s is above keySource''s primary key attributes. '...
                         'Transaction timeouts may occur. See DataJoint tutorial and issue #6'], abovePopRel{1})
                 end
             end

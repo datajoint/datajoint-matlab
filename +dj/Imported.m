@@ -1,5 +1,3 @@
-classdef Imported < dj.Relvar & dj.AutoPopulate
-    properties(Constant)
-        tier = 'imported'
-    end
+classdef Imported < dj.UserRelation & dj.AutoPopulate
+    % defines an imported table
 end

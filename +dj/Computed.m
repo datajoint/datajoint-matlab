@@ -1,5 +1,3 @@
-classdef Computed < dj.Relvar & dj.AutoPopulate
-    properties(Constant)
-        tier = 'computed'
-    end
+classdef Computed < dj.UserRelation & dj.AutoPopulate
+    % defines a computed table
 end

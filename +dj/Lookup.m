@@ -1,5 +1,3 @@
-classdef Lookup < dj.Relvar
-    properties(Constant)
-        tier = 'lookup'
-    end
+classdef Lookup < dj.UserRelation
+    % defines a lookup table
 end

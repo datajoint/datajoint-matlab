@@ -16,7 +16,7 @@ classdef Connection < handle
         password
     end
     
-    properties(Dependent)
+    properties(Dependent) 
         isConnected
     end
     
@@ -33,7 +33,7 @@ classdef Connection < handle
                 error 'Outdated version of mYm.  Please upgrade to version 2.6 or later'
             end
             if verLessThan('matlab', '8.6')
-                error 'MATLAB version 8.6 or greater is required'
+                error 'MATLAB version 8.6 (R2015b) or greater is required'
             end
             self.host = host;
             self.user = username;
@@ -196,7 +196,7 @@ classdef Connection < handle
             for i=1:d.numnodes
                 if tiers(i)<6
                     text(h.XData(i)+0.1,h.YData(i), self.tableToClass(d.Nodes.Name{i}), ...
-                        'fontsize', 11, 'rotation', -16, ...
+                        'fontsize', 24, 'rotation', -16, ...
                         'Interpreter', 'none');
                 end
             end
