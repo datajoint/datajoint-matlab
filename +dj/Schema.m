@@ -85,23 +85,24 @@ classdef Schema < handle
             end
             
             % if the table exists, create the file that matches its definition
+            tierClassMap = struct(...
+                'c','dj.Computed',...
+                'l','dj.Lookup',...
+                'm','dj.Manual',...
+                'i','dj.Imported',...
+                'p','dj.Part');
             if ismember([self.package '.' className], self.classNames)
                 existingTable = dj.Table([self.package '.' className]);
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
                 isAuto = ismember(existingTable.info.tier, {'computed','imported'});
+                tierClass = tierClassMap(existing.Table.info.tier(1));                
             else
                 existingTable = [];
                 choice = dj.ask(...
                     '\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n  P=part\n',...
                     {'L','M','I','C','P'});
-                tierClass = struct(...
-                    'c','dj.Coomputed',...
-                    'l','dj.Lookup',...
-                    'm','dj.Manual',...
-                    'i','dj.Imported',...
-                    'p','dj.Part');
-                tierClass = tierClass.(choice);
+                tierClass = tierClassMap.(choice);
                 isAuto = ismember(tierClass, {'dj.Imported', 'dj.Computed'});
             end
                         
@@ -125,7 +126,7 @@ classdef Schema < handle
                         
             % metod makeTuples
             if isAuto
-                fprintf(f, '\n\n\tmethods');
+                fprintf(f, '\n\n\tmethods(Access=protected)');
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
                 fprintf(f, '\t\t%%!!! compute missing fields for key here\n');
                 fprintf(f, '\t\t\t self.insert(key)\n');
@@ -229,6 +230,7 @@ classdef Schema < handle
         function dropQuick(self)
             % drop the database and all its tables with no prompt -- use with caution             
             self.conn.query(sprintf('DROP DATABASE `%s`', self.dbname))
+            disp done
         end
     end
 end
