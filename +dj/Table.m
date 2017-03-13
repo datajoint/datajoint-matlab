@@ -594,8 +594,6 @@ classdef Table < handle
             if self.isCreated
                 return
             end
-            assert(isa(self, 'dj.UserRelation') || isa(self, 'dj.Part'), ...
-                'Cannot create table %s without defining its UserRelation class', self.className)
             def = self.getDefinition();
             
             % split into a columnwise cell array
@@ -658,7 +656,7 @@ classdef Table < handle
                         };
                     tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
                     assert(numel(tableInfo)==1, ...
-                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1: \n  %s', firstLine)
                     assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
                         'invalidTableTier:Invalid tier for table ', tableInfo.className)
                     cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
@@ -687,7 +685,12 @@ classdef Table < handle
                         parts = strsplit(line, '->');
                         [attrs, cname] = deal(parts{:});
                         cname = strtrim(cname);
-                        rel = dj.Relvar(cname);
+                        if exist(cname, 'class')
+                            rel = feval(cname);
+                            assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', cname)
+                        else                            
+                            rel = dj.Relvar(cname);
+                        end
                         [sql, newFields] = makeFK(sql, strtrim(attrs), rel, fields, inKey);
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
