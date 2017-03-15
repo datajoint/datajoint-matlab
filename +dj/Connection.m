@@ -16,7 +16,7 @@ classdef Connection < handle
         password
     end
     
-    properties(Dependent) 
+    properties(Dependent)
         isConnected
     end
     
@@ -175,28 +175,33 @@ classdef Connection < handle
             
             d = self.makeGraph(list);
             rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
-            rege{end+1} = '^\d+$';
-            tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'first'), d.Nodes.Name);
+            rege{end+1} = '^`[a-z]\w*`\.`\W?\w+__\w+`$';   % for part tables
+            rege{end+1} = '^\d+$';  % for numbered nodes
+            tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'last'), d.Nodes.Name);
             colormap(0.3+0.7*[
                 0.3 0.3 0.3
                 0.0 0.5 0.0
                 0.0 0.0 1.0
                 1.0 0.0 0.0
                 1.0 1.0 1.0
+                0.0 0.0 0.0
                 1.0 1.0 1.0
                 ]);
-            marker = {'hexagram' 'square' 'o' 'pentagram' '.' '.'};
+            marker = {'hexagram' 'square' 'o' 'pentagram' '.' '.' '.'};
             d.Nodes.marker = marker(tiers)';
             h = d.plot('layout', 'layered', 'NodeLabel', []);
             h.NodeCData = tiers;
-            caxis([0.5 6.5])
+            caxis([0.5 7.5])
             h.MarkerSize = 12;
             h.Marker = d.Nodes.marker;
             axis off
             for i=1:d.numnodes
-                if tiers(i)<6
+                if tiers(i)<7  % ignore jobs, logs, etc.
+                    isPart = tiers(i)==6;
+                    fs = dj.set('erdFontSize')*(1 - 0.3*isPart);
+                    fc = isPart*0.3*[1 1 1];
                     text(h.XData(i)+0.1,h.YData(i), self.tableToClass(d.Nodes.Name{i}), ...
-                        'fontsize', dj.set('erdFontSize'), 'rotation', -16, ...
+                        'fontsize', fs, 'rotation', -16, 'color', fc, ...
                         'Interpreter', 'none');
                 end
             end
@@ -311,7 +316,7 @@ classdef Connection < handle
             if nargin<=1
                 list = union({self.foreignKeys.from}, {self.foreignKeys.ref});
             end
-            [~,i] = unique(list);  
+            [~,i] = unique(list);
             list = list(ismember(1:length(list), i));  % remove duplicates
             if isempty(self.foreignKeys)
                 ref = [];

@@ -125,6 +125,12 @@ classdef Schema < handle
             fprintf(f, '\n\nclassdef %s < %s', className, tierClass);
                         
             % metod makeTuples
+            if strcmp(tierClass, 'dj.Part')
+                fprintf(f, '\n\n\tproperties(SetAccess=protected)');
+                fprintf(f, '\n\t\tmaster= %s.<<MasterClass>>', self.package);
+                fprintf(f, '\n\t\end\n');
+            end
+            
             if isAuto
                 fprintf(f, '\n\n\tmethods(Access=protected)');
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');

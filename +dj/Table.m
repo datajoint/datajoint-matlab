@@ -61,7 +61,6 @@ classdef Table < handle
         end
         
         
-        
         function set.className(self, className)
             self.className = className;
             assert(ischar(self.className) && ~isempty(self.className),  ...
