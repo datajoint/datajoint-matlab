@@ -504,6 +504,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret = init(dj.GeneralRelvar, op, [{self} arg params]);
         end
         
+        function ret = proj(self, varargin)
+            % alias for dj.GeneralRelvar/pro - relational restriction
+            ret = self.pro(varargin{:});
+        end
+        
         function ret = mtimes(self, arg)
             % dj.GeneralRelvar/mtimes - relational natural join.
             %
@@ -708,7 +713,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 end
             end
             
-            % enclose in parentheses if necessary
+            % enclose in subquery if necessary
             if enclose==1 && header.hasAliases ...
                     || enclose==2 && (~ismember(self.operator, {'table', 'join'}) || ~isempty(self.restrictions)) ...
                     || enclose==3 && strcmp(self.operator, 'aggregate')
@@ -749,12 +754,12 @@ for arg = restrictions
             clause = sprintf('%s AND NOT(%s)', clause, ...
                 makeWhereClause(header, cond.operands));
             
-        case ischar(cond) && strcmpi(cond,'NOT')
+        case (ischar(cond) || isstring(cond)) && strcmpi(cond,'NOT')
             % negation of the next condition
             not = 'NOT ';
             continue
             
-        case ischar(cond) && ~strcmpi(cond, 'NOT')
+        case (ischar(cond) || isstring(cond)) && ~strcmpi(cond, 'NOT')
             % SQL condition
             clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
