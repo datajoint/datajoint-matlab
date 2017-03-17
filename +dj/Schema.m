@@ -128,7 +128,7 @@ classdef Schema < handle
             if strcmp(tierClass, 'dj.Part')
                 fprintf(f, '\n\n\tproperties(SetAccess=protected)');
                 fprintf(f, '\n\t\tmaster= %s.<<MasterClass>>', self.package);
-                fprintf(f, '\n\t\end\n');
+                fprintf(f, '\n\tend\n');
             end
             
             if isAuto

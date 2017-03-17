@@ -679,18 +679,21 @@ classdef Table < handle
                         inKey = false;
                         
                         % foreign key
-                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.*')
-                        line = strtrim(strtok(line, '#'));
-                        parts = strsplit(line, '->');
-                        [attrs, cname] = deal(parts{:});
-                        cname = strtrim(cname);
-                        if exist(cname, 'class')
-                            rel = feval(cname);
+                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
+                        pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
+                            '\s*->\s*' ...
+                            '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
+                            '\w*' ...
+                            '(?<attrs>\([\s\w,]*\))?' ...
+                            '\s*(#.*)?$'];
+                        fk = regexp(line, pat, 'names');
+                        if exist(fk.cname, 'class')
+                            rel = feval(fk.cname);
                             assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', cname)
                         else                            
-                            rel = dj.Relvar(cname);
+                            rel = dj.Relvar(fk.cname);
                         end
-                        [sql, newFields] = makeFK(sql, strtrim(attrs), rel, fields, inKey);
+                        [sql, newFields] = makeFK(sql, fk.attrs, fk.newattrs, rel, fields, inKey);
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
                             primaryFields = [primaryFields, newFields]; %#ok<AGROW>
@@ -819,31 +822,52 @@ sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
 end
 
 
-function [sql, newFields] = makeFK(sql, attrs, rel, existingFields, inKey)
+function [sql, newattrs] = makeFK(sql, attrs, newattrs, rel, existingFields, inKey)
 % add foreign key to SQL table definition
-newFields = {};
-toFields = rel.primaryKey;    % referenced fields
-if isempty(attrs)
-    fromFields = toFields;
-else
-    fromFields = [toFields(ismember(toFields, existingFields)) ...
-        cellfun(@strtrim, strsplit(attrs(2:end-1), ','), 'uni', false)];
-    assert(length(fromFields)==length(toFields), ...
-        'invalid reference %s -> %s', attrs, rel.className)
-end
-% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
-for i = 1:length(fromFields)
-    if ~ismember(fromFields(i), existingFields)
-        newFields(end+1) = fromFields(i); %#ok<AGROW>
-        fieldInfo = rel.tableHeader.attributes(i);
-        fieldInfo.name = fromFields{i};
-        fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
+
+% parse and validate the attribute lists
+attrs = strsplit(attrs, {' ',',','(',')'});
+newattrs = strsplit(newattrs, {' ',',','(',')'});
+attrs(cellfun(@isempty, attrs))=[];
+newattrs(cellfun(@isempty, newattrs))=[];
+assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
+    'All attributes in (%s) must be in the primary key of %s', ...
+    strjoin(attrs, ','), rel.className)
+if length(newattrs)==1 
+    % unambiguous single attribute
+    if length(rel.primaryKey)==1
+        attrs = self.primaryKey;
+    elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
+        attrs = setdiff(rel.primaryKey, existingFields);
     end
 end
+assert(length(attrs) == length(newattrs) , ...
+    'Mapped fields (%s) and (%s) must match in the foreign key.', ...
+    strjoin(newattrs,','), strjoin(attrs,','))
+
+% prepend unspecified primary key attributes that have not yet been included 
+pk = rel.primaryKey;
+pk(ismember(pk,attrs) | ismember(pk,existingFields))=[];
+attrs = [pk attrs];
+newattrs = [pk newattrs];
+
+% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
+[~, ix] = sort(cellfun(@(a) find(strcmp(a, rel.primaryKey)), attrs));
+attrs = attrs(ix);
+newattrs = newattrs(ix);
+
+for i=1:length(attrs)
+    fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, rel.tableHeader.names));
+    fieldInfo.name = newattrs{i};
+    fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
+    sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
+end
+
+fkattrs = rel.primaryKey;
+fkattrs(ismember(fkattrs, attrs))=newattrs;
 sql = sprintf(...
     '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-    sql, backquotedList(fromFields), rel.fullTableName, backquotedList(toFields));
+    sql, backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
 end
 
 
