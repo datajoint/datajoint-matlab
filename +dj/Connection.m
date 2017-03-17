@@ -185,7 +185,7 @@ classdef Connection < handle
                 1.0 0.0 0.0
                 1.0 1.0 1.0
                 0.0 0.0 0.0
-                1.0 1.0 1.0
+                1.0 0.0 0.0
                 ]);
             marker = {'hexagram' 'square' 'o' 'pentagram' '.' '.' '.'};
             d.Nodes.marker = marker(tiers)';
@@ -324,7 +324,7 @@ classdef Connection < handle
             else
                 from = arrayfun(@(item) find(strcmp(item.from, list)), self.foreignKeys, 'uni', false);
                 ref = arrayfun(@(item) find(strcmp(item.ref, list)), self.foreignKeys, 'uni', false);
-                ix =  ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);
+                ix = ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);
                 if ~isempty(ref)
                     primary = [self.foreignKeys(ix).primary];
                     aliased = [self.foreignKeys(ix).aliased];
