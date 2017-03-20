@@ -491,8 +491,17 @@ classdef Table < handle
                         fprintf(f,'%s\n',lines{i});
                     end
                     fprintf(f,'%s', self.describe);
+                    lookup = struct(...
+                        'lookup', 'dj.Lookup', ...
+                        'manual', 'dj.Manual', ...
+                        'imported', 'dj.Imported', ...
+                        'computed', 'dj.Computed');
                     for i=p2+1:length(lines)
-                        fprintf(f,'%s\n',lines{i});
+                        s = lines{i};
+                        if ~isempty(regexp(s, '^\s*classdef', 'once'))
+                            s = regexprep(s, 'dj\.Relvar\s*(&\s*dj\.AutoPopulate)?', lookup.(self.info.tier));
+                        end
+                        fprintf(f,'%s\n', s);
                     end
                     fclose(f);
                     disp 'updated table definition'
