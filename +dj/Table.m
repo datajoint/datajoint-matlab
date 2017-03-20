@@ -199,7 +199,23 @@ classdef Table < handle
                 up = up(1);
             end
             
-            self.schema.conn.erd({self.fullTableName},up,down)
+            d = dj.ERD(self);
+            n = length(d.nodes);
+            while down>0 || up>0
+                if down>0
+                    down = down - 1;
+                    d.down
+                end
+                if up>0
+                    up = up - 1;
+                    d.up
+                end
+                if length(d.nodes)==n
+                    break
+                end
+                n = length(d.nodes);
+            end
+            d.draw
         end
         
         

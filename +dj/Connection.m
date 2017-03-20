@@ -130,94 +130,7 @@ classdef Connection < handle
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
             end
         end
-        
-        
-        function erd(self, list, up, down)
-            % ERD -- plot the Entity Relationship Diagram
-            %
-            % INPUTS:
-            %    list -- tables to include in the diagram formatted as
-            %    `dbname`.`table_name`
-            
-            if nargin<3
-                up = 0;
-                down = 0;
-            end
-            
-            % get additional nodes that are connected to ones on the list:
-            % up the hierarchy
-            lastAdded = list;
-            assert(up>=0 && down>=0, 'ERD radius must be positive')
-            while up || down
-                added = [];
-                if up
-                    temp = cellfun(@(s) ...
-                        self.parents(s), ...
-                        lastAdded, 'uni', false);
-                    added = setdiff([temp{:}],list);
-                    up = up - 1;
-                end
-                if down
-                    temp = cellfun(@(s) ...
-                        self.children(s), ...
-                        lastAdded, 'uni', false);
-                    added = union(added,setdiff([temp{:}],list));
-                    down = down - 1;
-                end
-                list = union(list,added);
-                lastAdded = added;
-            end
-            
-            % determine tiers
-            % exclude job tables
-            j = cellfun(@isempty, regexp(list, '^`[a-z]\w*`\.`~\w+`$'));
-            list = list(j);
-            
-            d = self.makeGraph(list);
-            rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
-            rege{end+1} = '^`[a-z]\w*`\.`\W?\w+__\w+`$';   % for part tables
-            rege{end+1} = '^\d+$';  % for numbered nodes
-            tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'last'), d.Nodes.Name);
-            colormap(0.3+0.7*[
-                0.3 0.3 0.3
-                0.0 0.5 0.0
-                0.0 0.0 1.0
-                1.0 0.0 0.0
-                1.0 1.0 1.0
-                0.0 0.0 0.0
-                1.0 0.0 0.0
-                ]);
-            marker = {'hexagram' 'square' 'o' 'pentagram' '.' '.' '.'};
-            d.Nodes.marker = marker(tiers)';
-            h = d.plot('layout', 'layered', 'NodeLabel', []);
-            h.NodeCData = tiers;
-            caxis([0.5 7.5])
-            h.MarkerSize = 12;
-            h.Marker = d.Nodes.marker;
-            axis off
-            for i=1:d.numnodes
-                if tiers(i)<7  % ignore jobs, logs, etc.
-                    isPart = tiers(i)==6;
-                    fs = dj.set('erdFontSize')*(1 - 0.3*isPart);
-                    fc = isPart*0.3*[1 1 1];
-                    text(h.XData(i)+0.1,h.YData(i), self.tableToClass(d.Nodes.Name{i}), ...
-                        'fontsize', fs, 'rotation', -16, 'color', fc, ...
-                        'Interpreter', 'none');
-                end
-            end
-            if d.numedges
-                line_widths = [1 2];
-                h.LineWidth = line_widths(2-d.Edges.primary);
-                line_styles = {'-', ':'};
-                h.LineStyle = line_styles(2-d.Edges.primary);
-                ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(~d.Edges.multi,:));
-                highlight(h, ee(:,1), ee(:,2), 'LineWidth', 3)
-                ee = cellfun(@(e) find(strcmp(e, d.Nodes.Name), 1, 'first'), d.Edges.EndNodes(d.Edges.aliased,:));
-                highlight(h, ee(:,1), ee(:,2), 'EdgeColor', 'r')
-            end
-            figure(gcf)   % bring to foreground
-        end
-        
+                
         
         function reload(self)
             % reload all schemas
@@ -310,48 +223,6 @@ classdef Connection < handle
                 self.foreignKeys(ismember({self.foreignKeys.from}, tableNames)) = [];
             end
         end
-        
-        
-        function g = makeGraph(self, list)
-            if nargin<=1
-                list = union({self.foreignKeys.from}, {self.foreignKeys.ref});
-            end
-            [~,i] = unique(list);
-            list = list(ismember(1:length(list), i));  % remove duplicates
-            if isempty(self.foreignKeys)
-                ref = [];
-                from = [];
-            else
-                from = arrayfun(@(item) find(strcmp(item.from, list)), self.foreignKeys, 'uni', false);
-                ref = arrayfun(@(item) find(strcmp(item.ref, list)), self.foreignKeys, 'uni', false);
-                ix = ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);
-                if ~isempty(ref)
-                    primary = [self.foreignKeys(ix).primary];
-                    aliased = [self.foreignKeys(ix).aliased];
-                    multi = [self.foreignKeys(ix).multi];
-                    ref = [ref{ix}];
-                    from = [from{ix}];
-                    % for every renamed edge, introduce a new node
-                    for m = find(aliased)
-                        t = length(list)+1;
-                        list{t} = sprintf('%d',t);
-                        q = length(ref)+1;
-                        ref(q) = ref(m);
-                        from(q) = t;
-                        ref(m) = t;
-                        primary(q) = primary(m);
-                        aliased(q) = aliased(m);
-                        multi(q) = multi(m);
-                    end
-                end
-            end
-            
-            g = digraph(ref, from, 1:length(ref), list);
-            if g.numedges
-                g.Edges.primary = primary(g.Edges.Weight)';
-                g.Edges.aliased = aliased(g.Edges.Weight)';
-                g.Edges.multi = multi(g.Edges.Weight)';
-            end
-        end
+                
     end
 end
