@@ -902,7 +902,7 @@ function fieldInfo = parseAttrDef(line)
 line = strtrim(line);
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-    '(=\s*(?<default>".*"|''.*''|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?|null|NULL|Null|CURRENT_TIMESTAMP)\s*)?' % default value
+    '(=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*)?' % default value
     ':\s*(?<type>\w+(\(.*\))?)\s*'       % datatype
     '#(?<comment>.*)'           % comment
     '$'  % end of line
