@@ -9,7 +9,7 @@ classdef ERD < handle
     end
     
     
-    methods 
+    methods
         
         function self = ERD(obj)
             % initialize ERD node list. obj may be a schema object or a
@@ -53,7 +53,7 @@ classdef ERD < handle
         
         
         function ret = plus(self, obj)
-            % union of ERD graphs     
+            % union of ERD graphs
             % A + B is an ERD with all the nodes from A and B.
             % or when B is an integer, expand A by B levels upstream.
             
@@ -76,8 +76,8 @@ classdef ERD < handle
                     end
                 otherwise
                     error 'invalid ERD difference'
-            end            
-        end      
+            end
+        end
         
         
         function ret = minus(self, obj)
@@ -100,10 +100,10 @@ classdef ERD < handle
                     end
                 otherwise
                     error 'invalid ERD difference'
-            end            
+            end
         end
         
-                
+        
         function draw(self)
             % draw the diagram
             
@@ -112,7 +112,7 @@ classdef ERD < handle
             self.nodes = self.nodes(j);
             
             self.makeGraph
-
+            
             rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
             rege{end+1} = '^`[a-z]\w*`\.`\W?\w+__\w+`$';   % for part tables
             rege{end+1} = '^\d+$';  % for numbered nodes
@@ -133,6 +133,8 @@ classdef ERD < handle
             caxis([0.5 7.5])
             h.MarkerSize = 12;
             h.Marker = self.graph.Nodes.marker;
+            h.EdgeColor = [1 1 1]*0;
+            h.EdgeAlpha = 0.25;
             axis off
             for i=1:self.graph.numnodes
                 if tiers(i)<7  % ignore jobs, logs, etc.
@@ -166,7 +168,7 @@ classdef ERD < handle
         function makeGraph(self)
             % take foreign key and construct a digraph including all the
             % nodes from the list
-
+            
             list = self.nodes;
             if isempty(self.conn.foreignKeys)
                 ref = [];
