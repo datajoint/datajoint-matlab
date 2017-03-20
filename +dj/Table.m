@@ -903,12 +903,13 @@ line = strtrim(line);
 assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute name in %s', line)
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-    '(=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*)?' % default value
+    '=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*' % default value
     ':\s*(?<type>\w+(\(.*\))?)\s*'       % datatype
     '#(?<comment>.*)'           % comment
     '$'  % end of line
     };
-if isempty(regexp(line, '^\w+\s*=', 'once'))   % has no default
+hasDefault = ~isempty(regexp(line, '^\w+\s*=', 'once'));
+if ~hasDefault
     pat{2} = '';
 end
 for sub = {[1 2 3 4 5] [1 2 3 5]}  % with and without the comment
@@ -923,7 +924,7 @@ if ~isfield(fieldInfo,'comment')
     fieldInfo.comment = '';
 end
 fieldInfo.comment = strtrim(fieldInfo.comment);
-if ~isfield(fieldInfo,'default')
+if ~hasDefault
     fieldInfo.default = '';
 end
 assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
