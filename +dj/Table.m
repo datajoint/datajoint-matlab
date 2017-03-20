@@ -904,7 +904,7 @@ assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute nam
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
     '=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*' % default value
-    ':\s*(?<type>\w+(\(.*\))?)\s*'       % datatype
+    ':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE][mM][eE][nN][tT])?)\s*'       % datatype
     '#(?<comment>.*)'           % comment
     '$'  % end of line
     };
