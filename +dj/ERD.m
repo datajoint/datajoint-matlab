@@ -77,7 +77,9 @@ classdef ERD < handle
                 otherwise
                     error 'invalid ERD difference'
             end            
-        end        
+        end      
+        
+        
         function ret = minus(self, obj)
             % difference of ERD graphs
             % A - B is an ERD with all the nodes from A that are not in B.
@@ -100,6 +102,7 @@ classdef ERD < handle
                     error 'invalid ERD difference'
             end            
         end
+        
                 
         function draw(self)
             % draw the diagram

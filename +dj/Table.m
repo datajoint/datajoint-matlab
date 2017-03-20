@@ -347,19 +347,19 @@ classdef Table < handle
         
         function addForeignKey(self, target)
             % add a foreign key constraint.
-            % The target must be a dj.Relvar object.
+            % The target must be a dj.Table object or a string with the
+            % foreign key definition.
             % The referencing table must already possess all the attributes
             % of the primary key of the referenced table.
             %
             % EXAMPLE:
             %    tp.Align.table.addForeignKey(common.Scan)
             
-            fieldList = sprintf('%s,', target.primaryKey{:});
-            fieldList(end)=[];  % drop trailing comma
-            self.alter( sprintf(...
-                ['ADD FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
-                fieldList, target.fullTableName, fieldList));
+            if isa(target, 'dj.Table')
+                target = sprintf('->%s', target.className);
+            end
+            sql = makeFK('', target, self.primaryKey, true, dj.DataHash(self.fullTableName));
+            self.alter(sprintf('ADD %s', sql))
         end
         
         function dropForeignKey(self, target)
@@ -692,24 +692,12 @@ classdef Table < handle
                 line = def{iLine};
                 switch true
                     case strncmp(line,'---',3)
-                        inKey = false;
-                        
+                        inKey = false;                        
                         % foreign key
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-                        pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
-                            '\s*->\s*' ...
-                            '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
-                            '\w*' ...
-                            '(?<attrs>\([\s\w,]*\))?' ...
-                            '\s*(#.*)?$'];
-                        fk = regexp(line, pat, 'names');
-                        if exist(fk.cname, 'class')
-                            rel = feval(fk.cname);
-                            assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', cname)
-                        else                            
-                            rel = dj.Relvar(fk.cname);
-                        end
-                        [sql, newFields] = makeFK(sql, fk.attrs, fk.newattrs, rel, fields, inKey);
+                        [sql, newFields] = makeFK(sql, line, fields, inKey, ...
+                            dj.DataHash(sprintf('`%s`.`%s`', self.schema.dbname, tableName)));
+                        sql = sprintf('%s,\n', sql);
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
                             primaryFields = [primaryFields, newFields]; %#ok<AGROW>
@@ -838,12 +826,25 @@ sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
 end
 
 
-function [sql, newattrs] = makeFK(sql, attrs, newattrs, rel, existingFields, inKey)
+function [sql, newattrs] = makeFK(sql, line, existingFields, inKey, hash)
 % add foreign key to SQL table definition
+pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
+    '\s*->\s*' ...
+    '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
+    '\w*' ...
+    '(?<attrs>\([\s\w,]*\))?' ...
+    '\s*(#.*)?$'];
+fk = regexp(line, pat, 'names');
+if exist(fk.cname, 'class')
+    rel = feval(fk.cname);
+    assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', fk.cname)
+else
+    rel = dj.Relvar(fk.cname);
+end
 
 % parse and validate the attribute lists
-attrs = strsplit(attrs, {' ',',','(',')'});
-newattrs = strsplit(newattrs, {' ',',','(',')'});
+attrs = strsplit(fk.attrs, {' ',',','(',')'});
+newattrs = strsplit(fk.newattrs, {' ',',','(',')'});
 attrs(cellfun(@isempty, attrs))=[];
 newattrs(cellfun(@isempty, newattrs))=[];
 assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
@@ -881,9 +882,10 @@ end
 
 fkattrs = rel.primaryKey;
 fkattrs(ismember(fkattrs, attrs))=newattrs;
+hash = dj.DataHash([{hash rel.fullTableName} newattrs]);
 sql = sprintf(...
-    '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-    sql, backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
+    '%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT', ...
+    sql, hash(1:12), backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
 end
 
 
