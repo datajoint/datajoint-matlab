@@ -904,9 +904,10 @@ pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
     '(=\s*(?<default>".*"|''.*''|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?|null|NULL|Null|CURRENT_TIMESTAMP)\s*)?' % default value
     ':\s*(?<type>\w+(\(.*\))?)\s*'       % datatype
-    '#(?<comment>.*)$'           % comment
+    '#(?<comment>.*)'           % comment
+    '$'  % end of line
     };
-for sub = {[1 2 3 4] [1 3 4] [1 2 3] [1 3]}
+for sub = {[1 2 3 4 5] [1 3 4 5] [1 2 3 5] [1 3 5]}
     pattern = cat(2,pat{sub{:}});
     fieldInfo = regexp(line, pattern, 'names');
     if ~isempty(fieldInfo)
