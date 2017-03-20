@@ -908,7 +908,7 @@ pat = {
     '#(?<comment>.*)'           % comment
     '$'  % end of line
     };
-if ~isempty(regexp(line, '^\w+\s*=', 'once'))   % ahs default
+if isempty(regexp(line, '^\w+\s*=', 'once'))   % has no default
     pat{2} = '';
 end
 for sub = {[1 2 3 4 5] [1 2 3 5]}  % with and without the comment
