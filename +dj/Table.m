@@ -900,6 +900,7 @@ end
 
 function fieldInfo = parseAttrDef(line)
 line = strtrim(line);
+assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute name in %s', line)
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
     '(=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*)?' % default value
@@ -907,7 +908,10 @@ pat = {
     '#(?<comment>.*)'           % comment
     '$'  % end of line
     };
-for sub = {[1 2 3 4 5] [1 3 4 5] [1 2 3 5] [1 3 5]}
+if ~isempty(regexp(line, '^\w+\s*=', 'once'))   % ahs default
+    pat{2} = '';
+end
+for sub = {[1 2 3 4 5] [1 2 3 5]}  % with and without the comment
     pattern = cat(2,pat{sub{:}});
     fieldInfo = regexp(line, pattern, 'names');
     if ~isempty(fieldInfo)
