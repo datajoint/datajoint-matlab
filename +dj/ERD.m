@@ -55,21 +55,50 @@ classdef ERD < handle
         function ret = plus(self, obj)
             % union of ERD graphs     
             % A + B is an ERD with all the nodes from A and B.
-            if isempty(self.nodes)
-                ret = dj.ERD(obj);
-            else
-                assert(isa(obj, 'dj.ERD'), 'invalid argument in ERD union')
-                ret = dj.ERD(self);  % copy
-                ret.nodes = union(ret.nodes, obj.nodes);
-            end
-        end
-        
+            % or when B is an integer, expand A by B levels upstream.
+            
+            ret = dj.ERD(self);  % copy
+            switch true
+                case isa(obj, 'dj.ERD')
+                    if isempty(ret.nodes)
+                        ret = dj.ERD(obj);
+                    else
+                        ret.nodes = union(ret.nodes, obj.nodes);
+                    end
+                case isnumeric(obj)
+                    n = length(ret.nodes);
+                    for i=1:obj
+                        ret.down
+                        if length(ret.nodes)==n
+                            break
+                        end
+                        n = length(ret.nodes);
+                    end
+                otherwise
+                    error 'invalid ERD difference'
+            end            
+        end        
         function ret = minus(self, obj)
             % difference of ERD graphs
             % A - B is an ERD with all the nodes from A that are not in B.
-            assert(isa(obj, 'dj.ERD'), 'invalid argument in ERD union')
+            % or when B is an integer, expand A by B levels downstream.
+            
             ret = dj.ERD(self);  % copy
-            ret.nodes = setdiff(ret.nodes, obj.nodes);
+            switch true
+                case isa(obj, 'dj.ERD')
+                    ret.nodes = setdiff(ret.nodes, obj.nodes);
+                case isnumeric(obj)
+                    n = length(ret.nodes);
+                    for i=1:obj
+                        ret.up
+                        if length(ret.nodes)==n
+                            break
+                        end
+                        n = length(ret.nodes);
+                    end
+                otherwise
+                    error 'invalid ERD difference'
+            end            
         end
                 
         function draw(self)
