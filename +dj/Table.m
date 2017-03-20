@@ -902,14 +902,13 @@ function fieldInfo = parseAttrDef(line)
 line = strtrim(line);
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-    '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-    ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-    '#\s*'                            % comment delimiter
-    '(?<comment>\S.*\S)\s*'           % comment
-    '$'                               % line end
+    '(=\s*(?<default>".*"|''.*''|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?|null|NULL|Null|CURRENT_TIMESTAMP)\s*)?' % default value
+    ':\s*(?<type>\w+(\(.*\))?)\s*'       % datatype
+    '#(?<comment>.*)$'           % comment
     };
-for sub = {[1 2 3 4 5 6] [1 3 4 5 6] [1 2 3 4 6] [1 2 3 6] [1 3 4 6] [1 3 6]}
-    fieldInfo = regexp(line, cat(2,pat{sub{:}}), 'names');
+for sub = {[1 2 3 4] [1 3 4] [1 2 3] [1 3]}
+    pattern = cat(2,pat{sub{:}});
+    fieldInfo = regexp(line, pattern, 'names');
     if ~isempty(fieldInfo)
         break
     end
@@ -918,6 +917,7 @@ assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
 if ~isfield(fieldInfo,'comment')
     fieldInfo.comment = '';
 end
+fieldInfo.comment = strtrim(fieldInfo.comment);
 if ~isfield(fieldInfo,'default')
     fieldInfo.default = '';
 end
