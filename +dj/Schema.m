@@ -125,6 +125,12 @@ classdef Schema < handle
             fprintf(f, '\n\nclassdef %s < %s', className, tierClass);
                         
             % metod makeTuples
+            if strcmp(tierClass, 'dj.Part')
+                fprintf(f, '\n\n\tproperties(SetAccess=protected)');
+                fprintf(f, '\n\t\tmaster= %s.<<MasterClass>>', self.package);
+                fprintf(f, '\n\tend\n');
+            end
+            
             if isAuto
                 fprintf(f, '\n\n\tmethods(Access=protected)');
                 fprintf(f, '\n\n\t\tfunction makeTuples(self, key)\n');
@@ -221,10 +227,7 @@ classdef Schema < handle
         
         
         function erd(self)
-            list = arrayfun(@(schema) ...
-                cellfun(@(s) sprintf('`%s`.`%s`', schema.dbname, s), ...
-                schema.tableNames.values, 'uni', false), self, 'uni', false);
-            self(1).conn.erd([list{:}], 1, 1)
+            draw(dj.ERD(self))
         end
         
         function dropQuick(self)

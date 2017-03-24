@@ -61,7 +61,6 @@ classdef Table < handle
         end
         
         
-        
         function set.className(self, className)
             self.className = className;
             assert(ischar(self.className) && ~isempty(self.className),  ...
@@ -200,7 +199,23 @@ classdef Table < handle
                 up = up(1);
             end
             
-            self.schema.conn.erd({self.fullTableName},up,down)
+            d = dj.ERD(self);
+            n = length(d.nodes);
+            while down>0 || up>0
+                if down>0
+                    down = down - 1;
+                    d.down
+                end
+                if up>0
+                    up = up - 1;
+                    d.up
+                end
+                if length(d.nodes)==n
+                    break
+                end
+                n = length(d.nodes);
+            end
+            d.draw
         end
         
         
@@ -332,19 +347,19 @@ classdef Table < handle
         
         function addForeignKey(self, target)
             % add a foreign key constraint.
-            % The target must be a dj.Relvar object.
+            % The target must be a dj.Table object or a string with the
+            % foreign key definition.
             % The referencing table must already possess all the attributes
             % of the primary key of the referenced table.
             %
             % EXAMPLE:
             %    tp.Align.table.addForeignKey(common.Scan)
             
-            fieldList = sprintf('%s,', target.primaryKey{:});
-            fieldList(end)=[];  % drop trailing comma
-            self.alter( sprintf(...
-                ['ADD FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
-                fieldList, target.fullTableName, fieldList));
+            if isa(target, 'dj.Table')
+                target = sprintf('->%s', target.className);
+            end
+            sql = makeFK('', target, self.primaryKey, true, dj.DataHash(self.fullTableName));
+            self.alter(sprintf('ADD %s', sql))
         end
         
         function dropForeignKey(self, target)
@@ -476,8 +491,17 @@ classdef Table < handle
                         fprintf(f,'%s\n',lines{i});
                     end
                     fprintf(f,'%s', self.describe);
+                    lookup = struct(...
+                        'lookup', 'dj.Lookup', ...
+                        'manual', 'dj.Manual', ...
+                        'imported', 'dj.Imported', ...
+                        'computed', 'dj.Computed');
                     for i=p2+1:length(lines)
-                        fprintf(f,'%s\n',lines{i});
+                        s = lines{i};
+                        if ~isempty(regexp(s, '^\s*classdef', 'once'))
+                            s = regexprep(s, 'dj\.Relvar\s*(&\s*dj\.AutoPopulate)?', lookup.(self.info.tier));
+                        end
+                        fprintf(f,'%s\n', s);
                     end
                     fclose(f);
                     disp 'updated table definition'
@@ -594,8 +618,6 @@ classdef Table < handle
             if self.isCreated
                 return
             end
-            assert(isa(self, 'dj.UserRelation') || isa(self, 'dj.Part'), ...
-                'Cannot create table %s without defining its UserRelation class', self.className)
             def = self.getDefinition();
             
             % split into a columnwise cell array
@@ -658,7 +680,7 @@ classdef Table < handle
                         };
                     tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
                     assert(numel(tableInfo)==1, ...
-                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
+                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1: \n  %s', firstLine)
                     assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
                         'invalidTableTier:Invalid tier for table ', tableInfo.className)
                     cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
@@ -679,16 +701,12 @@ classdef Table < handle
                 line = def{iLine};
                 switch true
                     case strncmp(line,'---',3)
-                        inKey = false;
-                        
+                        inKey = false;                        
                         % foreign key
-                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.*')
-                        line = strtrim(strtok(line, '#'));
-                        parts = strsplit(line, '->');
-                        [attrs, cname] = deal(parts{:});
-                        cname = strtrim(cname);
-                        rel = dj.Relvar(cname);
-                        [sql, newFields] = makeFK(sql, strtrim(attrs), rel, fields, inKey);
+                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
+                        [sql, newFields] = makeFK(sql, line, fields, inKey, ...
+                            dj.DataHash(sprintf('`%s`.`%s`', self.schema.dbname, tableName)));
+                        sql = sprintf('%s,\n', sql);
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
                             primaryFields = [primaryFields, newFields]; %#ok<AGROW>
@@ -817,46 +835,86 @@ sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
 end
 
 
-function [sql, newFields] = makeFK(sql, attrs, rel, existingFields, inKey)
+function [sql, newattrs] = makeFK(sql, line, existingFields, inKey, hash)
 % add foreign key to SQL table definition
-newFields = {};
-toFields = rel.primaryKey;    % referenced fields
-if isempty(attrs)
-    fromFields = toFields;
+pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
+    '\s*->\s*' ...
+    '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
+    '\w*' ...
+    '(?<attrs>\([\s\w,]*\))?' ...
+    '\s*(#.*)?$'];
+fk = regexp(line, pat, 'names');
+if exist(fk.cname, 'class')
+    rel = feval(fk.cname);
+    assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', fk.cname)
 else
-    fromFields = [toFields(ismember(toFields, existingFields)) ...
-        cellfun(@strtrim, strsplit(attrs(2:end-1), ','), 'uni', false)];
-    assert(length(fromFields)==length(toFields), ...
-        'invalid reference %s -> %s', attrs, rel.className)
+    rel = dj.Relvar(fk.cname);
 end
-% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
-for i = 1:length(fromFields)
-    if ~ismember(fromFields(i), existingFields)
-        newFields(end+1) = fromFields(i); %#ok<AGROW>
-        fieldInfo = rel.tableHeader.attributes(i);
-        fieldInfo.name = fromFields{i};
-        fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
+
+% parse and validate the attribute lists
+attrs = strsplit(fk.attrs, {' ',',','(',')'});
+newattrs = strsplit(fk.newattrs, {' ',',','(',')'});
+attrs(cellfun(@isempty, attrs))=[];
+newattrs(cellfun(@isempty, newattrs))=[];
+assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
+    'All attributes in (%s) must be in the primary key of %s', ...
+    strjoin(attrs, ','), rel.className)
+if length(newattrs)==1 
+    % unambiguous single attribute
+    if length(rel.primaryKey)==1
+        attrs = self.primaryKey;
+    elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
+        attrs = setdiff(rel.primaryKey, existingFields);
     end
 end
+assert(length(attrs) == length(newattrs) , ...
+    'Mapped fields (%s) and (%s) must match in the foreign key.', ...
+    strjoin(newattrs,','), strjoin(attrs,','))
+
+% prepend unspecified primary key attributes that have not yet been included 
+pk = rel.primaryKey;
+pk(ismember(pk,attrs) | ismember(pk,existingFields))=[];
+attrs = [pk attrs];
+newattrs = [pk newattrs];
+
+% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
+[~, ix] = sort(cellfun(@(a) find(strcmp(a, rel.primaryKey)), attrs));
+attrs = attrs(ix);
+newattrs = newattrs(ix);
+
+for i=1:length(attrs)
+    fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, rel.tableHeader.names));
+    fieldInfo.name = newattrs{i};
+    fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
+    sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
+end
+
+fkattrs = rel.primaryKey;
+fkattrs(ismember(fkattrs, attrs))=newattrs;
+hash = dj.DataHash([{hash rel.fullTableName} newattrs]);
 sql = sprintf(...
-    '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-    sql, backquotedList(fromFields), rel.fullTableName, backquotedList(toFields));
+    '%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT', ...
+    sql, hash(1:12), backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
 end
 
 
 function fieldInfo = parseAttrDef(line)
 line = strtrim(line);
+assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute name in %s', line)
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-    '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-    ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-    '#\s*'                            % comment delimiter
-    '(?<comment>\S.*\S)\s*'           % comment
-    '$'                               % line end
+    '=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*' % default value
+    ':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE][mM][eE][nN][tT])?)\s*'       % datatype
+    '#(?<comment>.*)'           % comment
+    '$'  % end of line
     };
-for sub = {[1 2 3 4 5 6] [1 3 4 5 6] [1 2 3 4 6] [1 2 3 6] [1 3 4 6] [1 3 6]}
-    fieldInfo = regexp(line, cat(2,pat{sub{:}}), 'names');
+hasDefault = ~isempty(regexp(line, '^\w+\s*=', 'once'));
+if ~hasDefault
+    pat{2} = '';
+end
+for sub = {[1 2 3 4 5] [1 2 3 5]}  % with and without the comment
+    pattern = cat(2,pat{sub{:}});
+    fieldInfo = regexp(line, pattern, 'names');
     if ~isempty(fieldInfo)
         break
     end
@@ -865,7 +923,8 @@ assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
 if ~isfield(fieldInfo,'comment')
     fieldInfo.comment = '';
 end
-if ~isfield(fieldInfo,'default')
+fieldInfo.comment = strtrim(fieldInfo.comment);
+if ~hasDefault
     fieldInfo.default = '';
 end
 assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
