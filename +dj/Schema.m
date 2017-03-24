@@ -96,7 +96,7 @@ classdef Schema < handle
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
                 isAuto = ismember(existingTable.info.tier, {'computed','imported'});
-                tierClass = tierClassMap(existingTable.info.tier(1));                
+                tierClass = tierClassMap.(existingTable.info.tier(1));                
             else
                 existingTable = [];
                 choice = dj.ask(...
