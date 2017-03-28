@@ -220,8 +220,8 @@ classdef Table < handle
         
         
         function str = re(self)
-            % alias for self.re
-            warning 'dj.Table/re is deprecated: Use dj.Table/describe instead'
+            % alias for self.describe
+            warning 'dj.Table/re is deprecated and will be removed in future releases: Use dj.Table/describe instead'
             str = self.describe;
         end
         
@@ -466,7 +466,7 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if ~dj.set('suppressPrompt') ...
-                        && ~strcmpi('yes', dj.ask(sprintf('Update table definition in %s?',path)))
+                        && ~strcmpi('yes', dj.ask(sprintf('Update the table definition and class definition in %s?',path)))
                     disp 'No? Table definition left untouched.'
                 else
                     % read old file

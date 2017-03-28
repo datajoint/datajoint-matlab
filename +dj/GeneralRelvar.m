@@ -87,9 +87,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                         attrList{i} = hdr.names{i};
                     end
                 end
-                maxRows = 12;
+                maxRows = dj.set('maxPreviewRows');
                 tuples = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
-                tabl = struct2table(tuples);
+                tabl = struct2table(tuples(1:min(end,maxRows)));
                 funs = {
                     @(x) x
                     @upper
