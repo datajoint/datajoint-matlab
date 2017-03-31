@@ -72,10 +72,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             nTuples = self.count;
             fprintf('\nObject %s\n\n',class(self))
             hdr = self.header;
-            try
-                % tableHeader exists in tables but not in derived relations.
+            if isprop(self, 'tableHeader')   % tableHeader exists in tables but not in derived relations.
                 fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
-            catch
             end
             if nTuples
                 % print header
