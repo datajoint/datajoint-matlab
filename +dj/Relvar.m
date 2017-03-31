@@ -173,16 +173,18 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function insert(self, tuples, command)
-            % insert an array of tuples directly into the table
+            % insert(self, tuples, command)
+            %
+            % insert an array of tuples directly into the table.
             %
             % The input argument tuples must a structure array with field
             % names exactly matching those in the table.
             %
-            % The optional argument 'command' allows replacing the MySQL
-            % command from the default INSERT to INSERT IGNORE or REPLACE.
+            % The optional argument 'command' can be of of the following: 
+            % 'INSERT IGNORE' or 'REPLACE'.
             %
             % Duplicates, unmatched attributes, or missing required attributes will
-            % cause an error, unless command is specified.
+            % cause an error, unless 'command is specified.
             
             if isa(tuples,'cell')
                 % if a cell array, convert to structure assuming matching attributes
