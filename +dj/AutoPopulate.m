@@ -30,14 +30,15 @@ classdef AutoPopulate < dj.Master
     
     properties(Dependent)
         keySource
+        jobs  % the jobs table
     end
     
     properties(Access=protected)
         keySource_
         useReservations
         executionEngine
-        jobs     % the jobs table
-        timedOut % list of timedout transactions
+        jobs_     % used for self.jobs
+        timedOut  % list of timedout transactions
         timeoutAttempt
     end
     
@@ -193,9 +194,11 @@ classdef AutoPopulate < dj.Master
             
             function cleanup(self, key)
                 self.schema.conn.cancelTransaction
-                tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
-                if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
-                    self.setJobStatus(key, 'error', 'Populate interrupted', []);
+                if self.hasJobs
+                    tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
+                    if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
+                        self.setJobStatus(key, 'error', 'Populate interrupted', []);
+                    end
                 end
             end
             % this is guaranteed to be executed when the function is 
@@ -223,18 +226,22 @@ classdef AutoPopulate < dj.Master
         end
         
         
+        function yes = hasJobs(self)
+            yes = ~isempty(self.jobs_);
+        end
+        
         function jobs = get.jobs(self)
             % Return the jobs table associated with this current schema.
             % Create the jobs table if it does not yet exist.
-            if isempty(self.jobs)
+            if ~self.hasJobs
                 jobClassName = [self.schema.package '.Jobs'];
                 if ~exist(jobClassName,'class')
                     self.createJobTable
                     rehash path
                 end
-                self.jobs = feval(jobClassName);
+                self.jobs_ = feval(jobClassName);
             end
-            jobs = self.jobs;
+            jobs = self.jobs_;
         end
         
         
@@ -275,7 +282,7 @@ classdef AutoPopulate < dj.Master
             % create tables of all parts in a master-part relationship to
             % avoid implicit commits.
             for part = self.getParts
-                part.create
+                part{1}.create
             end
                      
             popRestricts = varargin;  % restrictions on keySource
@@ -402,7 +409,7 @@ classdef AutoPopulate < dj.Master
             path = fullfile(fileparts(schemaPath), 'Jobs.m');
             f = fopen(path,'w');
             fprintf(f, '%%{\n');
-            fprintf(f, '%# the job reservation table\n', self.schema.package);
+            fprintf(f, '# the job reservation table for +%s\n', self.schema.package);
             fprintf(f, 'table_name : varchar(255) # className of the table\n');
             fprintf(f, 'key_hash   : char(32)     # key hash\n');
             fprintf(f, '-----\n');

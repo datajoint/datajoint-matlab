@@ -180,8 +180,8 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % The input argument tuples must a structure array with field
             % names exactly matching those in the table.
             %
-            % The optional argument 'command' can be of of the following: 
-            % 'INSERT IGNORE' or 'REPLACE'.
+            % The optional argument 'command' can be of of the following:
+            % 'IGNORE' or 'REPLACE'.
             %
             % Duplicates, unmatched attributes, or missing required attributes will
             % cause an error, unless 'command is specified.
@@ -197,9 +197,16 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             end
             if nargin<=2
                 command = 'INSERT';
+            else
+                switch command
+                    case {'IGNORE','ignore'}
+                        command = 'INSERT IGNORE';
+                    case {'REPLACE', 'replace'}
+                        command = 'REPLACE';
+                    otherwise
+                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''', command)
+                end
             end
-            assert(any(strcmpi(command,{'INSERT', 'INSERT IGNORE', 'REPLACE'})), ...
-                'invalid insert command')
             header = self.header;
             
             % validate header
@@ -269,8 +276,8 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         function inserti(self, tuples)
             % insert tuples but ignore errors. This is useful for rare
             % applications when duplicate entries should be quietly
-            % discarded, for example.
-            self.insert(tuples, 'INSERT IGNORE')
+            % discarded.
+            self.insert(tuples, 'IGNORE')
         end
         
         
