@@ -195,11 +195,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             if isempty(tuples)
                 return
             end
-            if nargin<=2
+            if nargin<=2 || strcmp(command, 'INSERT')
                 command = 'INSERT';
             else
                 switch command
-                    case {'IGNORE','ignore'}
+                    case {'IGNORE','ignore','INSERT IGNORE'}
                         command = 'INSERT IGNORE';
                     case {'REPLACE', 'replace'}
                         command = 'REPLACE';
