@@ -11,14 +11,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
     methods
         function self = Relvar(varargin)
             self@dj.Table(varargin{:})
-            self.init('table',{self});
-        end
-        
-        function yes = isSubtable(self)
-            % a subtable is an imported or computed tables that does not
-            % have its own auto-populate functionality.
-            yes = ismember(self.tableHeader.info.tier, {'imported','computed'}) && ...
-                ~isa(self, 'dj.AutoPopulate');
+            self.init('table', {self});  % general relvar node
         end
         
         function id = get.lastInsertID(self)
@@ -28,15 +21,15 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         function delQuick(self)
-            % dj.BaseRelvar/delQuick - remove all tuples of the relation from its table.
-            % Unlike dj.BaseRelvar/del, delQuick does not prompt for user
+            % dj.Relvar/delQuick - remove all tuples of the relation from its table.
+            % Unlike dj.Relvar/del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
         
         
         function del(self)
-            % dj.BaseRelvar/del - remove all tuples of the relation from its table
+            % dj.Relvar/del - remove all tuples of the relation from its table
             % and, recursively, all matching tuples in dependent tables.
             %
             % A summary of the data to be removed will be provided followed by
@@ -47,8 +40,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
             %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans
             %                                   that do not have matching tuples in table Cells
-            %
-            % See also dj.BaseRelvar/delQuick, dj.Table/drop
+            % See also dj.Relvar/delQuick, dj.Table/drop
             
             function cleanup(self)
                 if self.schema.conn.inTransaction
@@ -57,7 +49,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 end
             end
             
-            % this is guaranteed to be executed when the function is 
+            % this is guaranteed to be executed when the function is
             % terminated even if by KeyboardInterrupt (CTRL-C)
             cleanupObject = onCleanup(@() cleanup(self));
             
@@ -66,17 +58,6 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             if ~self.exists
                 disp 'nothing to delete'
             else
-                % warn the user if deleting from a subtable
-                if ismember(self.info.tier, {'imported','computed'}) ...
-                        && ~isa(self, 'dj.AutoPopulate')
-                    fprintf(['!!! %s is a subtable. For referential integrity, ' ...
-                        'delete from its parent instead.\n'], class(self))
-                    if ~dj.set('suppressPrompt') && ~strcmpi('yes', dj.ask('Proceed anyway?'))
-                        disp 'delete cancelled'
-                        return
-                    end
-                end
-                
                 % compile the list of relvars to be deleted from
                 list = self.descendants;
                 rels = cellfun(@(name) dj.Relvar(name), list, 'UniformOutput', false);
@@ -86,16 +67,16 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 % apply proper restrictions
                 restrictByMe = arrayfun(@(rel) ...
                     any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.referenced,'uni',false),...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
                     list)),...
                     rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
                 restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), [rels(i).children rels(i).referencing])
+                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
-                            rels(ix).restrict(pro(rels(i)))
+                            rels(ix).restrict(pro(rels(i)))  % TODO: handle renamed attributes  self.conn.foreignKeys(fullTableName).aliased
                         else
                             rels(ix).restrict(rels(i).restrictions{:});
                         end
@@ -136,7 +117,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function exportCascade(self, path,  mbytesPerFile)
-            % dj.BaseRelvar/export_cascade - export all tuples of the
+            % dj.Relvar/export_cascade - export all tuples of the
             % relation and, recursively, all matching tuples in the
             % dependent tables.
             %
@@ -161,14 +142,14 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 % apply proper restrictions
                 restrictByMe = arrayfun(@(rel) ...
                     any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.referenced,'uni',false),...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
                     list)),...
                     rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
                 restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
                 counts = zeros(size(rels));
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), [rels(i).children rels(i).referencing])
+                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
                             rels(ix).restrict(pro(rels(i)))
@@ -192,16 +173,18 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function insert(self, tuples, command)
-            % insert an array of tuples directly into the table
+            % insert(self, tuples, command)
+            %
+            % insert an array of tuples directly into the table.
             %
             % The input argument tuples must a structure array with field
             % names exactly matching those in the table.
             %
-            % The optional argument 'command' allows replacing the MySQL
-            % command from the default INSERT to INSERT IGNORE or REPLACE.
+            % The optional argument 'command' can be of of the following:
+            % 'IGNORE' or 'REPLACE'.
             %
             % Duplicates, unmatched attributes, or missing required attributes will
-            % cause an error, unless command is specified.
+            % cause an error, unless 'command is specified.
             
             if isa(tuples,'cell')
                 % if a cell array, convert to structure assuming matching attributes
@@ -212,11 +195,18 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             if isempty(tuples)
                 return
             end
-            if nargin<=2
+            if nargin<=2 || strcmp(command, 'INSERT')
                 command = 'INSERT';
+            else
+                switch command
+                    case {'IGNORE','ignore','INSERT IGNORE'}
+                        command = 'INSERT IGNORE';
+                    case {'REPLACE', 'replace'}
+                        command = 'REPLACE';
+                    otherwise
+                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''', command)
+                end
             end
-            assert(any(strcmpi(command,{'INSERT', 'INSERT IGNORE', 'REPLACE'})), ...
-                'invalid insert command')
             header = self.header;
             
             % validate header
@@ -286,8 +276,8 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         function inserti(self, tuples)
             % insert tuples but ignore errors. This is useful for rare
             % applications when duplicate entries should be quietly
-            % discarded, for example.
-            self.insert(tuples, 'INSERT IGNORE')
+            % discarded.
+            self.insert(tuples, 'IGNORE')
         end
         
         
@@ -331,7 +321,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function update(self, attrname, value)
-            % dj.BaseRelvar/update - update a field in an existing tuple
+            % dj.Relvar/update - update a field in an existing tuple
             %
             % Relational database maintain referential integrity on the level
             % of a tuple. Therefore, the UPDATE operator can violate referential
@@ -425,14 +415,10 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % populate tables in order of dependence
             disp Inserting..
             names = cellfun(@(r) r.fullTableName, relvars, 'uni', false);
-            C = conn.makeDependencyMatrix(names);
-            levels = dj.Connection.computeHierarchyLevels(C);
-            for level=0:max(levels)
-                for i=find(levels(:)' == level)
-                    disp(s(i).name)
-                    contents = load(fullfile(path, s(i).name));
-                    relvars{i}.inserti(contents.tuples);
-                end
+            for i = toposort(conn.makeGraph(names))
+                disp(names{i})
+                contents = load(fullfile(path, names{i}));
+                relvars{i}.inserti(contents.tuples);
             end
         end
     end

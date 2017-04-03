@@ -11,8 +11,7 @@ function setupDJ
         mymURL = 'https://github.com/datajoint/mym/archive/master.zip';
         target = websave(target, mymURL);
         if isunix && ~ismac
-            % on Linux Matlab unzip doesn't work properly so use system
-            % unzip
+            % on Linux Matlab unzip doesn't work properly so use system unzip
             system(sprintf('unzip -o %s', target))
         else
             unzip(target)
