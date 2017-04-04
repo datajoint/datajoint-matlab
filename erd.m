@@ -3,31 +3,30 @@ function erd(varargin)
 %
 % See also dj.Schema/erd, dj.Table.erd
 
-switch nargin
-    case 0
-        disp 'nothing to plot'
-    case 1
-        entity = varargin{1};
-        if any(entity=='.')
-            erd(dj.Relvar(entity))
-        else
-            erd(feval([entity '.getSchema']))
-        end
-    otherwise
-        list = {};
-        conn = [];
-        for entity = varargin
-            if any(entity{1}=='.')
-                table = feval(entity{1});
-                conn = table.schema.conn;
-                list = union(list,{table.fullTableName});
-            else
-                schema = feval([entity{1} '.getSchema']);
-                conn = schema.conn;
-                list = union(list, ...
-                    cellfun(@(s) sprintf('`%s`.`%s`', schema.dbname, s), ...
-                    schema.tableNames.values, 'uni', false));
+if ~nargin
+    disp 'nothing to plot'
+    return
+end
+
+ret = dj.ERD();
+for entity = varargin
+    if exist(entity{1}, 'class')
+        obj = dj.ERD(feval(entity{1}));
+        r = dj.set('tableErdRadius');
+        while min(r)>0
+            if r(1)>0
+                obj.up
+                r(1) = r(1)-1;
+            end
+            if r(2)>0
+                obj.down
+                r(2) = r(2)-1;
             end
         end
-        conn.erd(list(:)')
+    else
+        obj = dj.ERD(feval([entity{1} '.getSchema']));
+    end
+    ret = ret + obj;
+end
+ret.draw
 end

@@ -1,5 +1,6 @@
 function str = toCamelCase(str)
 % converts underscore_compound_words to CamelCase
+% and double underscores in the middle into dots
 %
 % Not always exactly invertible
 %
