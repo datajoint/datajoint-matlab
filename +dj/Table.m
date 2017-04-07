@@ -632,7 +632,7 @@ classdef Table < handle
             % parse table schema, name, type, and comment
             switch true
                     
-                case {isa(self, 'dj.UserRelation'), isa(self, 'dj.Part')}
+                case {isa(self, 'dj.UserRelation'), isa(self, 'dj.Part'), isa(self, 'dj.Jobs')}
                     % New-style declaration using special classes for each tier
                     tableInfo = struct;
                     if isa(self, 'dj.Part')
