@@ -754,12 +754,12 @@ for arg = restrictions
             clause = sprintf('%s AND NOT(%s)', clause, ...
                 makeWhereClause(header, cond.operands));
             
-        case (ischar(cond) || isstring(cond)) && strcmpi(cond,'NOT')
+        case (ischar(cond) || (exist('isstring', 'builtin') && isstring(cond))) && strcmpi(cond,'NOT')
             % negation of the next condition
             not = 'NOT ';
             continue
             
-        case (ischar(cond) || isstring(cond)) && ~strcmpi(cond, 'NOT')
+        case (ischar(cond) || (exist('isstring', 'builtin') && isstring(cond))) && ~strcmpi(cond, 'NOT')
             % SQL condition
             clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
