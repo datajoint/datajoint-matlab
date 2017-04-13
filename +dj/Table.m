@@ -31,10 +31,6 @@ classdef Table < handle
     properties(Dependent, SetAccess = private)
         info           % table information
         fullTableName  % `database`.`plain_table_name`
-        parents        % names of tables referenced by foreign keys composed exclusively of primary key attributes
-        referenced     % names of tables referenced by foreign keys composed of primary and non-primary attributes
-        children       % names of tables referencing this table with their primary key attributes
-        referencing    % names of tables referencing this table with their primary and non-primary attributes
         ancestors      % names of all referenced tables, including self, recursively, in order of dependencies
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
     end
@@ -43,9 +39,6 @@ classdef Table < handle
         mysql_constants = {'CURRENT_TIMESTAMP'}
     end
     
-    properties(Access=private)
-        declaration     % table declaration
-    end
     
     methods
         function self = Table(className)
@@ -94,8 +87,15 @@ classdef Table < handle
         function ret = get.schema(self)
             if isempty(self.schema)
                 assert(~isempty(self.className), 'className not set')
-                schemaFunction = regexprep(self.className, '\.\w+$', '.getSchema');
-                assert(~isempty(which(schemaFunction)), ['Could not find ' schemaFunction])
+                parts = strsplit(self.className, '.');
+                for i=1:length(parts)-1
+                    schemaFunction = strjoin([parts(1:i) {'getSchema'}], '.');
+                    success = ~isempty(which(schemaFunction));
+                    if success
+                        break
+                    end
+                end
+                assert(success, ['Could not find ' schemaFunction])
                 self.schema = feval(schemaFunction);
                 assert(isa(self.schema, 'dj.Schema'), ...
                     [schemaFunction ' must return an instance of dj.Schema'])
@@ -118,27 +118,15 @@ classdef Table < handle
         end
         
         
-        function list = get.parents(self)
+        function list = parents(self, varargin)
             self.schema.reload(false)
-            list = self.schema.conn.parents(self.fullTableName);
+            list = self.schema.conn.parents(self.fullTableName, varargin{:});
         end
         
         
-        function list = get.referenced(self)
+        function list = children(self, varargin)
             self.schema.reload(false)
-            list = self.schema.conn.referenced(self.fullTableName);
-        end
-        
-        
-        function list = get.children(self)
-            self.schema.reload(false)
-            list = self.schema.conn.children(self.fullTableName);
-        end
-        
-        
-        function list = get.referencing(self)
-            self.schema.reload(false)
-            list = self.schema.conn.referencing(self.fullTableName);
+            list = self.schema.conn.children(self.fullTableName, varargin{:});
         end
         
         
@@ -152,13 +140,11 @@ classdef Table < handle
             
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), ...
-                        [table.parents table.referenced])
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), table.parents())
                     map(table.className)=level;
                 end
             end
         end
-        
         
         
         function list = get.descendants(self)
@@ -171,13 +157,11 @@ classdef Table < handle
             
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), ...
-                        [table.children table.referencing])
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), table.children())
                     map(table.className)=level;
                 end
             end
         end
-        
         
         
         function ret = sizeOnDisk(self)
@@ -215,109 +199,98 @@ classdef Table < handle
                 up = up(1);
             end
             
-            self.schema.conn.erd({self.fullTableName},up,down)
+            d = dj.ERD(self);
+            n = length(d.nodes);
+            while down>0 || up>0
+                if down>0
+                    down = down - 1;
+                    d.down
+                end
+                if up>0
+                    up = up - 1;
+                    d.up
+                end
+                if length(d.nodes)==n
+                    break
+                end
+                n = length(d.nodes);
+            end
+            d.draw
         end
         
         
         function str = re(self)
-            % dj.Table/re - "reverse engineer" the table declaration.
+            % alias for self.describe
+            warning 'dj.Table/re is deprecated and will be removed in future releases: Use dj.Table/describe instead'
+            str = self.describe;
+        end
+        
+        
+        function str = describe(self)
+            % dj.Table/re - "reverse engineer" the table defintion.
             %
             % SYNTAX:
-            %   str = table.re
+            %   str = table.describe
             %
-            % str will contain the table declaration string that can be used
+            % str will contain the table definition string that can be used
             % to create the table using dj.Table.
             
-            str = sprintf('%%{\n%s (%s) # %s', ...
-                self.className, self.info.tier, self.info.comment);
+            % table header
+            str = sprintf('%%{\n# %s', self.info.comment);
             assert(any(strcmp(self.schema.classNames, self.className)), ...
                 'class %s does not appear in the class list of the schema', self.className);
             
-            % list primary key fields
-            keyFields = self.tableHeader.primaryKey;
-            
-            % list parent referenced
-            [classNames,tables] = self.sortForeignKeys(self.parents);
-            if ~isempty(classNames)
-                str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
-                for t = tables
-                    % exclude primary key fields of referenced tables from the primary attribute list
-                    keyFields = keyFields(~ismember(keyFields, t.tableHeader.primaryKey));
-                end
+            % get foreign keys
+            fk = self.schema.conn.foreignKeys;
+            if ~isempty(fk)
+                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName), fk));
             end
             
-            % additional primary attributes
-            for i=find(ismember(self.tableHeader.names, keyFields))
-                comment = self.tableHeader.attributes(i).comment;
-                if self.tableHeader.attributes(i).isautoincrement
-                    autoIncrement = 'AUTO_INCREMENT';
-                else
-                    autoIncrement = '';
+            attributes_thus_far = {};
+            inKey = true;
+            for attr = self.tableHeader.attributes'
+                if inKey && ~attr.iskey
+                    str = sprintf('%s\n---', str);
+                    inKey = false;
                 end
-                str = sprintf('%s\n%-40s # %s', str, ...
-                    sprintf('%-16s: %s %s', self.tableHeader.attributes(i).name, ...
-                    self.tableHeader.attributes(i).type, autoIncrement), comment);
-            end
-            
-            % dividing line
-            str = sprintf('%s\n---', str);
-            
-            % list dependent attributes
-            dependentFields = self.tableHeader.dependentFields;
-            
-            % list other referenced
-            [classNames,tables] = self.sortForeignKeys(self.referenced);
-            if ~isempty(classNames)
-                str = sprintf('%s%s',str,sprintf('\n-> %s',classNames{:}));
-                for t = tables
-                    % exclude primary key fields of referenced tables from header
-                    dependentFields = dependentFields(~ismember(dependentFields, t.tableHeader.primaryKey));
-                end
-            end
-            
-            % list remaining attributes
-            for i=find(ismember(self.tableHeader.names, dependentFields))
-                attr = self.tableHeader.attributes(i);
-                default = attr.default;
-                if attr.isnullable
-                    default = '=null';
-                elseif ~isempty(default)
-                    if attr.isNumeric || any(strcmp(default,self.mysql_constants))
-                        default = ['=' default]; %#ok<AGROW>
+                doInclude = ~any(arrayfun(@(x) ismember(attr.name, x.attrs), fk));
+                attributes_thus_far{end+1} = attr.name; %#ok<AGROW>
+                resolved = find(arrayfun(@(x) all(ismember(x.attrs, attributes_thus_far)), fk));
+                for i = resolved
+                    if isequal(fk(i).attrs, fk(i).ref_attrs)
+                        str = sprintf('%s\n-> %s', str, ...
+                            self.schema.conn.tableToClass(fk(i).ref));
                     else
-                        default = ['="' default '"']; %#ok<AGROW>
+                        ref_attr = setdiff(fk(i).attrs, fk(i).ref_attrs);
+                        assert(length(ref_attr)==1, ...
+                            'only single-attributes aliases are supported for now')
+                        str = sprintf('%s\n (%s) -> %s', str, ref_attr{1}, ...
+                            self.schema.conn.tableToClass(fk(i).ref));
                     end
                 end
-                if attr.isautoincrement
-                    autoIncrement = 'AUTO_INCREMENT';
-                else
-                    autoIncrement = '';
-                end
-                str = sprintf('%s\n%-60s# %s', str, ...
-                    sprintf('%-28s: %s', [attr.name default], ...
-                    [attr.type ' ' autoIncrement]), attr.comment);
-            end
-            str = sprintf('%s\n', str);
-            
-            % list user-defined secondary indexes
-            allIndexes = self.getDatabaseIndexes;
-            implicitIndexes = self.getImplicitIndexes;
-            for thisIndex=allIndexes
-                % Skip implicit indexes
-                if ~any(arrayfun( ...
-                        @(x) isequal(x.attributes, thisIndex.attributes), ...
-                        implicitIndexes))
-                    attributeList = sprintf('%s,', thisIndex.attributes{:});
-                    if thisIndex.unique
-                        modifier = 'UNIQUE ';
-                    else
-                        modifier = '';
+                fk(resolved) = [];
+                if doInclude
+                    default = attr.default;
+                    if attr.isnullable
+                        default = '=null';
+                    elseif ~isempty(default)
+                        if attr.isNumeric || any(strcmp(default,self.mysql_constants))
+                            default = ['=' default]; %#ok<AGROW>
+                        else
+                            default = ['="' default '"']; %#ok<AGROW>
+                        end
                     end
-                    str = sprintf('%s%sINDEX(%s)\n', str, modifier, attributeList(1:end-1));
+                    if attr.isautoincrement
+                        autoIncrement = 'AUTO_INCREMENT';
+                    else
+                        autoIncrement = '';
+                    end
+                    str = sprintf('%s\n%-60s# %s', str, ...
+                        sprintf('%-28s: %s', [attr.name default], ...
+                        [attr.type ' ' autoIncrement]), attr.comment);
                 end
             end
-            
-            str = sprintf('%s%%}\n', str);
+            str = sprintf('%s\n%%}\n', str);
         end
         
         
@@ -334,7 +307,7 @@ classdef Table < handle
         %%%%% ALTER METHODS: change table definitions %%%%%%%%%%%%
         function setTableComment(self, newComment)
             % dj.Table/setTableComment - update the table comment
-            % in the table declaration
+            % in the table definition
             self.alter(sprintf('COMMENT="%s"', newComment));
         end
         
@@ -354,7 +327,7 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            sql = fieldToSQL(parseAttrDef(definition, false));
+            sql = fieldToSQL(parseAttrDef(definition));
             self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
@@ -368,25 +341,25 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = fieldToSQL(parseAttrDef(newDefinition, false));
+            sql = fieldToSQL(parseAttrDef(newDefinition));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
         
         function addForeignKey(self, target)
             % add a foreign key constraint.
-            % The target must be a dj.Relvar object.
+            % The target must be a dj.Table object or a string with the
+            % foreign key definition.
             % The referencing table must already possess all the attributes
             % of the primary key of the referenced table.
             %
             % EXAMPLE:
             %    tp.Align.table.addForeignKey(common.Scan)
             
-            fieldList = sprintf('%s,', target.primaryKey{:});
-            fieldList(end)=[];  % drop trailing comma
-            self.alter( sprintf(...
-                ['ADD FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT\n'], ...
-                fieldList, target.fullTableName, fieldList));
+            if isa(target, 'dj.Table')
+                target = sprintf('->%s', target.className);
+            end
+            sql = makeFK('', target, self.primaryKey, true, dj.DataHash(self.fullTableName));
+            self.alter(sprintf('ADD %s', sql))
         end
         
         function dropForeignKey(self, target)
@@ -429,7 +402,7 @@ classdef Table < handle
                 ['The specified set of attributes is implicitly ' ...
                 'indexed because of a foreign key constraint.']);
             % Prevent interference with existing indexes
-            allIndexes = self.getDatabaseIndexes;
+            allIndexes = self.getIndexes;
             assert( ~any(arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), ...
                 allIndexes)), ...
@@ -467,7 +440,7 @@ classdef Table < handle
             
             % Drop specified index(es). There should only be one unless
             % they were redundantly created outside of DataJoint.
-            allIndexes = self.getDatabaseIndexes;
+            allIndexes = self.getIndexes;
             selIndexToDrop = arrayfun( ...
                 @(x) isequal(x.attributes, indexAttributes), allIndexes);
             if any(selIndexToDrop)
@@ -479,7 +452,7 @@ classdef Table < handle
         end
         
         function syncDef(self)
-            % dj.Table/syncDef replace the table declaration in the file
+            % dj.Table/syncDef replace the table definition in the file
             % <package>.<className>.m with the actual definition from the database.
             %
             % This method is useful if the table definition has been
@@ -493,8 +466,8 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if ~dj.set('suppressPrompt') ...
-                        && ~strcmpi('yes', dj.ask(sprintf('Update table declaration in %s?',path)))
-                    disp 'No? Table declaration left untouched.'
+                        && ~strcmpi('yes', dj.ask(sprintf('Update the table definition and class definition in %s?',path)))
+                    disp 'No? Table definition left untouched.'
                 else
                     % read old file
                     f = fopen(path, 'rt');
@@ -517,9 +490,18 @@ classdef Table < handle
                     for i=1:p1-1
                         fprintf(f,'%s\n',lines{i});
                     end
-                    fprintf(f,'%s', self.re);
+                    fprintf(f,'%s', self.describe);
+                    lookup = struct(...
+                        'lookup', 'dj.Lookup', ...
+                        'manual', 'dj.Manual', ...
+                        'imported', 'dj.Imported', ...
+                        'computed', 'dj.Computed');
                     for i=p2+1:length(lines)
-                        fprintf(f,'%s\n',lines{i});
+                        s = lines{i};
+                        if ~isempty(regexp(s, '^\s*classdef', 'once'))
+                            s = regexprep(s, 'dj\.Relvar\s*(&\s*dj\.AutoPopulate)?', lookup.(self.info.tier));
+                        end
+                        fprintf(f,'%s\n', s);
                     end
                     fclose(f);
                     disp 'updated table definition'
@@ -557,19 +539,6 @@ classdef Table < handle
             else
                 doPrompt = false;  % don't prompt if tables are empty
                 self.schema.conn.cancelTransaction   % exit ongoing transaction
-                % warn user if self is a subtable
-                if ismember(self.info.tier, {'imported','computed'}) && ...
-                        ~isempty(which(self.className))
-                    rel = eval(self.className);
-                    if ~isa(rel,'dj.AutoPopulate') && ~dj.set('suppressPrompt')
-                        fprintf(['\n!!! %s is a subtable. For referential integrity, ' ...
-                            'drop its parent table instead.\n'], self.className)
-                        if ~strcmpi('yes', dj.ask('Proceed anyway?'))
-                            fprintf '\ndrop cancelled\n\n'
-                            return
-                        end
-                    end
-                end
                 fprintf 'ABOUT TO DROP TABLES: \n'
                 tables = cellfun(@(x) dj.Relvar(x), self.descendants, 'uni', false);
                 tables = [tables{:}];
@@ -608,136 +577,17 @@ classdef Table < handle
         end
         
         
-        function declaration = getDeclaration(self)
+        function definition = getDefinition(self)
             % extract the table declaration with the first percent-brace comment
             % block of the matching .m file.
-            if ~isempty(self.declaration)
-                declaration = self.declaration;
-            else
-                file = which(self.className);
-                assert(~isempty(file), ...
-                    'MissingTableDefinition:Could not find table definition file %s', self.className)
-                declaration = readPercentBraceComment(file);
-                assert(~isempty(declaration), ...
-                    'MissingTableDefnition:Could not find the table declaration in %s', file)
-            end
+            file = which(self.className);
+            assert(~isempty(file), ...
+                'MissingTableDefinition:Could not find table definition file %s', self.className)
+            definition = readPercentBraceComment(file);
+            assert(~isempty(definition), ...
+                'MissingTableDefnition:Could not find the table declaration in %s', file)
         end
         
-        
-        
-        function create(self)
-            if self.isCreated
-                return
-            end
-            [tableInfo, parents, referenced, fieldDefs, indexDefs] = ...
-                parseDeclaration(self.getDeclaration);
-            cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
-            assert(strcmp(cname, self.className), ...
-                'Table name %s does not match in file %s', cname, self.className)
-            
-            % compile the CREATE TABLE statement
-            tableName = [self.schema.prefix, ...
-                dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                dj.fromCamelCase(tableInfo.className)];
-            
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
-            
-            % add inherited primary key attributes
-            primaryKeyFields = {};
-            nonKeyFields = {};
-            for iRef = 1:length(parents)
-                for iField = find([parents{iRef}.tableHeader.attributes.iskey])
-                    field = parents{iRef}.tableHeader.attributes(iField);
-                    if ~ismember(field.name, primaryKeyFields)
-                        primaryKeyFields{end+1} = field.name;   %#ok<AGROW>
-                        assert(~field.isnullable, 'primary key header cannot be nullable')
-                        sql = sprintf('%s%s', sql, fieldToSQL(field));
-                    end
-                end
-            end
-            
-            % add the new primary key attribites
-            if ~isempty(fieldDefs)
-                for iField = find([fieldDefs.iskey])
-                    field = fieldDefs(iField);
-                    primaryKeyFields{end+1} = field.name;  %#ok<AGROW>
-                    assert(~strcmpi(field.default,'NULL'), ...
-                        'primary key header cannot be nullable')
-                    sql = sprintf('%s%s', sql, fieldToSQL(field));
-                end
-            end
-            
-            % add secondary foreign key attributes
-            for iRef = 1:length(referenced)
-                for iField = find([referenced{iRef}.tableHeader.attributes.iskey])
-                    field = referenced{iRef}.tableHeader.attributes(iField);
-                    if ~ismember(field.name, [primaryKeyFields nonKeyFields])
-                        nonKeyFields{end+1} = field.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, fieldToSQL(field));
-                    end
-                end
-            end
-            
-            % add dependent attributes
-            if ~isempty(fieldDefs)
-                for iField = find(~[fieldDefs.iskey])
-                    field = fieldDefs(iField);
-                    nonKeyFields{end+1} = field.name; %#ok<AGROW>
-                    sql = sprintf('%s%s', sql, fieldToSQL(field));
-                end
-            end
-            
-            % add primary key declaration
-            assert(~isempty(primaryKeyFields), 'table must have a primary key')
-            str = sprintf(',`%s`', primaryKeyFields{:});
-            sql = sprintf('%sPRIMARY KEY (%s),\n',sql, str(2:end));
-            
-            % add foreign key declarations
-            for ref = [parents referenced]
-                fieldList = sprintf('%s,', ref{1}.primaryKey{:});
-                fieldList(end)=[];
-                sql = sprintf(...
-                    '%sFOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT,\n', ...
-                    sql, fieldList, ref{1}.fullTableName, fieldList);
-            end
-            
-            % add secondary index declarations
-            % gather implicit indexes due to foreign keys first
-            implicitIndexes = {};
-            for fkSource = [parents referenced]
-                implicitIndexes{end+1} = fkSource{1}.primaryKey; %#ok<AGROW>
-            end
-            
-            for iIndex = 1:numel(indexDefs)
-                assert(all(ismember(indexDefs(iIndex).attributes, ...
-                    [primaryKeyFields, nonKeyFields])), ...
-                    'Index definition contains invalid attribute names');
-                assert(~any(cellfun( ...
-                    @(x) isequal(x, indexDefs(iIndex).attributes), ...
-                    implicitIndexes)), ...
-                    ['The specified set of attributes is implicitly ' ...
-                    'indexed because of a foreign key constraint. '...
-                    'Cannot create additional index.']);
-                fieldList = sprintf('`%s`,', indexDefs(iIndex).attributes{:});
-                fieldList(end)=[];
-                sql = sprintf(...
-                    '%s%s INDEX (%s),\n', ...
-                    sql, indexDefs(iIndex).unique, fieldList);
-            end
-            
-            % close the declaration
-            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
-            
-            self.schema.reload   % again, ensure that the table does not already exist
-            if ~self.isCreated
-                % execute declaration
-                fprintf \n<SQL>\n
-                disp(sql)
-                fprintf </SQL>\n\n
-                self.schema.conn.query(sql);
-                self.schema.reload
-            end
-        end
         
         function alter(self, alterStatement)
             % dj.Table/alter
@@ -753,8 +603,157 @@ classdef Table < handle
             self.syncDef
         end
         
-        function indexInfo = getDatabaseIndexes(self)
-            % dj.Table/getDatabaseIndexes
+    end
+    
+    
+    methods
+        
+        function create(self)
+            % parses the table declration and declares the table
+            
+            if self.isCreated
+                return
+            end
+            self.schema.reload   % ensure that the table does not already exist
+            if self.isCreated
+                return
+            end
+            def = self.getDefinition();
+            
+            % split into a columnwise cell array
+            def = strtrim(regexp(def,'\n','split')');
+            
+            % append the next line to lines that end in a backslash
+            for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', def'))
+                def{i} = [def{i}(1:end-1) ' ' def{i+1}];
+                def(i+1) = '';
+            end
+            
+            % parse table schema, name, type, and comment
+            switch true
+                    
+                case {isa(self, 'dj.UserRelation'), isa(self, 'dj.Part'), isa(self, 'dj.Jobs')}
+                    % New-style declaration using special classes for each tier
+                    tableInfo = struct;
+                    if isa(self, 'dj.Part')
+                        tableInfo.tier = 'part';
+                    else
+                        specialClass = find(cellfun(@(c) isa(self, c), dj.Schema.tierClasses));
+                        assert(length(specialClass)==1, 'Unknown type of UserRelation in %s', class(self))
+                        tableInfo.tier = dj.Schema.allowedTiers{specialClass};
+                    end
+                    % remove empty lines
+                    def(cellfun(@(x) isempty(x), def)) = [];
+                    if strncmp(def{1}, '#', 1)
+                        tableInfo.comment = strtrim(def{1}(2:end));
+                        def = def(2:end);
+                    else
+                        tableInfo.comment = '';
+                    end
+                    % remove pure comments
+                    def(cellfun(@(x) strncmp('#',strtrim(x),1), def)) = [];                    
+                    cname = strsplit(self.className, '.');
+                    tableInfo.package = strjoin(cname(1:end-1), '.');
+                    tableInfo.className = cname{end};
+                    if isa(self, 'dj.Part')
+                        tableName = sprintf('%s%s%s', self.schema.prefix, ...
+                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
+                            sprintf('%s__%s', self.master.plainTableName, ...
+                            dj.fromCamelCase(self.className(length(self.master.className)+1:end)))); %#ok<MCNPN>
+                    else
+                        tableName = sprintf('%s%s%s', self.schema.prefix, ...
+                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
+                            dj.fromCamelCase(tableInfo.className));
+                    end
+                    
+                otherwise
+                    % Old-style declaration for backward compatibility
+                    
+                    % remove empty lines and pure comment lines
+                    def(cellfun(@(x) isempty(x) || strncmp('#',x,1), def)) = [];
+                    firstLine = strtrim(def{1});
+                    def = def(2:end);
+                    pat = {
+                        '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
+                        '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
+                        '#\s*(?<comment>.*)$'                     % # comment
+                        };
+                    tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
+                    assert(numel(tableInfo)==1, ...
+                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1: \n  %s', firstLine)
+                    assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
+                        'invalidTableTier:Invalid tier for table ', tableInfo.className)
+                    cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
+                    assert(strcmp(cname, self.className), ...
+                        'Table name %s does not match in file %s', cname, self.className)
+                    tableName = sprintf('%s%s%s', self.schema.prefix, ...
+                        dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
+                        dj.fromCamelCase(tableInfo.className));
+            end
+            
+            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
+            
+            % fields and foreign keys
+            inKey = true;
+            primaryFields = {};
+            fields = {};
+            for iLine = 1:length(def)
+                line = def{iLine};
+                switch true
+                    case strncmp(line,'---',3)
+                        inKey = false;                        
+                        % foreign key
+                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
+                        [sql, newFields] = makeFK(sql, line, fields, inKey, ...
+                            dj.DataHash(sprintf('`%s`.`%s`', self.schema.dbname, tableName)));
+                        sql = sprintf('%s,\n', sql);
+                        fields = [fields, newFields]; %#ok<AGROW>
+                        if inKey
+                            primaryFields = [primaryFields, newFields]; %#ok<AGROW>
+                        end
+                        
+                        % index
+                    case regexpi(line, '^(unique\s+)?index[^:]*$')
+                        sql = sprintf('%s%s,\n', sql, line);    %  add checks
+                        
+                        % attribute
+                    case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
+                            '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
+                            ':\s*\w.*$'])                             % type, comment
+                        fieldInfo = parseAttrDef(line);
+                        assert(~inKey || ~fieldInfo.isnullable, ...
+                            'primary key attributes cannot be nullable')
+                        if inKey
+                            primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
+                        end
+                        fields{end+1} = fieldInfo.name; %#ok<AGROW>
+                        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
+                        
+                    otherwise
+                        error('Invalid table declaration line "%s"', line)
+                end
+            end
+            
+            % add primary key declaration
+            assert(~isempty(primaryFields), 'table must have a primary key')
+            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
+            
+            % finish the declaration
+            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
+            
+            % execute declaration
+            fprintf \n<SQL>\n
+            fprintf(sql)
+            fprintf \n</SQL>\n\n
+            self.schema.conn.query(sql);
+            self.schema.reload
+        end
+    end
+    
+    
+    methods
+        function indexInfo = getIndexes(self)
+            % dj.Table/getIndexes
             % Returns all secondary database indexes,
             % as given by the "SHOW INDEX" query
             indexInfo = struct('attributes', {}, ...
@@ -775,42 +774,8 @@ classdef Table < handle
                 indexInfo(end).name = indexNames{iIndex};
             end
         end
-        
-        
-        function indexInfo = getImplicitIndexes(self)
-            % dj.Table/getImplicitIndexes
-            % Returns database indexes that are implied by
-            % table relationships and should not be shown to the user
-            % or modified by the user
-            indexInfo = struct('attributes', {}, 'unique', {});
-            for refTable = [self.referenced self.parents]
-                refObj = dj.Table(self.schema.conn.tableToClass(refTable{1},true));
-                indexInfo(end+1).attributes = refObj.tableHeader.primaryKey;  %#ok<AGROW>
-            end
-        end
-        
-        
-        
-        function [classNames,tables] = sortForeignKeys(self, tableNames)
-            % sort referenced tables so that they reproduce the correct
-            % order of primary key attributes
-            tables = cellfun(@(x) dj.Table(self.schema.conn.tableToClass(x,true)), tableNames, 'uni', false);
-            tables = [tables{:}];
-            if isempty(tables)
-                classNames = {};
-            else
-                fkFields = arrayfun(@(x) {x.tableHeader.attributes([x.tableHeader.attributes.iskey]).name}, tables,'uni',false);
-                fkOrder = cellfun(@(s) cellfun(@(x) find(strcmp(x,{self.tableHeader.attributes.name})), s), fkFields, 'uni', false);
-                m = max(cellfun(@max, fkOrder));
-                [~,fkOrder] = sort(cellfun(@(x) sum((x-1).*m.^-(1:length(x))), fkOrder));
-                tables = tables(fkOrder);
-                classNames ={tables.className};
-            end
-        end
     end
 end
-
-
 
 
 %          LOCAL FUNCTIONS
@@ -870,84 +835,86 @@ sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
 end
 
 
-
-function [tableInfo, parents, referenced, fieldDefs, indexDefs] = parseDeclaration(declaration)
-parents = {};
-referenced = {};
-fieldDefs = [];
-indexDefs = [];
-
-% split into a columnwise cell array
-declaration = strtrim(regexp(declaration,'\n','split')');
-
-% append the next line to lines that end in a backslash
-for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', declaration'))
-    declaration{i} = [declaration{i}(1:end-1) ' ' declaration{i+1}];
-    declaration(i+1) = '';
+function [sql, newattrs] = makeFK(sql, line, existingFields, inKey, hash)
+% add foreign key to SQL table definition
+pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
+    '\s*->\s*' ...
+    '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
+    '\w*' ...
+    '(?<attrs>\([\s\w,]*\))?' ...
+    '\s*(#.*)?$'];
+fk = regexp(line, pat, 'names');
+if exist(fk.cname, 'class')
+    rel = feval(fk.cname);
+    assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', fk.cname)
+else
+    rel = dj.Relvar(fk.cname);
 end
 
-% remove empty lines and comment lines
-declaration(cellfun(@(x) isempty(strtrim(x)) || strncmp('#',strtrim(x),1), declaration)) = [];
-
-% parse table schema, name, type, and comment
-pat = {
-    '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-    '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
-    '#\s*(?<comment>.*)$'                     % # comment
-    };
-tableInfo = regexp(declaration{1}, cat(2,pat{:}), 'names');
-assert(numel(tableInfo)==1, ...
-    'invalidTableDeclaration:Incorrect syntax in table declaration, line 1')
-assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-    'invalidTableTier:Invalid tier for table ', tableInfo.className)
-
-if nargout > 1
-    % parse field declarations and referenced
-    inKey = true;
-    for iLine = 2:length(declaration)
-        line = declaration{iLine};
-        switch true
-            case strncmp(line,'---',3)
-                inKey = false;
-            case strncmp(line,'->',2)
-                % foreign key
-                p = dj.Relvar(strtrim(strtok(line(3:end),'#')));
-                assert(isa(p, 'dj.Relvar'), 'foreign keys must be base relvars')
-                if inKey
-                    parents{end+1} = p;     %#ok:<AGROW>
-                else
-                    referenced{end+1} = p;   %#ok:<AGROW>
-                end
-            case regexpi(line, '^(unique\s+)?index[^:]*$')
-                % parse index definition
-                indexInfo = parseIndexDef(line);
-                indexDefs = [indexDefs, indexInfo]; %#ok<AGROW>
-            case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
-                    '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
-                    ':\s*\w.*$'])                             % type, comment
-                fieldInfo = parseAttrDef(line, inKey);
-                fieldDefs = [fieldDefs fieldInfo];  %#ok:<AGROW>
-            otherwise
-                error('Invalid table declaration line "%s"', line)
-        end
+% parse and validate the attribute lists
+attrs = strsplit(fk.attrs, {' ',',','(',')'});
+newattrs = strsplit(fk.newattrs, {' ',',','(',')'});
+attrs(cellfun(@isempty, attrs))=[];
+newattrs(cellfun(@isempty, newattrs))=[];
+assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
+    'All attributes in (%s) must be in the primary key of %s', ...
+    strjoin(attrs, ','), rel.className)
+if length(newattrs)==1 
+    % unambiguous single attribute
+    if length(rel.primaryKey)==1
+        attrs = self.primaryKey;
+    elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
+        attrs = setdiff(rel.primaryKey, existingFields);
     end
 end
+assert(length(attrs) == length(newattrs) , ...
+    'Mapped fields (%s) and (%s) must match in the foreign key.', ...
+    strjoin(newattrs,','), strjoin(attrs,','))
+
+% prepend unspecified primary key attributes that have not yet been included 
+pk = rel.primaryKey;
+pk(ismember(pk,attrs) | ismember(pk,existingFields))=[];
+attrs = [pk attrs];
+newattrs = [pk newattrs];
+
+% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
+[~, ix] = sort(cellfun(@(a) find(strcmp(a, rel.primaryKey)), attrs));
+attrs = attrs(ix);
+newattrs = newattrs(ix);
+
+for i=1:length(attrs)
+    fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, rel.tableHeader.names));
+    fieldInfo.name = newattrs{i};
+    fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
+    sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
+end
+
+fkattrs = rel.primaryKey;
+fkattrs(ismember(fkattrs, attrs))=newattrs;
+hash = dj.DataHash([{hash rel.fullTableName} newattrs]);
+sql = sprintf(...
+    '%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT', ...
+    sql, hash(1:12), backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
 end
 
 
-
-function fieldInfo = parseAttrDef(line, inKey)
+function fieldInfo = parseAttrDef(line)
 line = strtrim(line);
+assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute name in %s', line)
 pat = {
     '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-    '=\s*(?<default>\S+(\s+\S+)*)\s*' % default value
-    ':\s*(?<type>\w[^#]*\S)\s*'       % datatype
-    '#\s*'                            % comment delimiter
-    '(?<comment>\S.*\S)\s*'           % comment
-    '$'                               % line end
+    '=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*' % default value
+    ':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE][mM][eE][nN][tT])?)\s*'       % datatype
+    '#(?<comment>.*)'           % comment
+    '$'  % end of line
     };
-for sub = {[1 2 3 4 5 6] [1 3 4 5 6] [1 2 3 4 6] [1 2 3 6] [1 3 4 6] [1 3 6]}
-    fieldInfo = regexp(line, cat(2,pat{sub{:}}), 'names');
+hasDefault = ~isempty(regexp(line, '^\w+\s*=', 'once'));
+if ~hasDefault
+    pat{2} = '';
+end
+for sub = {[1 2 3 4 5] [1 2 3 5]}  % with and without the comment
+    pattern = cat(2,pat{sub{:}});
+    fieldInfo = regexp(line, pattern, 'names');
     if ~isempty(fieldInfo)
         break
     end
@@ -956,29 +923,19 @@ assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
 if ~isfield(fieldInfo,'comment')
     fieldInfo.comment = '';
 end
-if ~isfield(fieldInfo,'default')
+fieldInfo.comment = strtrim(fieldInfo.comment);
+if ~hasDefault
     fieldInfo.default = '';
 end
 assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
     || ~strcmp(fieldInfo.default,'null'), ...
     'BIGINT attributes cannot be nullable in "%s"', line)
 fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
-fieldInfo.iskey = inKey;
 end
 
 
 
-function indexInfo = parseIndexDef(line)
-line = strtrim(line);
-pat = [
-    '^(?<unique>UNIQUE)?\s*INDEX\s*' ...  % [UNIQUE] INDEX
-    '\((?<attributes>[^\)]+)\)$'          % (attr1, attr2)
-    ];
-indexInfo = regexpi(line, pat, 'names');
-assert(numel(indexInfo)==1 && ~isempty(indexInfo.attributes), ...
-    'Invalid index declaration "%s"', line)
-attributes = textscan(indexInfo.attributes, '%s', 'delimiter',',');
-indexInfo.attributes = strtrim(attributes{1});
-assert(numel(unique(indexInfo.attributes)) == numel(indexInfo.attributes), ...
-    'Duplicate attributes in index declaration "%s"', line)
+function str = backquotedList(arr)
+str = sprintf('`%s`,', arr{:});
+str(end)=[];
 end

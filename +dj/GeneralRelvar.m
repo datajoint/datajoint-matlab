@@ -17,7 +17,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
     
     properties(SetAccess=private, GetAccess=protected)
         conn              % connection object
-        operator          % node type: table, join, or pro
+        operator          % node type: table, join, or proj
         operands = {}     % list of operands
     end
     
@@ -68,58 +68,55 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/disp - display the contents of the relation.
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
-            nTuples = 0;
-            fprintf('\nObject %s\n\n',class(self))
-            s = sprintf(', %s', self.primaryKey{:});
-            fprintf('Primary key: %s\n', s(2:end))
-            if isempty(self.nonKeyFields)
-                fprintf 'No dependent attributes'
-            else
-                s = sprintf(', %s',self.nonKeyFields{:});
-                fprintf('Dependent attributes: %s', s(2:end))
-            end
-            fprintf '\n\n Contents: \n'
             tic
-            if self.exists
+            nTuples = self.count;
+            fprintf('\nObject %s\n\n',class(self))
+            hdr = self.header;
+            if isprop(self, 'tableHeader')   % tableHeader exists in tables but not in derived relations.
+                fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
+            end
+            if nTuples
                 % print header
-                header = self.header;
-                ix = find( ~[header.attributes.isBlob] );  % header to display
-                fprintf('  %16.16s', header.attributes(ix).name)
-                fprintf \n
-                maxRows = 12;
-                tuples = self.fetch(header.attributes(ix).name, sprintf('LIMIT %d', maxRows+1));
-                nTuples = max(self.count, length(tuples));
-                
-                % print rows
-                for s = tuples(1:min(end,maxRows))'
-                    for iField = ix
-                        v = s.(header.attributes(iField).name);
-                        if isnumeric(v)
-                            if ismember(class(v),{'double','single'})
-                                fprintf('  %16g',v)
-                            else
-                                fprintf('  %16d',v)
-                            end
-                        else
-                            fprintf('  %16.16s',v)
-                        end
+                attrList = cell(size(hdr.attributes));
+                for i = 1:length(hdr.attributes)
+                    if hdr.attributes(i).isBlob
+                        attrList{i} = sprintf('("=BLOB=") -> %s', hdr.names{i});
+                    else
+                        attrList{i} = hdr.names{i};
                     end
-                    fprintf \n
                 end
+                maxRows = dj.set('maxPreviewRows');
+                tuples = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
+                tuples = arrayfun(@(r) structfun(@rep, r, 'uni', false), tuples);
+                tabl = struct2table(tuples);
+                funs = {
+                    @(x) x
+                    @upper
+                    };
+                tabl.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
+                    tabl.Properties.VariableNames, 'uni', false);
+                disp(tabl)
                 if nTuples > maxRows
-                    for iField = ix
-                        fprintf('  %16s','...')
-                    end
-                    fprintf \n
+                    fprintf '          ...\n\n'
                 end
             end
             
             % print the total number of tuples
             fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
+            
+
+            function r = rep(r)
+                % replace empty strings with a single space
+                if ischar(r) && isempty(r)
+                    r = ' ';
+                end
+            end
+            
+            
         end
         
         function view(self, varargin)
-            % dj.Relvar/view - view the data in speadsheet form. Blobs are omitted.
+            % dj.GeneralRelvar/view - view the data in speadsheet form. Blobs are omitted.
             % Additional arguments are forwarded to fetch(), e.g. for ORDER BY
             % and LIMIT clauses.
             if ~self.exists
@@ -174,15 +171,15 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function yes = exists(self)
             % dj.GeneralRelvar/exists - a fast check whether the relvar
             % contains any tuples
-            [~, sql] = self.compile(3);
-            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql));
+            [~, sql_] = self.compile(3);
+            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql_));
             yes = logical(yes.yes);
         end
         
         function n = count(self)
             % dj.GeneralRelvar/count - the number of tuples in the relation.
-            [~, sql] = self.compile(3);
-            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql));
+            [~, sql_] = self.compile(3);
+            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql_));
             n = double(n.n);
         end
         
@@ -195,7 +192,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %       attributes and additional listed attributes.
             %
             % The specification of attributes 'attri' follows the same
-            % conventions as in dj.GeneralRelvar.pro, including renamed
+            % conventions as in dj.GeneralRelvar.proj, including renamed
             % attributed, and computed arguments.  In particular, if the second
             % input argument is another relvar, the computed arguments can
             % include summary operations on the header of the second relvar.
@@ -215,18 +212,18 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %    s = R.fetch('*', 'LIMIT 100 OFFSET 200')  % read tuples 200-299
             %    s = R.fetch('*', 'ORDER BY field1 DESC, field 2  LIMIT 100');
             %
-            % See also dj.Relvar.pro, dj.Relvar/fetch1, dj.Relvar/fetchn
+            % See also dj.GeneralRelvar.proj, dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetchn
             
             [limit, args] = makeLimitClause(varargin{:});
-            self = self.pro(args{:});
-            [header, sql] = self.compile;
+            self = self.proj(args{:});
+            [hdr, sql_] = self.compile;
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
-                header.sql, sql, limit));
+                hdr.sql, sql_, limit));
             ret = dj.struct.fromFields(ret);
             
             if nargout>1
                 % return primary key structure array
-                keys = dj.struct.pro(ret,self.primaryKey{:});
+                keys = dj.struct.proj(ret,self.primaryKey{:});
             end
         end
         
@@ -244,7 +241,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %    v1 = R.fetch1('attr1');
             %    [v1,v2,qn] = R.fetch1(Q,'attr1','attr2','count(*)->n')
             %
-            % See also dj.Relvar.fetch, dj.Relvar/fetchn, dj.Relvar/pro
+            % See also dj.GeneralRelvar.fetch, dj.GeneralRelvar/fetchn, dj.GeneralRelvar/proj
             
             % validate input
             [~, args] = makeLimitClause(varargin{:});
@@ -279,7 +276,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %
             % [f1, ..., fn, keys] = rel.fetchn('field1',...,'fieldn')
             %
-            % See also dj.Relvar/fetch1, dj.Relvar/fetch, dj.Relvar/pro
+            % See also dj.GeneralRelvar/fetch1, dj.GeneralRelvar/fetch, dj.GeneralRelvar/proj
             
             [limit, args] = makeLimitClause(varargin{:});
             specs = args(cellfun(@ischar, args)); % attribute specifiers
@@ -290,10 +287,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             assert(~any(strcmp(specs,'*')), '"*" is not allowed in fetchn()')
             
             % submit query
-            self = self.pro(args{:});  % this copies the object, so now it's a different self
-            [header, sql] = self.compile;
+            self = self.proj(args{:});  % this copies the object, so now it's a different self
+            [hdr, sql_] = self.compile;
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s%s',...
-                header.sql, sql, limit));
+                hdr.sql, sql_, limit));
             
             % copy into output arguments
             varargout = cell(length(specs));
@@ -304,7 +301,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
             
             if returnKey
-                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.pro(ret, self.primaryKey{:}));
+                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.proj(ret, self.primaryKey{:}));
             end
         end
         
@@ -312,7 +309,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % dj.GeneralRelvar/export -- export the contents of the relation into and a .m file
             % The data are split into chunks according to mbytesPerFile.
             %
-            % See also dj.Relvar/import
+            % See also dj.GeneralRelvar/import
             
             if nargin<2
                 outfilePrefix = './temp';
@@ -425,7 +422,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         function ret = not(self)
-            %  dj.Relvar/not - negation operator.
+            %  dj.GeneralRelvar/not - negation operator.
             %  A & ~B   is equivalent to  A - B
             % But here is an example where minus could not be used.
             %  A & (B & cond | ~B)    % -- if B has matching tuples, also apply cond.
@@ -447,13 +444,13 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret.restrict('not', arg)
         end
         
-        function ret = pro(self, varargin)
-            % dj.GeneralRelvar/pro - relational operators that modify the relvar's header:
-            % project, rename, extend, and aggregate.
+        function ret = proj(self, varargin)
+            % dj.GeneralRelvar/proj - relational operators that modify the relvar's header:
+            % project, rename, extend.
             %
             % SYNTAX:
-            %   r = rel.pro(attr1, ..., attrn)
-            %   r = rel.pro(otherRel, attr1, ..., attrn)
+            %   r = rel.proj(attr1, ..., attrn)
+            %   r = rel.proj(otherRel, attr1, ..., attrn)
             %
             % INPUTS:
             %    'attr1',...,'attrn' is a comma-separated string of attributes.
@@ -461,7 +458,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %
             % The result will return another relation with the same number of tuples
             % with modified attributes. Primary key attributes are included implicitly
-            % and cannot be excluded. Thus pro(rel) simply strips all non-key header.
+            % and cannot be excluded. Thus proj(rel) simply strips all non-key header.
             %
             % Project: To include an attribute, add its name to the attribute list.
             %
@@ -473,48 +470,58 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % 'datediff(exp_date,now())->days_ago'. The computed expressions may use SQL
             % operators and functions.
             %
-            % Aggregate: When the second input is another relvar, the computed
-            % expressions may include aggregation functions on attributes of the
-            % other relvar: max, min, sum, avg, variance, std, and count.
             %
             % EXAMPLES:
             %   Construct relation r2 containing only the primary keys of r1:
-            %   >> r2 = r1.pro();
+            %   >> r2 = r1.proj();
             %
             %   Construct relation r3 which contains values for 'operator'
             %   and 'anesthesia' for every tuple in r1:
-            %   >> r3 = r1.pro('operator','anesthesia');
+            %   >> r3 = r1.proj('operator','anesthesia');
             %
             %   Rename attribute 'anesthesia' to 'anesth' in relation r1:
-            %   >> r1 = r1.pro('*','anesthesia->anesth');
+            %   >> r1 = r1.proj('*','anesthesia->anesth');
             %
             %   Add field mouse_age to relation r1 that has the field mouse_dob:
-            %   >> r1 = r1.pro('*','datediff(now(),mouse_dob)->mouse_age');
+            %   >> r1 = r1.proj('*','datediff(now(),mouse_dob)->mouse_age');
             %
+            %
+            % See also: dj.GeneralRelvar/fetch, dj.GeneralRelvar/aggr
+            if nargin>2 && isa(varargin{1}, 'dj.GeneralRelvar')
+                % if the first argument is a relvar, perform aggregation
+                ret = self.aggr(varargin{1}, varargin{2:end});
+            else
+                assert(iscellstr(varargin), 'proj() requires a list of strings as attribute args')
+                ret = init(dj.GeneralRelvar, 'proj', [{self} varargin]);
+            end
+        end
+        
+        
+        function ret = aggr(self, other, varargin)
+            % dj.GeneralRelvar/aggr -- relational aggregation operator.
+            % Aggregation is similar to projection but has an additional
+            % argument `other` that must be another relation.
+            % Computed expression now may include aggregation function on
+            % attributes of the `other` relation. The aggregation functions
+            % include max, min, sum, avg, variance, std, and count.
+            %
+            % EXAMPLES:
             %   Add field 'n' which contains the count of matching tuples in r2
             %   for every tuple in r1. Also add field 'avga' which contains the
             %   average value of field 'a' in r2.
-            %   >> r1 = r1.pro(r2,'count(*)->n','avg(a)->avga');
+            %   >> result = r1.proj(r2,'count(*)->n','avg(a)->avga');
             %
-            % See also: dj.Relvar/fetch
-            if nargin>2 && isa(varargin{1}, 'dj.GeneralRelvar')
-                % if the first argument is a relvar, perform aggregate operator
-                op = 'aggregate';
-                arg = varargin(1);
-                params = varargin(2:end);
-            else
-                op = 'pro';
-                arg = [];
-                params = varargin;
-            end
+            % See also: dj.GeneralRelvar/proj
             
-            if ~iscellstr(params)
-                throwAsCaller(MException('DataJoint:invalidOperotor', ...
-                    'pro() requires a list of strings as attribute args'))
-            end
-            
-            ret = init(dj.GeneralRelvar, op, [{self} arg params]);
+            assert(iscellstr(varargin), 'proj() requires a list of strings as attribute args')
+            ret = init(dj.GeneralRelvar, 'aggregate', [{self, other} varargin]);
         end
+        
+        function ret = pro(self, varargin)
+            % alias for dj.GeneralRelvar/proj - relational projection
+            ret = self.proj(varargin{:});
+        end
+        
         
         function ret = mtimes(self, arg)
             % dj.GeneralRelvar/mtimes - relational natural join.
@@ -527,12 +534,12 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % combination if their commonly named attributes contain the
             % same values.
             % To control on which attributes the join performed, individual
-            % attributes of the arguments may be renamed using dj.Relvar/pro.
+            % attributes of the arguments may be renamed using dj.GeneralRelvar/proj.
             % Blobs and nullable attributes should not be joined on.
             % To prevent an attribute from being joined on, rename it using
-            % dj.GeneralRelvar/pro's rename syntax.
+            % dj.GeneralRelvar/proj's rename syntax.
             %
-            % See also dj.Relvar/pro, dj.Relvar/fetch
+            % See also dj.GeneralRelvar/proj, dj.GeneralRelvar/fetch
             if ~isa(arg, 'dj.GeneralRelvar')
                 throwAsCaller(MException('DataJoint:invalidOperotor', ...
                     'dj.GeneralRelvar/mtimes requires another relvar as operand'))
@@ -548,7 +555,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             renamedAttrs1 = cellfun(@(s) sprintf('%s->%s1',s,s), varargin,'uni',false);
             renamedAttrs2 = cellfun(@(s) sprintf('%s->%s2',s,s), varargin,'uni',false);
-            ret = self.pro(renamedAttrs1{:})*self.pro(renamedAttrs2{:});
+            ret = self.proj(renamedAttrs1{:})*self.proj(renamedAttrs2{:});
         end
         
         
@@ -621,7 +628,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if nargout
                 ret = str;
             else
-                disp(str)
+                fprintf('%s\n', str)
             end
         end
     end
@@ -679,7 +686,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     header = derive(tab.tableHeader);
                     sql = tab.fullTableName;
                     
-                case 'pro'
+                case 'proj'
                     [header, sql] = compile(self.operands{1},1);
                     header.project(self.operands(2:end));
                     
@@ -720,7 +727,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 end
             end
             
-            % enclose in parentheses if necessary
+            % enclose in subquery if necessary
             if enclose==1 && header.hasAliases ...
                     || enclose==2 && (~ismember(self.operator, {'table', 'join'}) || ~isempty(self.restrictions)) ...
                     || enclose==3 && strcmp(self.operator, 'aggregate')
@@ -761,18 +768,18 @@ for arg = restrictions
             clause = sprintf('%s AND NOT(%s)', clause, ...
                 makeWhereClause(header, cond.operands));
             
-        case ischar(cond) && strcmpi(cond,'NOT')
+        case (ischar(cond) || (exist('isstring', 'builtin') && isstring(cond))) && strcmpi(cond,'NOT')
             % negation of the next condition
             not = 'NOT ';
             continue
             
-        case ischar(cond) && ~strcmpi(cond, 'NOT')
+        case (ischar(cond) || (exist('isstring', 'builtin') && isstring(cond))) && ~strcmpi(cond, 'NOT')
             % SQL condition
             clause = sprintf('%s AND %s(%s)', clause, not, cond);
             
         case isstruct(cond)
             % restriction by a structure array
-            cond = dj.struct.pro(cond, header.names{:}); % project onto common attributes
+            cond = dj.struct.proj(cond, header.names{:}); % project onto common attributes
             if isempty(fieldnames(cond))
                 % restrictor has no common attributes:
                 %    semijoin leaves relation unchanged.
@@ -801,7 +808,7 @@ for arg = restrictions
             [condHeader, condSQL] = cond.compile;
             
             % isolate previous projection (if not already)
-            if ismember(cond.operator, {'pro','aggregate'}) && isempty(cond.restrictions) && ...
+            if ismember(cond.operator, {'proj','aggregate'}) && isempty(cond.restrictions) && ...
                     ~all(cellfun(@isempty, {cond.header.attributes.alias}))
                 condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', ...
                     condHeader.sql, condSQL, aliasCount);

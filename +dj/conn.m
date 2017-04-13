@@ -54,7 +54,7 @@ else
         pass = getenv(env.pass);
     end
     if isempty(pass)
-        pass = input('Enter datajoint password >','s');
+        pass = input('Enter datajoint password> ','s');
     end
     
     % get initial query (if any) to execute when a connection is (re)established

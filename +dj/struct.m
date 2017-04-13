@@ -34,8 +34,8 @@ classdef struct
             for p2 = s2'
                 for p1 = s1'
                     if isequal(...
-                            dj.struct.pro(p1,commonFields{:}), ...
-                            dj.struct.pro(p2,commonFields{:}))
+                            dj.struct.proj(p1,commonFields{:}), ...
+                            dj.struct.proj(p2,commonFields{:}))
                         for f = s2only'
                             p1.(f{1}) = p2.(f{1});
                         end
@@ -91,10 +91,10 @@ classdef struct
             end
             % Do the joining
             ret = struct([]);
-            s2common = dj.struct.pro(s2, fcommon{:});
+            s2common = dj.struct.proj(s2, fcommon{:});
             for p1 = s1'
                 % Find the matches in s2
-                p1common = dj.struct.pro(p1, fcommon{:});
+                p1common = dj.struct.proj(p1, fcommon{:});
                 isMatch = arrayfun(@(x) isequal(x,p1common), s2common);
                 if any(isMatch)
                     % Copy the matching s2 tuples and add the p1 fields
@@ -117,14 +117,18 @@ classdef struct
         end
 
 
+        function s = pro(s, varargin)
+            % alias for dj.struct.proj for backward compatibility
+            s = dj.struct.proj(s, varargin{:});            
+        end
         
-        function s = pro(s,varargin)
-            % DJ.STRUCT.PRO - the relational projection operator
+        function s = proj(s,varargin)
+            % DJ.STRUCT.PROJ - the relational projection operator
             % of structure array onto the specified fields.
             % The result may contain duplicate tuples.
             %
             % SYNTAX:
-            %    s = dj.struct.pro(s, 'field1', 'field2')
+            %    s = dj.struct.proj(s, 'field1', 'field2')
             %    This removes all fields from s except field1 and field2
             
             for ff=fieldnames(s)'

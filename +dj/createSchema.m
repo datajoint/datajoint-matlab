@@ -46,7 +46,7 @@ else
         % create the getSchema function
         schemaFile = fullfile(folder,'getSchema.m');
         if exist(schemaFile,'file')
-            fprintf('%s.getSchema.m already exists', package)
+            fprintf('%s.getSchema.m already exists\n', package)
         else
             f = fopen(schemaFile,'wt');
             assert(-1 ~= f, 'Could not open %s', f)
