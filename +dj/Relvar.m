@@ -180,11 +180,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % The input argument tuples must a structure array with field
             % names exactly matching those in the table.
             %
-            % The optional argument 'command' can be of of the following:
+            % The optional argument 'command' can be of the following:
             % 'IGNORE' or 'REPLACE'.
             %
             % Duplicates, unmatched attributes, or missing required attributes will
-            % cause an error, unless 'command is specified.
+            % cause an error, unless 'command' is specified.
             
             if isa(tuples,'cell')
                 % if a cell array, convert to structure assuming matching attributes
