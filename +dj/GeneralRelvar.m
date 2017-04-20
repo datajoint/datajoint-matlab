@@ -86,9 +86,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     end
                 end
                 maxRows = dj.set('maxPreviewRows');
-                tuples = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
-                tuples = arrayfun(@(r) structfun(@rep, r, 'uni', false), tuples);
-                tabl = struct2table(tuples);
+                tabl = struct2table(self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1)));
+                % convert primary key to upper case:
                 funs = {
                     @(x) x
                     @upper
@@ -103,16 +102,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             % print the total number of tuples
             fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
-            
 
-            function r = rep(r)
-                % replace empty strings with a single space
-                if ischar(r) && isempty(r)
-                    r = ' ';
-                end
-            end
-            
-            
         end
         
         function view(self, varargin)
