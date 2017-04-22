@@ -1,3 +1,5 @@
+% dj.BatchPopulate is deprecated and will be removed in future versions
+
 % dj.BatchPopulate is an abstract mixin class that allows a dj.Relvar object
 % to automatically populate its table by pushing jobs to a cluster via the
 % Parallel Computing Toolbox
@@ -5,8 +7,14 @@
 
 
 classdef BatchPopulate < dj.AutoPopulate
-    
+
     methods
+
+        function self = BatchPopulate()
+            warning('DataJoint:deprecate', ...
+                'dj.BatchPopulate is no longer supported and will be removed in future versions')
+        end
+
         function varargout = batch_populate(self, varargin)
             % dj.BatchPopulate/batch_populate works identically to dj.AutoPopulate/parpopulate
             % except that it spools jobs to the cluster. It creates one job per key,

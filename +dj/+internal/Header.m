@@ -65,7 +65,7 @@ classdef Header < matlab.mixin.Copyable
     
     methods(Static)
         function self = initFromDatabase(schema,tableInfo)  % constructor
-            self = dj.Header;
+            self = dj.internal.Header;
             self.info = tableInfo;
             attrs = schema.conn.query(...
                 sprintf('SHOW FULL COLUMNS FROM `%s` IN `%s`', self.info.name, schema.dbname));
@@ -105,7 +105,7 @@ classdef Header < matlab.mixin.Copyable
         function newHeader = derive(self)
             % copy attribute information but not table information; used to
             % produce headers of derived relations
-            newHeader = dj.Header;
+            newHeader = dj.internal.Header;
             newHeader.attributes = self.attributes;
         end
         
@@ -163,7 +163,7 @@ classdef Header < matlab.mixin.Copyable
             % form the header of a relational join
             
             % merge primary keys
-            ret = dj.Header;
+            ret = dj.internal.Header;
             ret.attributes = [hdr1.attributes([hdr1.attributes.iskey])
                 hdr2.attributes([hdr2.attributes.iskey] & ~ismember(hdr2.names, hdr1.primaryKey))];
             

@@ -1,3 +1,3 @@
-classdef Imported < dj.UserRelation & dj.AutoPopulate
+classdef Imported < dj.internal.AutoPopulate
     % defines an imported table
 end
