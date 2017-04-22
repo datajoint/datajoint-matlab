@@ -894,7 +894,7 @@ fkattrs(ismember(fkattrs, attrs))=newattrs;
 hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
 sql = sprintf(...
     '%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT', ...
-    sql, hash(1:12), backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
+    sql, hash, backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
 end
 
 

@@ -1,2 +1,2 @@
-classdef Jobs < dj.internal.Relvar
+classdef Jobs < dj.Relvar
 end
