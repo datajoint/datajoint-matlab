@@ -1,6 +1,5 @@
 % dj.Schema - manages information about database tables and their dependencies
 % Complete documentation is available at <a href=https://github.com/datajoint/datajoint-matlab/wiki>Datajoint wiki</a>
-% See also dj.Table, dj.BaseRelvar, dj.GeneralRelvar
 
 classdef Schema < handle
     
@@ -11,7 +10,7 @@ classdef Schema < handle
         conn       % handle to the dj.Connection object
         loaded = false
         tableNames   % tables indexed by classNames
-        headers    % dj.Header objects indexed by table names
+        headers    % dj.internal.Header objects indexed by table names
     end
     
     
@@ -92,14 +91,14 @@ classdef Schema < handle
                 'i','dj.Imported',...
                 'p','dj.Part');
             if ismember([self.package '.' className], self.classNames)
-                existingTable = dj.Table([self.package '.' className]);
+                existingTable = dj.internal.Table([self.package '.' className]);
                 fprintf('Table %s already exists, Creating matching class\n', ...
                     [self.package '.' className])
                 isAuto = ismember(existingTable.info.tier, {'computed','imported'});
                 tierClass = tierClassMap.(existingTable.info.tier(1));                
             else
                 existingTable = [];
-                choice = dj.ask(...
+                choice = dj.internal.ask(...
                     '\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n  P=part\n',...
                     {'L','M','I','C','P'});
                 tierClass = tierClassMap.(choice);
@@ -175,7 +174,7 @@ classdef Schema < handle
                     self.dbname),self.tableRegexp,'bigint_to_double');
                 tableInfo = dj.struct.rename(tableInfo,'Name','name','Comment','comment');
                 
-                % determine table tier (see dj.Table)
+                % determine table tier (see dj.internal.Table)
                 re = cellfun(@(x) sprintf('^%s%s[a-z][a-z0-9_]*$',self.prefix,x), ...
                     dj.Schema.tierPrefixes, 'UniformOutput', false); % regular expressions to determine table tier
                 
@@ -186,8 +185,8 @@ classdef Schema < handle
                     tierIdx = ~cellfun(@isempty, regexp(info.name, re, 'once'));
                     assert(sum(tierIdx)==1)
                     info.tier = dj.Schema.allowedTiers{tierIdx};
-                    self.tableNames(sprintf('%s.%s',self.package,dj.toCamelCase(info.name(length(self.prefix)+1:end)))) = info.name;
-                    self.headers(info.name) = dj.Header.initFromDatabase(self,info);
+                    self.tableNames(sprintf('%s.%s',self.package,dj.internal.toCamelCase(info.name(length(self.prefix)+1:end)))) = info.name;
+                    self.headers(info.name) = dj.internal.Header.initFromDatabase(self,info);
                 end
                 
                 if dj.set('verbose')
@@ -217,7 +216,7 @@ classdef Schema < handle
                 for key=schema.headers.keys
                     table = schema.headers(key{1});
                     fprintf('%20s %10s  %s\n', ...
-                        dj.toCamelCase(table.info.name),...
+                        dj.internal.toCamelCase(table.info.name),...
                         table.info.tier, table.info.comment)
                 end
                 fprintf('\n<a href="matlab:erd(%s.getSchema)">%s</a>\n', ...

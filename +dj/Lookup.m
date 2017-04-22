@@ -1,4 +1,4 @@
-classdef Lookup < dj.UserRelation
+classdef Lookup < dj.internal.UserRelation
     % defines a lookup table
     
     methods

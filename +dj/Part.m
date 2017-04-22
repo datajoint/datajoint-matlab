@@ -1,4 +1,4 @@
-classdef Part < dj.Relvar
+classdef Part < dj.internal.Relvar
     
     properties(Abstract, SetAccess=protected)
         master

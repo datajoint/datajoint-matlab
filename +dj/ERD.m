@@ -21,7 +21,7 @@ classdef ERD < handle
                 self.nodes = {};
             else
                 switch true
-                    case isa(obj, 'dj.Table')
+                    case isa(obj, 'dj.internal.Table')
                         self.nodes = {obj.fullTableName};
                         self.conn = obj.schema.conn;
                     case isa(obj, 'dj.Schema')
