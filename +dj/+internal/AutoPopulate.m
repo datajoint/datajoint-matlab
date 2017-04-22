@@ -160,7 +160,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             % until you delete the job tuples from package.Jobs.
             %
             % The primary key of the jobs table comprises the name of the
-            % class and the 32-bit MD5 hash of the primary key. However, the
+            % class and a 32-character hash of the primary key. However, the
             % key is saved in a separate field for errors for debugging
             % purposes.
             %
@@ -342,7 +342,8 @@ classdef AutoPopulate < dj.internal.UserRelation
         
         
         function jobKey = makeJobKey(self, key)
-            jobKey = struct('table_name', self.className, 'key_hash', dj.hash(key));
+            hash = dj.internal.hash(key);
+            jobKey = struct('table_name', self.className, 'key_hash', hash(32));
         end
         
         
