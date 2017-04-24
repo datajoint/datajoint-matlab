@@ -59,7 +59,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                 rel = self.keySource_;
             else
                 rel = self.makeKeySource;
-                self.keySource_ = self.rel;
+                self.keySource_ = rel;
             end
         end
         
