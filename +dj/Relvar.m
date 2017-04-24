@@ -215,7 +215,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             if any(~found)
                 if dj.set('ignore_extra_insert_fields')
                     tuples = rmfield(tuples, fnames(~found));
-                    fnames = fnames(~found);
+                    fnames = fnames(found);
                 else
                     throw(MException('DataJoint:invalidInsert',...
                         'Field %s is not found in the table %s', ...
