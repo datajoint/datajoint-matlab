@@ -348,7 +348,7 @@ classdef AutoPopulate < dj.internal.UserRelation
         
         function jobKey = makeJobKey(self, key)
             hash = dj.internal.hash(key);
-            jobKey = struct('table_name', self.className, 'key_hash', hash(32));
+            jobKey = struct('table_name', self.className, 'key_hash', hash(1:32));
         end
         
         
