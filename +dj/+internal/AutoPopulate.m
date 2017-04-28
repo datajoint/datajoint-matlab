@@ -55,27 +55,35 @@ classdef AutoPopulate < dj.internal.UserRelation
     methods
         
         function rel = get.keySource(self)
-            if numel(self.keySource_)
+            if ~isempty(self.keySource_)
                 rel = self.keySource_;
-                return
+            else
+                rel = self.makeKeySource;
+                self.keySource_ = rel;
             end
-            if isprop(self, 'popRel')   % for backward compatibility
-                rel = self.popRel;
+        end
+        
+        
+        function source = makeKeySource(self)
+            % construct key source for auto-population of imported and
+            % computed tables.  This function is called by get.keySource. 
+            % By default the key source is the join of the primary
+            % parents. Users can override makeKeySource to customize the
+            % keySource.
+            
+            if isprop(self, 'popRel')  % for backward compatibility
+                source = self.popRel;
             else
                 % the default key source is the join of the parents
                 parents = self.parents(true);
                 assert(~isempty(parents), ...
                     'AutoPopulate table %s must have primary dependencies or an explicit keySource', class(self))
-                for i=1:length(parents)
-                    r = feval(self.schema.conn.tableToClass(parents{i}));
-                    if i==1
-                        rel = r;
-                    else
-                        rel = rel * r;
-                    end
+                r = @(ix) dj.Relvar(self.schema.conn.tableToClass(parents{ix}));
+                source = r(1);
+                for i=2:length(parents)
+                    source = source * r(i);
                 end
             end
-            self.keySource_ = rel;
         end
         
         
