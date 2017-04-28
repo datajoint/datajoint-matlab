@@ -26,7 +26,6 @@
 classdef AutoPopulate < dj.internal.UserRelation
     
     properties(Dependent)
-        keySource
         jobs  % the jobs table
     end
     
@@ -54,53 +53,51 @@ classdef AutoPopulate < dj.internal.UserRelation
     
     methods
         
-        function rel = get.keySource(self)
-            if ~isempty(self.keySource_)
-                rel = self.keySource_;
-            else
-                rel = self.makeKeySource;
-                self.keySource_ = rel;
-            end
-        end
         
-        
-        function source = makeKeySource(self)
+        function source = getKeySource(self)
             % construct key source for auto-population of imported and
-            % computed tables.  This function is called by get.keySource. 
-            % By default the key source is the join of the primary
-            % parents. Users can override makeKeySource to customize the
-            % keySource.
+            % computed tables.   
+            % By default the key source is the join of the primary parents. 
+            % Users can customize the key source by defining the optional
+            % keySource property.
             
-            if isprop(self, 'popRel')  % for backward compatibility
-                source = self.popRel;
+            if ~isempty(self.keySource_)
+                source = self.keySource_;
             else
-                % the default key source is the join of the parents
-                parents = self.parents(true);
-                assert(~isempty(parents), ...
-                    'AutoPopulate table %s must have primary dependencies or an explicit keySource', class(self))
-                r = @(ix) dj.Relvar(self.schema.conn.tableToClass(parents{ix}));
-                source = r(1);
-                for i=2:length(parents)
-                    source = source * r(i);
+                if isprop(self, 'popRel')
+                    source = self.popRel;
+                elseif isprop(self, 'keySource')
+                    source = self.keySource;
+                else 
+                    % the default key source is the join of the parents
+                    parents = self.parents(true);
+                    assert(~isempty(parents), ...
+                        'AutoPopulate table %s must have primary dependencies or an explicit keySource property', class(self))
+                    r = @(ix) dj.Relvar(self.schema.conn.tableToClass(parents{ix}));
+                    source = r(1);
+                    for i=2:length(parents)
+                        source = source * r(i);
+                    end
                 end
+                self.keySource_ = source;
             end
         end
         
         
         function varargout = populate(self, varargin)
             % [failedKeys, errors] = populate(baseRelvar [, restrictors...])
-            % populates a table based on the contents self.keySource
+            % populates a table based on the contents self.getKeySource
             %
-            % The property self.keySource contains the relation that provides
+            % The method self.getKeySource yields the relation that provides
             % the keys for which self must be populated.
             %
             % self.populate will call self.makeTuples(key) for every
-            % key in self.keySource that does not already have matching tuples
+            % key in the key source that does not already have matching tuples
             % in self.
             %
             % Additional input arguments contain restriction conditions
-            % applied to self.keySource.  Therefore, all keys to be populated
-            % are obtained as fetch((self.keySource - self) & varargin).
+            % applied to the key source.  Therefore, all keys to be populated
+            % are obtained as fetch((self.getKeySource - self) & varargin).
             %
             % Without any output arguments, populate rethrows errors
             % that occur in makeTuples. However, if output arguments are
@@ -257,13 +254,13 @@ classdef AutoPopulate < dj.internal.UserRelation
                     'Cannot populate a restricted relation. Correct syntax: progress(rel, restriction)'))
             end
             
-            remaining = count((self.keySource&varargin) - self);
+            remaining = count((self.getKeySource & varargin) - self);
             if nargout
                 % return remaning items if asked
                 varargout{1} = remaining;
             else
                 fprintf('%s %30s:  ', datestr(now,'yyyy-mm-dd HH:MM:SS'), self.className)
-                total = count(self.keySource&varargin);
+                total = count(self.getKeySource & varargin);
                 if ~total
                     disp 'Nothing to populate'
                 else
@@ -290,10 +287,10 @@ classdef AutoPopulate < dj.internal.UserRelation
                 part{1}.create
             end
                      
-            popRestricts = varargin;  % restrictions on keySource
+            popRestricts = varargin;  % restrictions on key source
             restricts = self.restrictions;  % restricts on self
             if isempty(restricts)
-                unpopulated = fetch((self.keySource & popRestricts) - self.pro());
+                unpopulated = fetch((self.getKeySource & popRestricts) - self.pro());
             else
                 assert(numel(restricts)==1, 'only one restriction is allowed in populated relations')
                 restricts = restricts{1};
@@ -303,10 +300,10 @@ classdef AutoPopulate < dj.internal.UserRelation
                 assert(isstruct(restricts), ...
                     'populated relvars can be restricted only by other relations, structures, or structure arrays')
                 % the rule for populating restricted relations:
-                unpopulated = dj.struct.join(restricts, fetch((self.keySource & popRestricts & restricts) - (self & restricts)));
+                unpopulated = dj.struct.join(restricts, fetch((self.getKeySource & popRestricts & restricts) - (self & restricts)));
             end
             
-            % restrict the keySource to unpopulated tuples
+            % restrict the key source to unpopulated tuples
             if isempty(unpopulated)
                 fprintf('%s: Nothing to populate\n', self.className)
             else
@@ -437,9 +434,10 @@ classdef AutoPopulate < dj.internal.UserRelation
             % Performs sanity checks that are common to populate,
             % parpopulate and batch_populate.
             % To disable the sanity check: dj.set('populateCheck',false)
-            if dj.set('populateCheck')                
-                abovePopRel = setdiff(self.primaryKey(1:min(end,length(self.keySource.primaryKey))), self.keySource.primaryKey);
-                if ~all(ismember(self.keySource.primaryKey, self.primaryKey))
+            if dj.set('populateCheck')
+                source = self.getKeySource;
+                abovePopRel = setdiff(self.primaryKey(1:min(end,length(source.primaryKey))), source.primaryKey);
+                if ~all(ismember(source.primaryKey, self.primaryKey))
                     warning(['The keySource primary key contains extra fields. ' ...
                         'The keySource''s  primary key is normally a subset of the populated relation''s primary key'])
                 end
