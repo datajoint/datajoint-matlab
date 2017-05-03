@@ -69,38 +69,37 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % Only non-blob attributes of the first several tuples are shown.
             % The total number of tuples is printed at the end.
             tic
-            nTuples = self.count;
             fprintf('\nObject %s\n\n',class(self))
             hdr = self.header;
             if isprop(self, 'tableHeader')   % tableHeader exists in tables but not in derived relations.
                 fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
             end
-            if nTuples
-                % print header
-                attrList = cell(size(hdr.attributes));
-                for i = 1:length(hdr.attributes)
-                    if hdr.attributes(i).isBlob
-                        attrList{i} = sprintf('("=BLOB=") -> %s', hdr.names{i});
-                    else
-                        attrList{i} = hdr.names{i};
-                    end
+            
+            attrList = cell(size(hdr.attributes));
+            for i = 1:length(hdr.attributes)
+                if hdr.attributes(i).isBlob
+                    attrList{i} = sprintf('("=BLOB=") -> %s', hdr.names{i});
+                else
+                    attrList{i} = hdr.names{i};
                 end
-                maxRows = dj.set('maxPreviewRows');
-                tabl = struct2table(self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1)));
+            end
+            maxRows = dj.set('maxPreviewRows');
+            table_ = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
+            if ~isempty(table_)
+                hasMore = length(table_) > maxRows;
+                table_ = struct2table(table_(1:min(end,maxRows)));
                 % convert primary key to upper case:
-                funs = {
-                    @(x) x
-                    @upper
-                    };
-                tabl.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
-                    tabl.Properties.VariableNames, 'uni', false);
-                disp(tabl)
-                if nTuples > maxRows
+                funs = {@(x) x; @upper};
+                table_.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
+                    table_.Properties.VariableNames, 'uni', false);
+                disp(table_)
+                if hasMore
                     fprintf '          ...\n\n'
                 end
             end
             
             % print the total number of tuples
+            nTuples = self.count;
             fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
             
         end
