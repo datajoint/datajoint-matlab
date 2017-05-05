@@ -84,24 +84,20 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 end
             end
             maxRows = dj.set('maxPreviewRows');
-            table_ = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
-            if ~isempty(table_)
-                hasMore = length(table_) > maxRows;
-                table_ = struct2table(table_(1:min(end,maxRows)));
+            preview = self.fetch(attrList{:}, sprintf('LIMIT %d', maxRows+1));
+            if ~isempty(preview)
+                hasMore = length(preview) > maxRows;
+                preview = struct2table(preview(1:min(end,maxRows)), 'asArray', true);
                 % convert primary key to upper case:
                 funs = {@(x) x; @upper};
-                table_.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
-                    table_.Properties.VariableNames, 'uni', false);
-                disp(table_)
+                preview.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
+                    preview.Properties.VariableNames, 'uni', false);
+                disp(preview)
                 if hasMore
                     fprintf '          ...\n\n'
                 end
             end
-            
-            % print the total number of tuples
-            nTuples = self.count;
-            fprintf('%d tuples (%.3g s)\n\n', nTuples, toc)
-            
+            fprintf('%d tuples (%.3g s)\n\n', self.count, toc)            
         end
         
         function view(self, varargin)
