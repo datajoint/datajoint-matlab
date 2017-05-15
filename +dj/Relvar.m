@@ -233,14 +233,14 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 for i = find(ix)
                     v = tuple.(header.attributes(i).name);
                     if header.attributes(i).isString
-                        assert(ischar(v), ...
+                        assert(dj.lib.isString(v), ...
                             'The field %s must be a character string', ...
                             header.attributes(i).name)
                         if isempty(v)
                             valueStr = sprintf('%s"",',valueStr);
                         else
                             valueStr = sprintf('%s"{S}",', valueStr);
-                            blobs{end+1} = v;  %#ok<AGROW>
+                            blobs{end+1} = char(v);  %#ok<AGROW>
                         end
                     elseif header.attributes(i).isBlob
                         valueStr = sprintf('%s"{M}",', valueStr);
@@ -349,9 +349,9 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     valueStr = 'NULL';
                     value = {};
                 case header.attributes(ix).isString
-                    assert(ischar(value), 'Value must be a string')
+                    assert(dj.lib.isString(value), 'Value must be a string')
                     valueStr = '"{S}"';
-                    value = {value};
+                    value = {char(value)};
                 case header.attributes(ix).isBlob
                     if isempty(value) && header.attributes(ix).isnullable
                         valueStr = 'NULL';
