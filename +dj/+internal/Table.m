@@ -1,8 +1,8 @@
-% dj.Table provides the data definition interface to a single table in the
+% dj.internal.Table provides the data definition interface to a single table in the
 % database.
 %
 % Initialization:
-%    table = dj.Table('package.ClassName')
+%    table = dj.internal.Table('package.ClassName')
 %
 % If the table does not exist, it is created based on the definition
 % specified in the first percent-brace comment block in the file whose path

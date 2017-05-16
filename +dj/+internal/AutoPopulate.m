@@ -1,4 +1,4 @@
-% dj.internal.AutoPopulate is an abstract UserRelation class that  
+% dj.internal.AutoPopulate is an abstract UserRelation class that
 % automatically populate its table.
 %
 % Derived classes must define the callback function makeTuples(self, key),
@@ -56,8 +56,8 @@ classdef AutoPopulate < dj.internal.UserRelation
         
         function source = getKeySource(self)
             % construct key source for auto-population of imported and
-            % computed tables.   
-            % By default the key source is the join of the primary parents. 
+            % computed tables.
+            % By default the key source is the join of the primary parents.
             % Users can customize the key source by defining the optional
             % keySource property.
             
@@ -68,7 +68,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                     source = self.popRel;
                 elseif isprop(self, 'keySource')
                     source = self.keySource;
-                else 
+                else
                     % the default key source is the join of the parents
                     parents = self.parents(true);
                     assert(~isempty(parents), ...
@@ -203,7 +203,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                     end
                 end
             end
-            % this is guaranteed to be executed when the function is 
+            % this is guaranteed to be executed when the function is
             % terminated even if by KeyboardInterrupt (CTRL-C)
             % When used with onCleanup,  the function itself cannot contain upvalues
             cleanupObject = onCleanup(@() cleanup(self, key));
@@ -286,11 +286,11 @@ classdef AutoPopulate < dj.internal.UserRelation
             for part = self.getParts
                 part{1}.create
             end
-                     
+            
             popRestricts = varargin;  % restrictions on key source
             restricts = self.restrictions;  % restricts on self
             if isempty(restricts)
-                unpopulated = fetch((self.getKeySource & popRestricts) - self.pro());
+                unpopulated = fetch((self.getKeySource & popRestricts) - self.proj());
             else
                 assert(numel(restricts)==1, 'only one restriction is allowed in populated relations')
                 restricts = restricts{1};
