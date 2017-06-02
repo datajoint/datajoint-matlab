@@ -1,8 +1,15 @@
-function setupDJ
+function setupDJ(skip)
     base = fileparts(mfilename('fullpath'));
-    fprintf('Adding DataJoint to the path...\n')
-    addpath(base)
+
+    if nargin < 1
+        skip = false;
+    end
     
+    if ~skip
+        fprintf('Adding DataJoint to the path...\n')
+        addpath(base)
+    end
+
     mymdir = fullfile(base, 'mym');
     % if mym directory missing, download and install
     if ~isdir(mymdir)
@@ -12,13 +19,13 @@ function setupDJ
         target = websave(target, mymURL);
         if isunix && ~ismac
             % on Linux Matlab unzip doesn't work properly so use system unzip
-            system(sprintf('unzip -o %s', target))
+            system(sprintf('unzip -o %s -d %s', target, base))
         else
-            unzip(target)
+            unzip(target, base)
         end
         % rename extracted mym-master directory to mym
         movefile(fullfile(base, 'mym-master'), mymdir)
-        delete('mym.zip')
+        delete(target)
     end
     
     % run mymSetup.m
