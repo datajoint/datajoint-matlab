@@ -2,7 +2,7 @@
 % MATLAB class in the schema.
 
 
-classdef Relvar < dj.GeneralRelvar & dj.Table
+classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
     
     properties(Dependent, SetAccess = private)
         lastInsertID        % Value of Last auto_incremented primary key
@@ -10,7 +10,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
     
     methods
         function self = Relvar(varargin)
-            self@dj.Table(varargin{:})
+            self@dj.internal.Table(varargin{:})
             self.init('table', {self});  % general relvar node
         end
         
@@ -21,15 +21,15 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         end
         
         function delQuick(self)
-            % dj.Relvar/delQuick - remove all tuples of the relation from its table.
-            % Unlike dj.Relvar/del, delQuick does not prompt for user
+            % DELQUICK - remove all tuples of the relation from its table.
+            % Unlike del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
         end
         
         
         function del(self)
-            % dj.Relvar/del - remove all tuples of the relation from its table
+            % DEL - remove all tuples of the relation from its table
             % and, recursively, all matching tuples in dependent tables.
             %
             % A summary of the data to be removed will be provided followed by
@@ -40,7 +40,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
             %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans
             %                                   that do not have matching tuples in table Cells
-            % See also dj.Relvar/delQuick, dj.Table/drop
+            % See also delQuick, drop
             
             function cleanup(self)
                 if self.schema.conn.inTransaction
@@ -95,7 +95,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 rels = rels(counts>0);
                 
                 % confirm and delete
-                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.ask('Proceed to delete?'))
+                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.internal.ask('Proceed to delete?'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
@@ -117,11 +117,11 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function exportCascade(self, path,  mbytesPerFile)
-            % dj.Relvar/export_cascade - export all tuples of the
+            % exportCascade - export all tuples of the
             % relation and, recursively, all matching tuples in the
             % dependent tables.
             %
-            % See also dj.GeneralRelvar/export
+            % See also export
             
             if nargin<2
                 path = './temp';
@@ -176,9 +176,15 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             % insert(self, tuples, command)
             %
             % insert an array of tuples directly into the table.
+            % The insert is performed as a single query even for multiple
+            % inserts. Therefore, it's an all-or-nothing operation: failure
+            % to insert any tuple is a failure to insert all tuples.
             %
             % The input argument tuples must a structure array with field
             % names exactly matching those in the table.
+            % 
+            % The ignoreExtraFields setting in dj.set allows ignoring fields
+            % in the tuples structure that are not found in the table.
             %
             % The optional argument 'command' can be of the following:
             % 'IGNORE' or 'REPLACE'.
@@ -215,7 +221,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
             if any(~found)
                 if dj.set('ignore_extra_insert_fields')
                     tuples = rmfield(tuples, fnames(~found));
-                    fnames = fnames(~found);
+                    fnames = fnames(found);
                 else
                     throw(MException('DataJoint:invalidInsert',...
                         'Field %s is not found in the table %s', ...
@@ -233,14 +239,14 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                 for i = find(ix)
                     v = tuple.(header.attributes(i).name);
                     if header.attributes(i).isString
-                        assert(ischar(v), ...
+                        assert(dj.lib.isString(v), ...
                             'The field %s must be a character string', ...
                             header.attributes(i).name)
                         if isempty(v)
                             valueStr = sprintf('%s"",',valueStr);
                         else
                             valueStr = sprintf('%s"{S}",', valueStr);
-                            blobs{end+1} = v;  %#ok<AGROW>
+                            blobs{end+1} = char(v);  %#ok<AGROW>
                         end
                     elseif header.attributes(i).isBlob
                         valueStr = sprintf('%s"{M}",', valueStr);
@@ -307,8 +313,8 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function import(self, fileMask)
-            % dj.Relvar/import -- load data into one table from .mat files
-            % See also dj.GeneralRelvar/export
+            % IMPORT(self, fileMask) - load data into one table from .mat files
+            % See also export
             countTuples = 0;
             for f = dir(fileMask)'
                 fprintf('Reading file %s  ', f.name)
@@ -321,7 +327,7 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
         
         
         function update(self, attrname, value)
-            % dj.Relvar/update - update a field in an existing tuple
+            % update - update a field in an existing tuple
             %
             % Relational database maintain referential integrity on the level
             % of a tuple. Therefore, the UPDATE operator can violate referential
@@ -349,9 +355,9 @@ classdef Relvar < dj.GeneralRelvar & dj.Table
                     valueStr = 'NULL';
                     value = {};
                 case header.attributes(ix).isString
-                    assert(ischar(value), 'Value must be a string')
+                    assert(dj.lib.isString(value), 'Value must be a string')
                     valueStr = '"{S}"';
-                    value = {value};
+                    value = {char(value)};
                 case header.attributes(ix).isBlob
                     if isempty(value) && header.attributes(ix).isnullable
                         valueStr = 'NULL';

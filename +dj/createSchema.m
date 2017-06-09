@@ -25,8 +25,10 @@ else
     end
     
     if nargin < 1
+        disp 'Please select a package folder. Opening UI...'
         folder = uigetdir('./','Select a package folder');
     else
+        fprintf('Please select folder to create package %s in. Opening UI...\n', ['+', package])
         folder = uigetdir('./', sprintf('Select folder to create package %s in', ['+', package]));
         if folder
             folder = fullfile(folder, ['+', package]);

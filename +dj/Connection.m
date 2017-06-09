@@ -125,7 +125,7 @@ classdef Connection < handle
             s = regexp(fullTableName, '^`(?<dbname>.+)`.`(?<tablename>[#~\w\d]+)`$','names');
             className = fullTableName;
             if ~isempty(s) && self.packages.isKey(s.dbname)
-                className = sprintf('%s.%s',self.packages(s.dbname),dj.toCamelCase(s.tablename));
+                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(s.tablename));
             elseif strict
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
             end
