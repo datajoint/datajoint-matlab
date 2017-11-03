@@ -632,7 +632,7 @@ classdef Table < handle
             % parse table schema, name, type, and comment
             switch true
                     
-                case {isa(self, 'dj.internal.UserRelation'), isa(self, 'dj.Part'), isa(self, 'dj.Jobs')}
+                case {isa(self, 'dj.internal.UserRelation') && (~isa(self, 'dj.internal.AutoPopulate') || isa(self, 'dj.Computed')), isa(self, 'dj.Part'), isa(self, 'dj.Jobs')}
                     % New-style declaration using special classes for each tier
                     tableInfo = struct;
                     if isa(self, 'dj.Part')
