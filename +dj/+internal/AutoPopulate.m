@@ -193,10 +193,11 @@ classdef AutoPopulate < dj.internal.UserRelation
         function taskCore(self, key)
             % The work unit that is submitted to the cluster
             % or executed locally
+            completed = false;
             
-            function cleanup(self, key)
+            function cleanup(self, key, completed)
                 self.schema.conn.cancelTransaction
-                if self.hasJobs
+                if self.hasJobs && ~completed
                     tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
                     if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
                         self.setJobStatus(key, 'error', 'Populate interrupted', []);
@@ -206,13 +207,14 @@ classdef AutoPopulate < dj.internal.UserRelation
             % this is guaranteed to be executed when the function is
             % terminated even if by KeyboardInterrupt (CTRL-C)
             % When used with onCleanup,  the function itself cannot contain upvalues
-            cleanupObject = onCleanup(@() cleanup(self, key));
+            cleanupObject = onCleanup(@() cleanup(self, key, completed));
             
             self.schema.conn.startTransaction()
             try
                 self.makeTuples(key)
                 self.schema.conn.commitTransaction
                 self.setJobStatus(key, 'completed');
+                completed = true;
             catch err
                 self.schema.conn.cancelTransaction
                 if strncmpi(err.message, self.timeoutMessage, length(self.timeoutMessage)) && ...
@@ -225,6 +227,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                     rethrow(err)   % Make error visible to DCT / caller
                 end
             end
+            
         end
         
         
