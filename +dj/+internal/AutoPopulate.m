@@ -200,6 +200,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                 if self.hasJobs && ~completed
                     tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
                     if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
+                        fprintf('Mark as interrupted...\n');
                         self.setJobStatus(key, 'error', 'Populate interrupted', []);
                     end
                 end
@@ -214,8 +215,11 @@ classdef AutoPopulate < dj.internal.UserRelation
                 self.makeTuples(key)
                 self.schema.conn.commitTransaction
                 self.setJobStatus(key, 'completed');
+                fprintf('Mark as completed...\n');
+
                 completed = true;
             catch err
+                fprintf('Some error occured...\n');
                 self.schema.conn.cancelTransaction
                 if strncmpi(err.message, self.timeoutMessage, length(self.timeoutMessage)) && ...
                         self.timeoutAttempt<=self.maxTimeouts
