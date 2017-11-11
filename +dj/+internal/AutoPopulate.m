@@ -196,12 +196,14 @@ classdef AutoPopulate < dj.internal.UserRelation
             completed = false;
             
             function cleanup(self, key, completed)
+                fprintf('Entering cleanup...');
                 self.schema.conn.cancelTransaction
                 if self.hasJobs && ~completed
                     tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
                     if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
-                        fprintf('Mark as interrupted...\n');
+                        fprintf('Mark as interrupted!!!!!\n\n\n\n');
                         self.setJobStatus(key, 'error', 'Populate interrupted', []);
+                        error('Interruption error occured while populating'); 
                     end
                 end
             end
