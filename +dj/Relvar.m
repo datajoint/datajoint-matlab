@@ -64,22 +64,16 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 rels = [rels{:}];
                 rels(1) = rels(1) & self.restrictions;
                 
-                % apply proper restrictions
-                restrictByMe = arrayfun(@(rel) ...
-                    any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
-                    list)),...
-                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
-                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                operands = cell(length(rels), 1);
+                
                 for i=1:length(rels)
+                    % apply restrictions to rels(i)
+                    if ~isempty(operands{i})
+                        rels(i).restrict(init(dj.internal.GeneralRelvar, 'union', operands{i}));
+                    end
                     % iterate through all tables that reference rels(i)
                     for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
-                        % and restrict them by it or its restrictions
-                        if restrictByMe(i)
-                            rels(ix).restrict(pro(rels(i)))  % TODO: handle renamed attributes  self.conn.foreignKeys(fullTableName).aliased
-                        else
-                            rels(ix).restrict(rels(i).restrictions{:});
-                        end
+                        operands{ix} = [operands{ix} {pro(rels(i))}];
                     end
                 end
                 

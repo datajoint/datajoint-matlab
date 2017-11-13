@@ -193,12 +193,16 @@ classdef AutoPopulate < dj.internal.UserRelation
         function taskCore(self, key)
             % The work unit that is submitted to the cluster
             % or executed locally
+            completed = struct('status', false);
             
-            function cleanup(self, key)
+            function cleanup(self, key, completed)
+                fprintf('Completion status in cleanup: %s\n', completed.status);
+                fprintf('Entering cleanup...\n');
                 self.schema.conn.cancelTransaction
-                if self.hasJobs
+                if self.hasJobs && ~completed.status
                     tuple = fetch(self.jobs & self.makeJobKey(key), 'status');
                     if ~isempty(tuple) && strcmp(tuple.status, 'reserved')
+                        fprintf('Mark as interrupted!!!!!\n\n\n\n');
                         self.setJobStatus(key, 'error', 'Populate interrupted', []);
                     end
                 end
@@ -206,14 +210,18 @@ classdef AutoPopulate < dj.internal.UserRelation
             % this is guaranteed to be executed when the function is
             % terminated even if by KeyboardInterrupt (CTRL-C)
             % When used with onCleanup,  the function itself cannot contain upvalues
-            cleanupObject = onCleanup(@() cleanup(self, key));
+            cleanupObject = onCleanup(@() cleanup(self, key, completed));
             
             self.schema.conn.startTransaction()
             try
                 self.makeTuples(key)
                 self.schema.conn.commitTransaction
                 self.setJobStatus(key, 'completed');
+                fprintf('Mark as completed...\n');
+                completed.status = true;
+                fprintf('Completion status changed to: %s\n', completed.status);
             catch err
+                fprintf('Some error occured...\n');
                 self.schema.conn.cancelTransaction
                 if strncmpi(err.message, self.timeoutMessage, length(self.timeoutMessage)) && ...
                         self.timeoutAttempt<=self.maxTimeouts
@@ -225,6 +233,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                     rethrow(err)   % Make error visible to DCT / caller
                 end
             end
+            
         end
         
         
