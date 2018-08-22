@@ -11,6 +11,7 @@ classdef Schema < handle
         loaded = false
         tableNames   % tables indexed by classNames
         headers    % dj.internal.Header objects indexed by table names
+        v          % virtual class generator
     end
     
     
@@ -52,6 +53,7 @@ classdef Schema < handle
             self.conn.addPackage(dbname, package)
             self.headers    = containers.Map('KeyType','char','ValueType','any');
             self.tableNames = containers.Map('KeyType','char','ValueType','char');
+            self.v = dj.internal.TableAccessor(self);
         end
         
         
