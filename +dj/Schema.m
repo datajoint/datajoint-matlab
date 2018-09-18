@@ -1,5 +1,14 @@
 % dj.Schema - manages information about database tables and their dependencies
-% Complete documentation is available at <a href=https://github.com/datajoint/datajoint-matlab/wiki>Datajoint wiki</a>
+%
+% A TableAccessor object is created as a property of a schema during the
+% schema's creation. This property is named schema.v for
+% 'virtual class generator.' The TableAccessor v itself has properties that
+% refer to the tables of the schema. For example, one can access the
+% Session table using schema.v.Session with no need for any Session class
+% to exist in Matlab. Tab completion of table names is possible because the
+% table names are added as dynamic properties of TableAccessor.
+%
+%Complete documentation is available at <a href=https://github.com/datajoint/datajoint-matlab/wiki>Datajoint wiki</a>
 
 classdef Schema < handle
     
@@ -11,6 +20,7 @@ classdef Schema < handle
         loaded = false
         tableNames   % tables indexed by classNames
         headers    % dj.internal.Header objects indexed by table names
+        v          % virtual class generator
     end
     
     
@@ -52,6 +62,7 @@ classdef Schema < handle
             self.conn.addPackage(dbname, package)
             self.headers    = containers.Map('KeyType','char','ValueType','any');
             self.tableNames = containers.Map('KeyType','char','ValueType','char');
+            self.v = dj.internal.TableAccessor(self);
         end
         
         
