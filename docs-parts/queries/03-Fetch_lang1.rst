@@ -1,7 +1,4 @@
 
-MATLAB
-------
-
 DataJoint for MATLAB provides three distinct fetch methods: ``fetch``, ``fetch1``, and ``fetchn``.
 The three methods differ by the type and number of their returned variables.
 
