@@ -1,6 +1,4 @@
 
-|matlab| MATLAB
-
 .. code-block:: MATLAB
 
     %{
@@ -19,4 +17,3 @@
             end
         end
     end
-

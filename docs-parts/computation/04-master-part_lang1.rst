@@ -1,6 +1,4 @@
 
-|matlab| MATLAB
----------------
 In MATLAB, the master and  part tables are declared in a separate ``classdef`` file.
 The name of the part table must begin with the name of the master table.
 The part table must declare the property ``master`` containing an object of the master.
