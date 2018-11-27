@@ -1,7 +1,5 @@
 
-|matlab| MATLAB
----------------------------
-A schema can be created in MATLAB either automatically using the ``dj.createSchema`` script or manually.
+A schema can be created either automatically using the ``dj.createSchema`` script or manually.
 While ``dj.createSchema`` simplifies the process, the manual approach yields a better understanding of what actually takes place, so both approaches are listed below.
 
 Manual
@@ -20,7 +18,7 @@ Thus the user ``alice`` would be able to perform any work in any schema that beg
 
 **Step 2.**  Create the MATLAB package
 
-DataJoint for MATLAB organizes schemas as MATLAB **packages**.
+DataJoint organizes schemas as MATLAB **packages**.
 If you are not familiar with packages, please review:
 
 * `How to work with MATLAB packages <https://www.mathworks.com/help/matlab/matlab_oop/scoping-classes-with-packages.html>`_
@@ -33,7 +31,7 @@ Make sure that your project directory (the parent directory of your package fold
 **Step 3.**  Associate the package with the database schema
 
 In this step, we tell DataJoint that all classes in the package folder ``+experiment`` will work with tables in the database schema ``alice_experiment``.
-Each package in MATLAB corresponds to exactly one schema.
+Each package corresponds to exactly one schema.
 In some special cases, multiple packages may all relate to a single database schema, but in most cases there will be a one-to-one relationship between packages and schemas.
 
 In the ``+experiment`` folder, create the file ``getSchema.m`` with the following contents:

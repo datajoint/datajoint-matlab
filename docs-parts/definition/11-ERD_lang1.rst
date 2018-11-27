@@ -1,15 +1,12 @@
 
-|matlab| MATLAB
-+++++++++++++++
-
-In MATLAB, the schema object for a package can be obtained using its ``getSchema`` function.
+The schema object for a package can be obtained using its ``getSchema`` function.
 (See :ref:`schema`.)
 
 .. code-block:: matlab
 
     draw(dj.ERD(seq.getSchema))   % draw the ERD
 
-MATLAB provides shortcuts to plot ERD of a table neighborhood or a schema using the ``erd`` command:
+DataJoint provides shortcuts to plot ERD of a table neighborhood or a schema using the ``erd`` command:
 
 .. code-block:: matlab
 

@@ -1,6 +1,4 @@
 
-|matlab| MATLAB
-
 File ``+experiment/Animal.m``
 
 .. code-block:: matlab

@@ -1,5 +1,3 @@
-.. figure:: ../_static/img/matlab-tiny.png
-   :alt:
 
 File ``+lab/User.m``
 
