@@ -1,10 +1,7 @@
 
-MATLAB
-------
-
-1. Download the DataJoint Toolbox from the `MATLAB Central FileExchange <https://www.mathworks.com/matlabcentral/fileexchange/63218-datajoint>`_.
+1. Download the DataJoint MATLAB Toolbox from the `MATLAB Central FileExchange <https://www.mathworks.com/matlabcentral/fileexchange/63218-datajoint>`_.
 2. Open ``DataJoint.mltbx`` and follow installation instructions.
-3. After installation, from MATLAB, verify that you have the latest version of DataJoint (3.0.0 or above):
+3. After installation, verify from MATLAB that you have the latest version of DataJoint (3.0.0 or above):
    ::
 
      >> dj.version
