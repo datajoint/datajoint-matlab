@@ -1,5 +1,5 @@
 
-The ``insert`` method inserts any number of entities in the form of a structure array with field attributes corresponding to the attribute names.
+The ``insert`` method inserts any number of entities in the form of a structure array with field names corresponding to the attribute names.
 
 For example
 
