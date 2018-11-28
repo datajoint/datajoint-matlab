@@ -1,6 +1,4 @@
 
-|matlab| MATLAB examples
-------------------------
 Delete the entire contents of the table ``tuning.VonMises`` and all its dependents:
 
 .. code-block:: matlab

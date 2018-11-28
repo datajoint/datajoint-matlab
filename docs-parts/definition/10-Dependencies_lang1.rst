@@ -1,7 +1,6 @@
 
-You can examine the resulting table heading in MATLAB with
+You can examine the resulting table heading with
 
 .. code-block:: matlab
 
     show(mp.BrainSlice)
-

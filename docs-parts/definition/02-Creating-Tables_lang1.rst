@@ -1,8 +1,5 @@
 
-|matlab| MATLAB
-^^^^^^^^^^^^^^^
-
-DataJoint for MATLAB provides the interactive script ``dj.new`` for creating a new table.
+DataJoint provides the interactive script ``dj.new`` for creating a new table.
 It will prompt to enter the new table's class name in the form ``package.ClassName``.
 This will create the file ``+package/ClassName.m``.
 
