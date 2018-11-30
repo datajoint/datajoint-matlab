@@ -30,7 +30,7 @@ Make sure that your project directory (the parent directory of your package fold
 
 **Step 3.**  Associate the package with the database schema
 
-In this step, we tell DataJoint that all classes in the package folder ``+experiment`` will work with tables in the database schema ``alice_experiment``.
+This step tells DataJoint that all classes in the package folder ``+experiment`` will work with tables in the database schema ``alice_experiment``.
 Each package corresponds to exactly one schema.
 In some special cases, multiple packages may all relate to a single database schema, but in most cases there will be a one-to-one relationship between packages and schemas.
 
