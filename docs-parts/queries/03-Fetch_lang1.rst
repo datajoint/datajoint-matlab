@@ -66,7 +66,7 @@ As separate variables
 ~~~~~~~~~~~~~~~~~~~~~
 
 The ``fetch1`` and ``fetchn`` methods are used to retrieve each attribute into a separate variable.
-We need two different methods to tell MATLAB whether the result should be in array or scalar form; for numerical fields it does not matter (because scalars are still matrices in matlab) but non-uniform collections of values must be enclosed in cell arrays.
+DataJoint needs two different methods to tell MATLAB whether the result should be in array or scalar form; for numerical fields it does not matter (because scalars are still matrices in MATLAB) but non-uniform collections of values must be enclosed in cell arrays.
 
 ``query.fetch1`` is used when ``query``  contains exactly one entity, otherwise ``fetch1`` will raise an error.
 
