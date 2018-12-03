@@ -10,7 +10,7 @@ For example
     s.last_name = 'Cooper';
     insert(lab.Person, s)
 
-Quick entry of multiple entities take advantage of MATLAB's cell array notation:
+Quick entry of multiple entities takes advantage of MATLAB's cell array notation:
 
 .. code-block:: matlab
 
