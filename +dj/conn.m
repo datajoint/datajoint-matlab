@@ -18,11 +18,13 @@
 % Once established during the first invocation, the connection object cannot
 % be changed. To reset the connection, use 'clear functions' or 'clear classes'.
 
-function connObj = conn(host, user, pass, initQuery)
-
+function connObj = conn(host, user, pass, initQuery, reset)
 persistent CONN
+if nargin < 5
+    reset = false;
+end
 
-if isa(CONN, 'dj.Connection')
+if isa(CONN, 'dj.Connection') && ~reset
     assert(nargin==0, ...
         'connection already instantiated. To reconnect, clear functions')
 else
