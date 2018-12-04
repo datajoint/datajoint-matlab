@@ -1,5 +1,5 @@
 
-  ``+test/ArrayResponse.m``
+``+test/ArrayResponse.m``
 
 .. code-block:: matlab
 
@@ -15,7 +15,7 @@
       end
   end
 
-  ``+test/ArrayResponseElectrodeResponse.m``
+``+test/ArrayResponseElectrodeResponse.m``
 
 .. code-block:: matlab
 
@@ -31,20 +31,20 @@
       end
   end
 
-  ``+test/ArrayResponseChannelResponse.m``
+``+test/ArrayResponseChannelResponse.m``
 
-  .. code-block:: matlab
+.. code-block:: matlab
 
-    %{
-    -> test.ArrayResponseElectrodeResponse
-    channel: int
-    ---
-    response: longblob  % response of a channel
-    %}
-    classdef ArrayResponseChannelResponse < dj.Part
-        methods(SetAccess=protected)
-            function make(self, key)
-                self.insert(key)
-            end
-        end
-    end
+  %{
+  -> test.ArrayResponseElectrodeResponse
+  channel: int
+  ---
+  response: longblob  % response of a channel
+  %}
+  classdef ArrayResponseChannelResponse < dj.Part
+      methods(SetAccess=protected)
+          function make(self, key)
+              self.insert(key)
+          end
+      end
+  end
