@@ -1,11 +1,22 @@
-function setupDJ(skip)
+function setupDJ(skipPathAddition, force)
+
+    if nargin < 2
+        force = false;
+    end
+
+    persistent INVOKED;
+    
+    if ~isempty(INVOKED) && ~force
+        return
+    end
+
     base = fileparts(mfilename('fullpath'));
 
     if nargin < 1
-        skip = false;
+        skipPathAddition = false;
     end
     
-    if ~skip
+    if ~skipPathAddition
         fprintf('Adding DataJoint to the path...\n')
         addpath(base)
     end
@@ -31,4 +42,6 @@ function setupDJ(skip)
     % run mymSetup.m
     fprintf('Setting up mym...\n')
     run(fullfile(mymdir, 'mymSetup.m'))
+    
+    INVOKED = 1;
 end
