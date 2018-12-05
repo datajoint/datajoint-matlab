@@ -20,6 +20,7 @@
 
 function connObj = conn(host, user, pass, initQuery, reset)
 persistent CONN
+
 if nargin < 5
     reset = false;
 end
@@ -29,7 +30,6 @@ if isa(CONN, 'dj.Connection') && ~reset
         'connection already instantiated. To reconnect, clear functions')
 else
     % invoke setupDJ
-    setupDJ(true);
     % optional environment variables specifying the connection.
     env  = struct(...
         'host', 'DJ_HOST', ...

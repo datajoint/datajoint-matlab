@@ -26,6 +26,7 @@ classdef Connection < handle
             % specify the connection to the database.
             % initQuery is the SQL query to be executed at the start
             % of each new session.
+            setupDJ(true);
             try
                 mymVersion = mym('version');
                 assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
@@ -151,7 +152,7 @@ classdef Connection < handle
                     error 'Server disconnected during a transaction'
                 end
             end
-        end
+       end
         
         
         function ret = query(self, queryStr, varargin)
