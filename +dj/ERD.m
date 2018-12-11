@@ -75,7 +75,7 @@ classdef ERD < handle
                         n = length(ret.nodes);
                     end
                 otherwise
-                    error 'invalid ERD difference'
+                    error 'invalid ERD addition argument'
             end
         end
         
@@ -99,8 +99,13 @@ classdef ERD < handle
                         n = length(ret.nodes);
                     end
                 otherwise
-                    error 'invalid ERD difference'
+                    error 'invalid ERD difference argument'
             end
+        end
+        
+        
+        function display(self)
+            self.draw
         end
         
         
