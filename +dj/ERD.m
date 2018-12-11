@@ -141,7 +141,8 @@ classdef ERD < handle
                     isPart = tiers(i)==6;
                     fs = dj.set('erdFontSize')*(1 - 0.3*isPart);
                     fc = isPart*0.3*[1 1 1];
-                    text(h.XData(i)+0.1,h.YData(i), self.conn.tableToClass(self.graph.Nodes.Name{i}), ...
+                    name = self.conn.tableToClass(self.graph.Nodes.Name{i});
+                    text(h.XData(i)+0.1, h.YData(i), name, ...
                         'fontsize', fs, 'rotation', -16, 'color', fc, ...
                         'Interpreter', 'none');
                 end

@@ -841,7 +841,13 @@ cond = cond(min(end,5):end);  % strip " OR "
             else
                 assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                     'Value for key.%s must be a numeric scalar', field{1});
-                value=sprintf('%1.16g', value);
+                if isa(value, 'uint64')
+                    value = sprintf('%u', value);
+                elseif isa(value, 'int64')
+                    value = sprintf('%i', value);
+                else
+                    value = sprintf('%1.16g', value);
+                end
             end
             subcond = sprintf('%s AND `%s`=%s', subcond, field{1}, value);
         end
