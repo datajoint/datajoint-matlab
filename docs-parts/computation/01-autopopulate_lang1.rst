@@ -17,3 +17,5 @@
             end
         end
     end
+
+.. note:: Currently matlab uses ``makeTuples`` rather than ``make``.  This will be fixed in an upcoming release: https://github.com/datajoint/datajoint-matlab/issues/141
