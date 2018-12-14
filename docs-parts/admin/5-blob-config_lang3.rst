@@ -1,3 +1,1 @@
-.. note::
-
-  External storage is not yet implemented in MATLAB.
+   This is done using the ``setCacheFolder`` method of the schema object.

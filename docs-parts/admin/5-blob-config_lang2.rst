@@ -1,3 +1,1 @@
-.. note::
-
-  External storage is not yet implemented in MATLAB.
+   In MATLAB, this is performed using ``dj.set``.
