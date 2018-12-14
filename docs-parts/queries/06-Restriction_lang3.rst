@@ -1,4 +1,8 @@
 
 .. code-block:: matlab
 
-    ephys.Session & struct('session_dat', '2018-01-01')
+  % All the sessions performed by Alice
+  ephys.Session & 'user = "Alice"'
+
+  % All the experiments at least one minute long
+  ephys.Experiment & 'duration >= 60'
