@@ -1,7 +1,7 @@
-Transactions are formed using the methods `startTransaction`, `cancelTransaction`, and `commitTransaction` of a connection object. 
+Transactions are formed using the methods ``startTransaction``, ``cancelTransaction``, and ``commitTransaction`` of a connection object. 
 A connection object may obtained from any table object.
 
-For example, the following code inserts mating entries for the master table `Session` and its part table `SessionExperimenter`.
+For example, the following code inserts mating entries for the master table ``Session`` and its part table ``SessionExperimenter``.
 
 .. code-block:: matlab
 
@@ -28,6 +28,6 @@ For example, the following code inserts mating entries for the master table `Ses
     end
         
       
-Here, to external observers, both inserts will take effect together only upon exiting from the `try-catch` block or will not have any effect at all.
+Here, to external observers, both inserts will take effect together only upon exiting from the ``try-catch`` block or will not have any effect at all.
 For example, if the second insert fails due to an error, the first insert will be rolled back. 
 
