@@ -21,3 +21,6 @@ Quick entry of multiple entities takes advantage of MATLAB's cell array notation
     })
 
 In this case, the values must match the order of the attributes in the table.
+
+The optional parameter ``command`` can be either ``'IGNORE'`` or ``'REPLACE'``.
+Duplicates, unmatched attributes, or missing required attributes will cause insert errors, unless ``command`` is specified.
