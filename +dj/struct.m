@@ -142,6 +142,7 @@ classdef struct
         function s = fromFields(s)
             % DJ.STRUCT.FROMFIELDS - construct a structure array from a
             % scalar structure whose fields contain same-sized arrays of values.
+            assert(isscalar(s) && isstruct(s), 'the input must be a scalar structure')
             
             fnames = fieldnames(s)';
             lst = cell(1,length(fnames)*2);
@@ -151,7 +152,7 @@ classdef struct
                 if isempty(v)
                     lst{i*2}={};
                 else
-                    if isnumeric(v) || islogical(v)
+                    if isnumeric(v) || islogical(v) ||  isstring(v)
                         lst{i*2} = num2cell(s.(fnames{i}));
                     else
                         lst{i*2} = s.(fnames{i});
