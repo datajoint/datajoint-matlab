@@ -1,7 +1,7 @@
 Transactions are formed using the methods ``startTransaction``, ``cancelTransaction``, and ``commitTransaction`` of a connection object. 
 A connection object may obtained from any table object.
 
-For example, the following code inserts mating entries for the master table ``Session`` and its part table ``SessionExperimenter``.
+For example, the following code inserts matching entries for the master table ``Session`` and its part table ``SessionExperimenter``.
 
 .. code-block:: matlab
 
