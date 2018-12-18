@@ -4,6 +4,7 @@
 .. code-block:: matlab
 
   %{
+  -> Probe
   array: int
   %}
   classdef ArrayResponse < dj.Computed
