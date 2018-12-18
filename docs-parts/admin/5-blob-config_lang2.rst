@@ -1,1 +1,1 @@
-   This is performed using ``dj.set``.
+Use ``dj.set`` for configuration.
