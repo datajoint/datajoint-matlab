@@ -1,1 +1,1 @@
-   In MATLAB, this is performed using ``dj.set``.
+   This is performed using ``dj.set``.
