@@ -15,4 +15,4 @@
   U('home_state').aggr(university.Student, 'count(*)->n')
 
   % Total number of students in the database
-  U().aggr(university.Student, 'count(*)->n')
+aggr(U(), university.Student, 'count(*)->n')
