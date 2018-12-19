@@ -26,7 +26,7 @@ The part table must declare the property ``master`` containing an object of the 
 
    %{
    # Region of interest resulting from segmentation
-   -> Segmentation
+   -> test.Segmentation
    roi  : smallint   # roi number
    ---
    roi_pixels  : longblob   #  indices of pixels
