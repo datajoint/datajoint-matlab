@@ -1,5 +1,5 @@
 The function ``parpopulate`` works identically to ``populate`` except that it uses a job reservation mechanism to allow multiple processes to populate the same table in parallel without collision.
-To enable ``parpopulate``, create the job reservation table ``<package>.Jobs`` which must have the following declaration:
+When running ``parpopulate`` for the first time, DataJoint will create a job reservation table and its class ``<package>.Jobs`` with the following declaration:
 
 .. code-block:: matlab
 
