@@ -12,7 +12,7 @@
   dj.U('home_city', 'home_state').aggr(university.Student, 'count(*)->n')
 
   % Total number of students from each state
-  U('home_state').aggr(university.Student, 'count(*)->n')
+  aggr(U('home_state'), university.Student, 'count(*)->n')
 
   % Total number of students in the database
 aggr(U(), university.Student, 'count(*)->n')
