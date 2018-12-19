@@ -9,10 +9,10 @@
   dj.U('home_city', 'home_state') & university.Student
 
   % Total number of students from each city
-aggr(dj.U('home_city', 'home_state'), university.Student, 'count(*)->n')
+  aggr(dj.U('home_city', 'home_state'), university.Student, 'count(*)->n')
 
   % Total number of students from each state
   aggr(U('home_state'), university.Student, 'count(*)->n')
 
   % Total number of students in the database
-aggr(U(), university.Student, 'count(*)->n')
+  aggr(U(), university.Student, 'count(*)->n')
