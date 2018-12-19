@@ -24,15 +24,14 @@
   classdef SubjectGroup < dj.Manual
   end
 
-``+test/SubjectGroup.m``
+``+test/SubjectGroupGroupMember.m``
 
 .. code-block:: matlab
 
   %{
-  group_number : int
-  ---
-  group_name : varchar(64)
+  -> test.SubjectGroup
+  -> test.Mouse
   %}
 
-  classdef SubjectGroup < dj.Manual
+  classdef SubjectGroupGroupMember < dj.Part
   end
