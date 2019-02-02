@@ -862,7 +862,7 @@ assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
 if length(newattrs)==1 
     % unambiguous single attribute
     if length(rel.primaryKey)==1
-        attrs = self.primaryKey;
+        attrs = rel.primaryKey;
     elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
         attrs = setdiff(rel.primaryKey, existingFields);
     end
