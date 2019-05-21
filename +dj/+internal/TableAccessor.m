@@ -25,7 +25,7 @@ classdef TableAccessor < dynamicprops
             for className = schema.classNames
                 splitName = strsplit(className{1}, '.');
                 name = splitName{2};
-                addprop(self, name)
+                addprop(self, name);
                 self.(name) = dj.Relvar(className{1});
             end
         end
