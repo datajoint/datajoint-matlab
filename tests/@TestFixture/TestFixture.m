@@ -1,7 +1,7 @@
 classdef TestFixture < matlab.unittest.TestCase
     
     properties (Constant)
-        CONN_INFO = struct('host', getenv('DJ_HOST'), 'user', getenv('DJ_USER'), 'password', getenv('DJ_PASS'));
+        CONN_INFO = struct('host', getenv('DJ_TEST_HOST'), 'user', getenv('DJ_TEST_USER'), 'password', getenv('DJ_TEST_PASSWORD'));
     end
 
     methods (TestClassSetup)
