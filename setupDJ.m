@@ -26,7 +26,7 @@ function setupDJ(skipPathAddition, force)
     if ~isdir(mymdir)
         fprintf('mym missing. Downloading...\n')
         target = fullfile(base, 'mym.zip');
-        mymURL = 'https://github.com/datajoint/mym/archive/master.zip';
+        mymURL = 'https://github.com/guzman-raphael/mym/archive/master.zip';
         target = websave(target, mymURL);
         if isunix && ~ismac
             % on Linux Matlab unzip doesn't work properly so use system unzip

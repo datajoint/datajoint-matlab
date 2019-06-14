@@ -4,6 +4,7 @@ classdef Connection < handle
         host
         user
         initQuery    % initializing function or query executed for each new session
+        use_tls
         inTransaction = false
         connId       % connection handle
         packages     % maps database names to package names
@@ -22,7 +23,7 @@ classdef Connection < handle
     
     methods
         
-        function self=Connection(host, username, password, initQuery)
+        function self=Connection(host, username, password, initQuery, use_tls)
             % specify the connection to the database.
             % initQuery is the SQL query to be executed at the start
             % of each new session.
@@ -41,6 +42,9 @@ classdef Connection < handle
             self.password = password;
             if nargin>=4
                 self.initQuery = initQuery;
+            end
+            if nargin>=5
+                self.use_tls = use_tls;
             end
             self.foreignKeys  = struct([]);
             self.packages = containers.Map;
@@ -160,7 +164,7 @@ classdef Connection < handle
             % SQL query and return the result if any.
             % The same connection is re-used by all DataJoint objects.
             if ~self.isConnected
-                self.connId=mym(-1, 'open', self.host, self.user, self.password);
+                self.connId=mym(-1, 'open', self.host, self.user, self.password, self.use_tls);
                 if ~isempty(self.initQuery)
                     self.query(self.initQuery);
                 end

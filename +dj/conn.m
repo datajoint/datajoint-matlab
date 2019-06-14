@@ -18,7 +18,7 @@
 % Once established during the first invocation, the connection object cannot
 % be changed. To reset the connection, use 'clear functions' or 'clear classes'.
 
-function connObj = conn(host, user, pass, initQuery, reset)
+function connObj = conn(host, user, pass, initQuery, reset, use_tls)
 persistent CONN
 
 if nargin < 5
@@ -65,8 +65,22 @@ else
     if nargin<4 || isempty(initQuery)
         initQuery = getenv(env.init);
     end
+
+    % get tls option
+    if nargin<6 || isempty(use_tls)
+        use_tls = dj.set('use_tls');
+    end
+    if islogical(use_tls) && ~use_tls
+        use_tls = 'false';
+    elseif islogical(use_tls) && use_tls
+        use_tls = 'true';
+    elseif ~isstruct(use_tls)
+        use_tls = 'none';
+    else
+        use_tls = jsonencode(use_tls);
+    end
     
-    CONN = dj.Connection(host, user, pass, initQuery);
+    CONN = dj.Connection(host, user, pass, initQuery, use_tls);
 end
 
 connObj = CONN;
