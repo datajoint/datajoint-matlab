@@ -1,14 +1,14 @@
-function res = verge(verArray, verComp)
-    % verge - Period-based version comparison (greater than or equal)
+function res = compareVersions(verArray, verComp)
+    % compareVersions - Semantic version comparison (greater than or equal)
     %
-    % This function evaluates if an array of period-based versions is greater than 
+    % This function evaluates if an array of semantic versions is greater than 
     % or equal to a reference version.
     %
     % DISTRIBUTION:
-    %  GitHub:       https://github.com/guzman-raphael/verge
-    %  FileExchange: https://www.mathworks.com/matlabcentral/fileexchange/71849-verge
+    %  GitHub:       https://github.com/guzman-raphael/compareVersions
+    %  FileExchange: https://www.mathworks.com/matlabcentral/fileexchange/71849-compareversions
     %
-    % res = verge(verArray, verComp)
+    % res = compareVersions(verArray, verComp)
     % INPUT:
     %   verArray: Cell array with the following conditions:
     %              - be of length >= 1,
@@ -26,7 +26,7 @@ function res = verge(verArray, verComp)
     %   use command: runtests
     %
     % EXAMPLES:
-    %   output = verge({'3.2.4beta','9.5.2.1','8.0'}, '8.0.0'); %logical([0 1 1]) 
+    %   output = compareVersions({'3.2.4beta','9.5.2.1','8.0'}, '8.0.0'); %logical([0 1 1]) 
     %
     % NOTES:
     %   Tests included for reference. From root package directory,
@@ -36,7 +36,7 @@ function res = verge(verArray, verComp)
     % Author: Raphael Guzman, DataJoint
     %
     % $License: MIT (use/copy/change/redistribute on own risk) $
-    % $File: verge.m $
+    % $File: compareVersions.m $
     % History:
     % 001: 2019-06-12 11:00, First version.
     %
@@ -46,22 +46,22 @@ function res = verge(verArray, verComp)
     if ~res_n || max(cellfun(@(c) ~ischar(c) && ...
             ~isstring(c),verArray)) > 0 || min(cellfun('length',verArray)) == 0
         msg = {
-            'Verge:Error:CellArray'
+            'compareVersions:Error:CellArray'
             'Cell array to verify must:'
             '- be of length >= 1,'
             '- contain only string elements, and'
             '- each element must be of length >= 1.'
         };
-        error('Verge:Error:CellArray', sprintf('%s\n',msg{:}));
+        error('compareVersions:Error:CellArray', sprintf('%s\n',msg{:}));
     end
     if ~ischar(verComp) && ~isstring(verComp) || length(verComp) == 0
         msg = {
-            'Verge:Error:VersionRef'
+            'compareVersions:Error:VersionRef'
             'Version reference must:'
             '- be of length >= 1, and'
             '- a string.'
         };
-        error('Verge:Error:VersionRef', sprintf('%s\n',msg{:}));
+        error('compareVersions:Error:VersionRef', sprintf('%s\n',msg{:}));
     end
     res = false(1, res_n);
     for i = 1:res_n

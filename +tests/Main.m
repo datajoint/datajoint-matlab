@@ -23,7 +23,7 @@ classdef Main < ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
 
             ver = curr_conn.query('select @@version as version').version;
-            if dj.lib.verge(ver,'5.8')
+            if dj.lib.compareVersions(ver,'5.8')
                 cmd = {...
                 'CREATE USER IF NOT EXISTS ''datajoint''@''%%'' '
                 'IDENTIFIED BY ''datajoint'';'
