@@ -9,6 +9,7 @@ services:
     environment:
     - DISPLAY
     - MATLAB_LICENSE
+    - MATLAB_USER
     - DJ_HOST=mysql
     - DJ_USER=root
     - DJ_PASS=simple
@@ -19,7 +20,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    user: $MATLAB_USER
+    user: ${MATLAB_UID}:${MATLAB_GID}
     working_dir: /src
     command: > 
       /bin/bash -c "

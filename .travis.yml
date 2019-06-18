@@ -6,6 +6,8 @@ env:
     - DOCKER_CLIENT_TIMEOUT: 120
     - COMPOSE_HTTP_TIMEOUT: 120
     - MATLAB_USER: muser
+    - MATLAB_UID: 2000
+    - MATLAB_GID: 2000
 slim: &slim
   stage: Slim9.9
   os: linux
