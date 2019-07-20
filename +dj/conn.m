@@ -18,12 +18,18 @@
 % Once established during the first invocation, the connection object cannot
 % be changed. To reset the connection, use 'clear functions' or 'clear classes'.
 
-function connObj = conn(host, user, pass, initQuery, reset, use_tls)
+function connObj = conn(host, user, pass, initQuery, reset, use_tls, nogui)
 persistent CONN
 
-if nargin < 5
+if nargin < 5 || isempty(reset)
     reset = false;
 end
+
+% get password prompt option
+if nargin < 7 || isempty(nogui)
+    nogui = false;
+end
+
 
 if isa(CONN, 'dj.Connection') && ~reset
     assert(nargin==0, ...
@@ -58,7 +64,11 @@ else
         pass = getenv(env.pass);
     end
     if isempty(pass)
-        pass = input('Enter datajoint password> ','s');
+        if nogui
+            pass = input('Enter datajoint password> ','s');
+        else
+            pass = dj.lib.getpass('Enter datajoint password');
+        end
     end
     
     % get initial query (if any) to execute when a connection is (re)established
@@ -70,6 +80,7 @@ else
     if nargin<6 || isempty(use_tls)
         use_tls = dj.set('use_tls');
     end
+    
     if islogical(use_tls) && ~use_tls
         use_tls = 'false';
     elseif islogical(use_tls) && use_tls
@@ -85,8 +96,14 @@ end
 
 connObj = CONN;
 
+% if connection fails to establish, remove the persistent connection object
 if ~connObj.isConnected
-    query(connObj, 'status')
+    try
+        query(connObj, 'status')
+    catch e
+        CONN = [];
+        rethrow(e) 
+    end
 end
 
 if nargout==0
