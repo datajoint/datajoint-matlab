@@ -21,12 +21,12 @@ jobs:
     - <<: *slim
       env:
       - MATLAB_VERSION: R2018b
-      - MYSQL_TAG: 8.0-slim9.9
+      - MYSQL_TAG: 8.0
     - <<: *slim
       env:
       - MATLAB_VERSION: R2018b
-      - MYSQL_TAG: 5.7-slim9.9
+      - MYSQL_TAG: 5.7
     - <<: *slim
       env:
       - MATLAB_VERSION: R2018b
-      - MYSQL_TAG: 5.6-slim9.9
+      - MYSQL_TAG: 5.6
