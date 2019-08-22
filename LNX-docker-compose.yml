@@ -1,0 +1,43 @@
+# docker-compose -f LNX-docker-compose.yml --env-file LNX.env up --build --exit-code-from dj
+version: '2.2'
+x-net: &net
+  networks:
+    - main
+services:
+  dj:
+    <<: *net
+    environment:
+    - DISPLAY
+    - MATLAB_LICENSE
+    - MATLAB_USER
+    - DJ_HOST=mysql
+    - DJ_USER=root
+    - DJ_PASS=simple
+    - DJ_TEST_HOST=mysql
+    - DJ_TEST_USER=datajoint
+    - DJ_TEST_PASSWORD=datajoint
+    image: raphaelguzman/matlab:${MATLAB_VERSION}-MIN
+    depends_on:
+      mysql:
+        condition: service_healthy
+    user: ${MATLAB_UID}:${MATLAB_GID}
+    working_dir: /src
+    command: > 
+      /bin/bash -c "
+        matlab -nodisplay -r \"\
+            res=run(tests.Main);\
+            disp(res);\
+            if all([res.Passed])  exit, else exit(1), end;\
+          \";
+      "
+    mac_address: $MATLAB_HOSTID
+    volumes:
+      - .:/src
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  mysql:
+    <<: *net
+    image: datajoint/mysql:${MYSQL_TAG}
+    environment:
+      - MYSQL_ROOT_PASSWORD=simple
+networks:
+  main:
