@@ -20,7 +20,8 @@ if isempty(STATE) || (nargin==1 && strcmpi(name,'restore'))
         'populateAncestors', false, ...
         'bigint_to_double', false, ...
         'maxPreviewRows', 12, ... how many rows to display when previewing a relation
-        'ignore_extra_insert_fields', false ...  when false, throws an error in `insert(self, tuple)` when tuple has extra fields.
+        'ignore_extra_insert_fields', false, ...  when false, throws an error in `insert(self, tuple)` when tuple has extra fields.
+        'use_tls', nan ...
         );
 end
 

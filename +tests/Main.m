@@ -1,5 +1,6 @@
 classdef Main < ...
-    tests.TestConnection
+    tests.TestConnection & ...
+    tests.TestTls
 
     properties (Constant)
         CONN_INFO_ROOT = struct(...
@@ -17,7 +18,7 @@ classdef Main < ...
             disp('---------------INIT---------------');
             clear functions;
             testCase.addTeardown(@testCase.dispose);
-
+            
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
 
@@ -78,12 +79,12 @@ classdef Main < ...
             end
         end
     end
-
+       
     methods (Static)
         function dispose()
             disp('---------------DISP---------------');
             warning('off','MATLAB:RMDIR:RemovedFromPath');
-
+            
             curr_conn = dj.conn(tests.Main.CONN_INFO_ROOT.host, ...
                 tests.Main.CONN_INFO_ROOT.user, tests.Main.CONN_INFO_ROOT.password, '',true);
 
