@@ -10,3 +10,4 @@ classdef TestConnection < matlab.unittest.TestCase
                 testCase.CONN_INFO.password,'',true).isConnected);
         end
     end
+end
