@@ -32,8 +32,11 @@ end
 
 
 if isa(CONN, 'dj.Connection') && ~reset
-    assert(nargin==0, ...
-        'connection already instantiated. To reconnect, clear functions')
+    if nargin>0
+        warning(sprintf(['Connection already instantiated.\n' ...
+            'Will use existing connection to "' CONN.host '".\n' ...
+            'To reconnect, set reset to true']));
+    end
 else
     % invoke setupDJ
     % optional environment variables specifying the connection.

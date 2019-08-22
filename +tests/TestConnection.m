@@ -9,5 +9,13 @@ classdef TestConnection < matlab.unittest.TestCase
                 testCase.CONN_INFO.user,...
                 testCase.CONN_INFO.password,'',true).isConnected);
         end
+        function testConnectionExists(testCase)
+            % testConnectionExists tests that will not fail if connection open.
+            % Fix https://github.com/datajoint/datajoint-matlab/issues/160
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            dj.conn(testCase.CONN_INFO.host, '', '', '', '', true)
+            dj.conn(testCase.CONN_INFO.host, '', '', '', '', true)
+        end
     end
 end
