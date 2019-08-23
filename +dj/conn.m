@@ -32,8 +32,18 @@ end
 
 
 if isa(CONN, 'dj.Connection') && ~reset
-    assert(nargin==0, ...
-        'connection already instantiated. To reconnect, clear functions')
+    if nargin>0
+        if strcmp(CONN.host,host)
+            warning('DataJoint:Connection:AlreadyInstantiated', sprintf([...
+                'Connection already instantiated.\n' ...
+                'Will use existing connection to "' CONN.host '".\n' ...
+                'To reconnect, set reset to true']));
+        else
+            error('DataJoint:Connection:AlreadyInstantiated', sprintf([...
+                'Connection already instantiated to "' CONN.host '".\n' ...
+                'To reconnect, set reset to true']));
+        end
+    end
 else
     % invoke setupDJ
     % optional environment variables specifying the connection.
