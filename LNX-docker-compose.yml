@@ -16,7 +16,7 @@ services:
     - DJ_TEST_HOST=mysql
     - DJ_TEST_USER=datajoint
     - DJ_TEST_PASSWORD=datajoint
-    image: raphaelguzman/matlab:${MATLAB_VERSION}-MIN
+    image: raphaelguzman/matlab:${MATLAB_VERSION}-GUI
     depends_on:
       mysql:
         condition: service_healthy
@@ -29,6 +29,7 @@ services:
             disp(res);\
             if all([res.Passed])  exit, else exit(1), end;\
           \";
+        tail -f /dev/null;
       "
     mac_address: $MATLAB_HOSTID
     volumes:
