@@ -115,7 +115,7 @@ classdef ERD < handle
             % exclude auxiliary tables (job tables, etc.)
             j = cellfun(@isempty, regexp(self.nodes, '^`[a-z]\w*`\.`~\w+`$'));
             self.nodes = self.nodes(j);
-            
+            r
             self.makeGraph
             
             rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
