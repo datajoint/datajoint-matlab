@@ -1,3 +1,7 @@
+
+Creating a virtual class
+~~~~~~~~~~~~~~~~~~~~~~~~
+
 A ``TableAccessor`` object is created as a property of a schema during each schema's creation.
 This property is named ``schema.v``, for *virtual class generator*.
 The ``TableAccessor`` ``v`` itself has properties that refer to the tables of the schema.
