@@ -113,12 +113,12 @@ classdef ERD < handle
             % draw the diagram
             
             % exclude auxiliary tables (job tables, etc.)
-            j = cellfun(@isempty, regexp(self.nodes, '^`[a-z]\w*`\.`~\w+`$')); %raphael
+            j = cellfun(@isempty, regexp(self.nodes, '^`[a-z]\w*`\.`~\w+`$'));
             self.nodes = self.nodes(j);
 
             self.makeGraph
-            
-            rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false); %raphael
+
+            rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
             rege{end+1} = '^`[a-z]\w*`\.`\W?\w+__\w+`$';   % for part tables
             rege{end+1} = '^\d+$';  % for numbered nodes
             tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'last'), self.graph.Nodes.Name);
