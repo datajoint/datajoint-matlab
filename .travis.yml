@@ -18,7 +18,7 @@ slim: &slim
   script:
     - license=MATLAB_LICENSE_${MATLAB_VERSION}
     - export MATLAB_LICENSE=$(eval echo "\$$license")
-    - docker-compose -f LNX-docker-compose.yml up --exit-code-from dj
+    - docker-compose -f LNX-docker-compose.yml up --exit-code-from app
 jobs:
   include:
     - <<: *slim

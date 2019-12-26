@@ -1,6 +1,7 @@
 classdef Header < matlab.mixin.Copyable
     % relation header: a list of attributes, their types, etc.
     % This class is used internally by DataJoint and should not
+    % be modified.
     
     properties(SetAccess=private)
         info          % table info
@@ -188,11 +189,11 @@ classdef Header < matlab.mixin.Copyable
             assert(~isempty(self.attributes))
             for i = 1:length(self.attributes)
                 if isempty(self.attributes(i).alias)
-%                     if strcmp(self.attributes(i).type,'float')
-%                         sql = sprintf('%s,1.0*`%s` as `%s`', sql, self.names{i}, self.names{i});  % cast to double to avoid rounding problems
-%                     else
+                    % if strcmp(self.attributes(i).type,'float')
+                    %     sql = sprintf('%s,1.0*`%s` as `%s`', sql, self.names{i}, self.names{i});  % cast to double to avoid rounding problems
+                    % else
                         sql = sprintf('%s,`%s`', sql, self.names{i});
-%                    end
+                    % end
                 else
                     % aliased attributes
                     if strcmp(self.attributes(i).type,'float')  % cast to double to avoid rounding problems

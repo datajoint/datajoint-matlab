@@ -327,7 +327,7 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            sql = fieldToSQL(parseAttrDef(definition));
+            sql = fieldToSQL(dj.internal.Declare.parseAttrDef(definition));
             self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
@@ -341,7 +341,7 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = fieldToSQL(parseAttrDef(newDefinition));
+            sql = fieldToSQL(dj.internal.Declare.parseAttrDef(newDefinition));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
         
@@ -358,7 +358,7 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            sql = makeFK('', target, self.primaryKey, true, dj.internal.shorthash(self.fullTableName));
+            sql = dj.internal.Declare.makeFK('', target, self.primaryKey, true, dj.internal.shorthash(self.fullTableName));
             self.alter(sprintf('ADD %s', sql))
         end
         
@@ -704,7 +704,7 @@ classdef Table < handle
                         inKey = false;                        
                         % foreign key
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-                        [sql, newFields] = makeFK(sql, line, fields, inKey, ...
+                        [sql, newFields] = dj.internal.Declare.makeFK(sql, line, fields, inKey, ...
                             dj.internal.shorthash(sprintf('`%s`.`%s`', self.schema.dbname, tableName)));
                         sql = sprintf('%s,\n', sql);
                         fields = [fields, newFields]; %#ok<AGROW>
@@ -720,7 +720,7 @@ classdef Table < handle
                     case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
                             '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
                             ':\s*\w.*$'])                             % type, comment
-                        fieldInfo = parseAttrDef(line);
+                        fieldInfo = dj.internal.Declare.parseAttrDef(line);
                         assert(~inKey || ~fieldInfo.isnullable, ...
                             'primary key attributes cannot be nullable')
                         if inKey
@@ -781,161 +781,63 @@ end
 %          LOCAL FUNCTIONS
 
 function str = readPercentBraceComment(filename)
-% reads the initial comment block %{ ... %} in filename
+    % reads the initial comment block %{ ... %} in filename
 
-f = fopen(filename, 'rt');
-assert(f~=-1, 'Could not open %s', filename)
-str = '';
+    f = fopen(filename, 'rt');
+    assert(f~=-1, 'Could not open %s', filename)
+    str = '';
 
-% skip all lines that do not begin with a %{
-l = fgetl(f);
-while ischar(l) && ~strcmp(strtrim(l),'%{')
+    % skip all lines that do not begin with a %{
     l = fgetl(f);
-end
-
-% read the contents of the comment
-if ischar(l)
-    while true
+    while ischar(l) && ~strcmp(strtrim(l),'%{')
         l = fgetl(f);
-        if strcmp(strtrim(l),'%}')
-            break
-        end
-        str = sprintf('%s%s\n', str, l);
     end
-end
 
-fclose(f);
+    % read the contents of the comment
+    if ischar(l)
+        while true
+            l = fgetl(f);
+            if strcmp(strtrim(l),'%}')
+                break
+            end
+            str = sprintf('%s%s\n', str, l);
+        end
+    end
+
+    fclose(f);
 end
 
 
 
 function sql = fieldToSQL(field)
-% convert the structure field with header {'name' 'type' 'default' 'comment'}
-% to the SQL column declaration
+    % convert the structure field with header {'name' 'type' 'default' 'comment'}
+    % to the SQL column declaration
 
-if field.isnullable   % all nullable attributes default to null
-    default = 'DEFAULT NULL';
-else
-    default = 'NOT NULL';
-    if ~isempty(field.default)
-        % enclose value in quotes (even numeric), except special SQL values
-        % or values already enclosed by the user
-        if any(strcmpi(field.default, dj.Table.mysql_constants)) || ...
-                ismember(field.default(1), {'''', '"'})
-            default = sprintf('%s DEFAULT %s', default, field.default);
-        else
-            default = sprintf('%s DEFAULT "%s"', default, field.default);
+    if field.isnullable   % all nullable attributes default to null
+        default = 'DEFAULT NULL';
+    else
+        default = 'NOT NULL';
+        if ~isempty(field.default)
+            % enclose value in quotes (even numeric), except special SQL values
+            % or values already enclosed by the user
+            if any(strcmpi(field.default, dj.Table.mysql_constants)) || ...
+                    ismember(field.default(1), {'''', '"'})
+                default = sprintf('%s DEFAULT %s', default, field.default);
+            else
+                default = sprintf('%s DEFAULT "%s"', default, field.default);
+            end
         end
     end
-end
-assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
-    'illegal characters in attribute comment "%s"', field.comment)
-sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
-    field.name, field.type, default, field.comment);
-end
-
-
-function [sql, newattrs] = makeFK(sql, line, existingFields, inKey, hash)
-% add foreign key to SQL table definition
-pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
-    '\s*->\s*' ...
-    '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
-    '\w*' ...
-    '(?<attrs>\([\s\w,]*\))?' ...
-    '\s*(#.*)?$'];
-fk = regexp(line, pat, 'names');
-if exist(fk.cname, 'class')
-    rel = feval(fk.cname);
-    assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', fk.cname)
-else
-    rel = dj.Relvar(fk.cname);
+    assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
+        'illegal characters in attribute comment "%s"', field.comment)
+    sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
+        field.name, field.type, default, field.comment);
 end
 
-% parse and validate the attribute lists
-attrs = strsplit(fk.attrs, {' ',',','(',')'});
-newattrs = strsplit(fk.newattrs, {' ',',','(',')'});
-attrs(cellfun(@isempty, attrs))=[];
-newattrs(cellfun(@isempty, newattrs))=[];
-assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
-    'All attributes in (%s) must be in the primary key of %s', ...
-    strjoin(attrs, ','), rel.className)
-if length(newattrs)==1 
-    % unambiguous single attribute
-    if length(rel.primaryKey)==1
-        attrs = rel.primaryKey;
-    elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
-        attrs = setdiff(rel.primaryKey, existingFields);
-    end
-end
-assert(length(attrs) == length(newattrs) , ...
-    'Mapped fields (%s) and (%s) must match in the foreign key.', ...
-    strjoin(newattrs,','), strjoin(attrs,','))
-
-% prepend unspecified primary key attributes that have not yet been included 
-pk = rel.primaryKey;
-pk(ismember(pk,attrs) | ismember(pk,existingFields))=[];
-attrs = [pk attrs];
-newattrs = [pk newattrs];
-
-% fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
-[~, ix] = sort(cellfun(@(a) find(strcmp(a, rel.primaryKey)), attrs));
-attrs = attrs(ix);
-newattrs = newattrs(ix);
-
-for i=1:length(attrs)
-    fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, rel.tableHeader.names));
-    fieldInfo.name = newattrs{i};
-    fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-    sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
-end
-
-fkattrs = rel.primaryKey;
-fkattrs(ismember(fkattrs, attrs))=newattrs;
-hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
-sql = sprintf(...
-    '%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT', ...
-    sql, hash, backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
-end
-
-
-function fieldInfo = parseAttrDef(line)
-line = strtrim(line);
-assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute name in %s', line)
-pat = {
-    '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-    '=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*' % default value
-    ':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE][mM][eE][nN][tT])?)\s*'       % datatype
-    '#(?<comment>.*)'           % comment
-    '$'  % end of line
-    };
-hasDefault = ~isempty(regexp(line, '^\w+\s*=', 'once'));
-if ~hasDefault
-    pat{2} = '';
-end
-for sub = {[1 2 3 4 5] [1 2 3 5]}  % with and without the comment
-    pattern = cat(2,pat{sub{:}});
-    fieldInfo = regexp(line, pattern, 'names');
-    if ~isempty(fieldInfo)
-        break
-    end
-end
-assert(numel(fieldInfo)==1, 'Invalid field declaration "%s"', line)
-if ~isfield(fieldInfo,'comment')
-    fieldInfo.comment = '';
-end
-fieldInfo.comment = strtrim(fieldInfo.comment);
-if ~hasDefault
-    fieldInfo.default = '';
-end
-assert(isempty(regexp(fieldInfo.type,'^bigint', 'once')) ...
-    || ~strcmp(fieldInfo.default,'null'), ...
-    'BIGINT attributes cannot be nullable in "%s"', line)
-fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
-end
 
 
 
 function str = backquotedList(arr)
-str = sprintf('`%s`,', arr{:});
-str(end)=[];
+    str = sprintf('`%s`,', arr{:});
+    str(end)=[];
 end

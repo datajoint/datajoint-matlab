@@ -713,120 +713,120 @@ end
 
 
 function clause = makeWhereClause(header, restrictions)
-% make the where clause from self.restrictions
-persistent aliasCount
-if isempty(aliasCount)
-    aliasCount = 0;
-else
-    aliasCount = aliasCount + 1;
-end
+    % make the where clause from self.restrictions
+    persistent aliasCount
+    if isempty(aliasCount)
+        aliasCount = 0;
+    else
+        aliasCount = aliasCount + 1;
+    end
 
-assert(all(arrayfun(@(x) isempty(x.alias), header.attributes)), ...
-    'aliases must be resolved before restriction')
+    assert(all(arrayfun(@(x) isempty(x.alias), header.attributes)), ...
+        'aliases must be resolved before restriction')
 
-clause = '';
-not = '';
+    clause = '';
+    not = '';
 
-for arg = restrictions
-    cond = arg{1};
-    switch true
-        case isa(cond, 'dj.internal.GeneralRelvar') && strcmp(cond.operator, 'union')
-            % union
-            s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'uni', false);
-            assert(~isempty(s))
-            s = sprintf('(%s) OR ', s{:});
-            clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
-            
-        case isa(cond, 'dj.internal.GeneralRelvar') && strcmp(cond.operator, 'not')
-            clause = sprintf('%s AND NOT(%s)', clause, ...
-                makeWhereClause(header, cond.operands));
-            
-        case dj.lib.isString(cond) && strcmpi(cond,'NOT')
-            % negation of the next condition
-            not = 'NOT ';
-            continue
-            
-        case dj.lib.isString(cond) && ~strcmpi(cond, 'NOT')
-            % SQL condition
-            clause = sprintf('%s AND %s(%s)', clause, not, cond);
-            
-        case isstruct(cond)
-            % restriction by a structure array
-            cond = dj.struct.proj(cond, header.names{:}); % project onto common attributes
-            if isempty(fieldnames(cond))
-                % restrictor has no common attributes:
-                %    semijoin leaves relation unchanged.
-                %    antijoin returns the empty relation.
-                if ~isempty(not)
-                    clause = ' AND FALSE';
-                end
-            else
-                if ~isempty(cond)
-                    % normal restricton
-                    clause = sprintf('%s AND %s(%s)', clause, not, struct2cond(cond, header));
+    for arg = restrictions
+        cond = arg{1};
+        switch true
+            case isa(cond, 'dj.internal.GeneralRelvar') && strcmp(cond.operator, 'union')
+                % union
+                s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'uni', false);
+                assert(~isempty(s))
+                s = sprintf('(%s) OR ', s{:});
+                clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
+                
+            case isa(cond, 'dj.internal.GeneralRelvar') && strcmp(cond.operator, 'not')
+                clause = sprintf('%s AND NOT(%s)', clause, ...
+                    makeWhereClause(header, cond.operands));
+                
+            case dj.lib.isString(cond) && strcmpi(cond,'NOT')
+                % negation of the next condition
+                not = 'NOT ';
+                continue
+                
+            case dj.lib.isString(cond) && ~strcmpi(cond, 'NOT')
+                % SQL condition
+                clause = sprintf('%s AND %s(%s)', clause, not, cond);
+                
+            case isstruct(cond)
+                % restriction by a structure array
+                cond = dj.struct.proj(cond, header.names{:}); % project onto common attributes
+                if isempty(fieldnames(cond))
+                    % restrictor has no common attributes:
+                    %    semijoin leaves relation unchanged.
+                    %    antijoin returns the empty relation.
+                    if ~isempty(not)
+                        clause = ' AND FALSE';
+                    end
                 else
-                    if isempty(cond)
-                        % restrictor has common attributes but is empty:
-                        %     semijoin makes the empty relation
-                        %     antijoin leavs relation unchanged
-                        if isempty(not)
-                            clause = ' AND FALSE';
+                    if ~isempty(cond)
+                        % normal restricton
+                        clause = sprintf('%s AND %s(%s)', clause, not, struct2cond(cond, header));
+                    else
+                        if isempty(cond)
+                            % restrictor has common attributes but is empty:
+                            %     semijoin makes the empty relation
+                            %     antijoin leavs relation unchanged
+                            if isempty(not)
+                                clause = ' AND FALSE';
+                            end
                         end
                     end
                 end
-            end
-            
-        case isa(cond, 'dj.internal.GeneralRelvar')
-            % semijoin or antijoin
-            [condHeader, condSQL] = cond.compile;
-            
-            % isolate previous projection (if not already)
-            if ismember(cond.operator, {'proj','aggregate'}) && isempty(cond.restrictions) && ...
-                    ~all(cellfun(@isempty, {cond.header.attributes.alias}))
-                condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', ...
-                    condHeader.sql, condSQL, aliasCount);
-            end
-            
-            % common attributes for matching. Blobs are not included
-            commonDependent = intersect(header.dependentFields,condHeader.dependentFields);
-            if ~isempty(commonDependent)
-                error('Cannot restrict by dependent attribute `%s`.  It must be projected out or renamed before restriction.',commonDependent{1})
-            end
-            commonAttrs = intersect(header.names, condHeader.names);
-            if isempty(commonAttrs)
-                % no common attributes. Semijoin = original relation, antijoin = empty relation
-                if ~isempty(not)
-                    clause = ' AND FALSE';
+                
+            case isa(cond, 'dj.internal.GeneralRelvar')
+                % semijoin or antijoin
+                [condHeader, condSQL] = cond.compile;
+                
+                % isolate previous projection (if not already)
+                if ismember(cond.operator, {'proj','aggregate'}) && isempty(cond.restrictions) && ...
+                        ~all(cellfun(@isempty, {cond.header.attributes.alias}))
+                    condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', ...
+                        condHeader.sql, condSQL, aliasCount);
                 end
-            else
-                % make semijoin or antijoin clause
-                commonAttrs = sprintf( ',`%s`', commonAttrs{:});
-                commonAttrs = commonAttrs(2:end);
-                clause = sprintf('%s AND ((%s) %s IN (SELECT %s FROM %s))',...
-                    clause, commonAttrs, not, commonAttrs, condSQL);
-            end
+                
+                % common attributes for matching. Blobs are not included
+                commonDependent = intersect(header.dependentFields,condHeader.dependentFields);
+                if ~isempty(commonDependent)
+                    error('Cannot restrict by dependent attribute `%s`.  It must be projected out or renamed before restriction.',commonDependent{1})
+                end
+                commonAttrs = intersect(header.names, condHeader.names);
+                if isempty(commonAttrs)
+                    % no common attributes. Semijoin = original relation, antijoin = empty relation
+                    if ~isempty(not)
+                        clause = ' AND FALSE';
+                    end
+                else
+                    % make semijoin or antijoin clause
+                    commonAttrs = sprintf( ',`%s`', commonAttrs{:});
+                    commonAttrs = commonAttrs(2:end);
+                    clause = sprintf('%s AND ((%s) %s IN (SELECT %s FROM %s))',...
+                        clause, commonAttrs, not, commonAttrs, condSQL);
+                end
+        end
+        not = '';
     end
-    not = '';
-end
-if length(clause)>6
-    clause = clause(6:end); % strip " AND "
-end
+    if length(clause)>6
+        clause = clause(6:end); % strip " AND "
+    end
 end
 
 
 function cond = struct2cond(keys, header)
-% convert the structure array into an SQL condition
-n = length(keys);
-assert(n>=1)
-if n>512
-    warning('DataJoint:longCondition', ...
-        'consider replacing the long array of keys with a more succinct condition')
-end
-cond = '';
-for key = keys(:)'
-    cond = sprintf('%s OR (%s)', cond, makeCond(key));
-end
-cond = cond(min(end,5):end);  % strip " OR "
+    % convert the structure array into an SQL condition
+    n = length(keys);
+    assert(n>=1)
+    if n>512
+        warning('DataJoint:longCondition', ...
+            'consider replacing the long array of keys with a more succinct condition')
+    end
+    cond = '';
+    for key = keys(:)'
+        cond = sprintf('%s OR (%s)', cond, makeCond(key));
+    end
+    cond = cond(min(end,5):end);  % strip " OR "
 
     function subcond = makeCond(key)
         subcond = '';
@@ -857,29 +857,29 @@ end
 
 
 function [limit, args] = makeLimitClause(varargin)
-% makes the SQL limit clause from fetch() input arguments.
-% If the last one or two inputs are numeric, a LIMIT clause is
-% created.
-args = varargin;
-limit = '';
-if nargin
-    lastArg = varargin{end};
-    if ischar(lastArg) && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
-        limit = [' ' varargin{end}];
-        args = args(1:end-1);
-    elseif isnumeric(lastArg)
-        limit = sprintf(' LIMIT %d', lastArg);
-        args = args(1:end-1);
+    % makes the SQL limit clause from fetch() input arguments.
+    % If the last one or two inputs are numeric, a LIMIT clause is
+    % created.
+    args = varargin;
+    limit = '';
+    if nargin
+        lastArg = varargin{end};
+        if ischar(lastArg) && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
+            limit = [' ' varargin{end}];
+            args = args(1:end-1);
+        elseif isnumeric(lastArg)
+            limit = sprintf(' LIMIT %d', lastArg);
+            args = args(1:end-1);
+        end
     end
-end
 end
 
 
 function str = escapeString(str)
-% Escapes strings that are used in SQL clauses by struct2cond.
-% We use ' to enclose strings, so we need to replace all instances of ' with ''.
-% To prevent the expansion of MySQL escape characters, all instances
-% of \ have to be replaced with \\.
-str = strrep(str, '''', '''''');
-str = strrep(str, '\', '\\');
+    % Escapes strings that are used in SQL clauses by struct2cond.
+    % We use ' to enclose strings, so we need to replace all instances of ' with ''.
+    % To prevent the expansion of MySQL escape characters, all instances
+    % of \ have to be replaced with \\.
+    str = strrep(str, '''', '''''');
+    str = strrep(str, '\', '\\');
 end
