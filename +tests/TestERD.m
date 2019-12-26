@@ -11,7 +11,8 @@ classdef TestERD < tests.Prep
                 testCase.CONN_INFO.user,...
                 testCase.CONN_INFO.password,'',true);
 
-            dj.createSchema(package,[testCase.test_root '/test_schemas'], [testCase.PREFIX '_university']);
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_university']);
 
             insert(University.Student, {
                0   'John'   'Smith'  '2019-09-19 16:50'

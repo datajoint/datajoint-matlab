@@ -6,11 +6,14 @@ classdef Declare
     methods(Static)
         function fieldInfo = parseAttrDef(line)
             line = strtrim(line);
-            assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), 'invalid attribute name in %s', line)
+            assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), ...
+                'invalid attribute name in %s', line)
             pat = {
                 '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-                '=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*' % default value
-                ':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE][mM][eE][nN][tT])?)\s*'       % datatype
+                ['=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)' ...
+                    '\s*'] % default value
+                [':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE]' ...
+                    '[mM][eE][nN][tT])?)\s*']       % datatype
                 '#(?<comment>.*)'           % comment
                 '$'  % end of line
                 };
@@ -81,13 +84,15 @@ classdef Declare
             attrs = [pk attrs];
             newattrs = [pk newattrs];
             
-            % fromFields and toFields are sorted in the same order as ref.rel.tableHeader.attributes
+            % fromFields and toFields are sorted in the same order as
+            % ref.rel.tableHeader.attributes
             [~, ix] = sort(cellfun(@(a) find(strcmp(a, rel.primaryKey)), attrs));
             attrs = attrs(ix);
             newattrs = newattrs(ix);
             
             for i=1:length(attrs)
-                fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, rel.tableHeader.names));
+                fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, ...
+                    rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
                 sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
@@ -97,8 +102,9 @@ classdef Declare
             fkattrs(ismember(fkattrs, attrs))=newattrs;
             hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
             sql = sprintf(...
-                '%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ON DELETE RESTRICT', ...
-                sql, hash, backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
+                ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ' ...
+                'ON DELETE RESTRICT'], sql, hash, backquotedList(fkattrs), ...
+                rel.fullTableName, backquotedList(rel.primaryKey));
         end
     end
 end

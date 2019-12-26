@@ -735,7 +735,8 @@ function clause = makeWhereClause(header, restrictions)
                 s = cellfun(@(x) makeWhereClause(header, {x}), cond.operands, 'uni', false);
                 assert(~isempty(s))
                 s = sprintf('(%s) OR ', s{:});
-                clause = sprintf('%s AND %s(%s)', clause, not, s(1:end-4));  % strip trailing " OR "
+                clause = sprintf('%s AND %s(%s)', clause, not, ...
+                    s(1:end-4));  % strip trailing " OR "
                 
             case isa(cond, 'dj.internal.GeneralRelvar') && strcmp(cond.operator, 'not')
                 clause = sprintf('%s AND NOT(%s)', clause, ...
@@ -763,7 +764,8 @@ function clause = makeWhereClause(header, restrictions)
                 else
                     if ~isempty(cond)
                         % normal restricton
-                        clause = sprintf('%s AND %s(%s)', clause, not, struct2cond(cond, header));
+                        clause = sprintf('%s AND %s(%s)', clause, not, ...
+                            struct2cond(cond, header));
                     else
                         if isempty(cond)
                             % restrictor has common attributes but is empty:
@@ -781,7 +783,8 @@ function clause = makeWhereClause(header, restrictions)
                 [condHeader, condSQL] = cond.compile;
                 
                 % isolate previous projection (if not already)
-                if ismember(cond.operator, {'proj','aggregate'}) && isempty(cond.restrictions) && ...
+                if ismember(cond.operator, {'proj','aggregate'}) && ...
+                        isempty(cond.restrictions) && ...
                         ~all(cellfun(@isempty, {cond.header.attributes.alias}))
                     condSQL = sprintf('(SELECT %s FROM %s) as `$u%x`', ...
                         condHeader.sql, condSQL, aliasCount);
@@ -790,11 +793,14 @@ function clause = makeWhereClause(header, restrictions)
                 % common attributes for matching. Blobs are not included
                 commonDependent = intersect(header.dependentFields,condHeader.dependentFields);
                 if ~isempty(commonDependent)
-                    error('Cannot restrict by dependent attribute `%s`.  It must be projected out or renamed before restriction.',commonDependent{1})
+                    error(['Cannot restrict by dependent attribute `%s`. It must be' ...
+                        ' projected out or renamed before restriction.'], ...
+                        commonDependent{1})
                 end
                 commonAttrs = intersect(header.names, condHeader.names);
                 if isempty(commonAttrs)
-                    % no common attributes. Semijoin = original relation, antijoin = empty relation
+                    % no common attributes. Semijoin = original relation, 
+                    % antijoin = empty relation
                     if ~isempty(not)
                         clause = ' AND FALSE';
                     end
@@ -864,7 +870,8 @@ function [limit, args] = makeLimitClause(varargin)
     limit = '';
     if nargin
         lastArg = varargin{end};
-        if ischar(lastArg) && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || strncmp(varargin{end}, 'LIMIT ', 6))
+        if ischar(lastArg) && (strncmp(strtrim(varargin{end}), 'ORDER BY', 8) || ...
+                strncmp(varargin{end}, 'LIMIT ', 6))
             limit = [' ' varargin{end}];
             args = args(1:end-1);
         elseif isnumeric(lastArg)

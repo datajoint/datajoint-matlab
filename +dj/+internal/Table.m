@@ -358,7 +358,8 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            sql = dj.internal.Declare.makeFK('', target, self.primaryKey, true, dj.internal.shorthash(self.fullTableName));
+            sql = dj.internal.Declare.makeFK('', target, self.primaryKey, ...
+                true, dj.internal.shorthash(self.fullTableName));
             self.alter(sprintf('ADD %s', sql))
         end
         
@@ -704,7 +705,8 @@ classdef Table < handle
                         inKey = false;                        
                         % foreign key
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-                        [sql, newFields] = dj.internal.Declare.makeFK(sql, line, fields, inKey, ...
+                        [sql, newFields] = dj.internal.Declare.makeFK( ...
+                            sql, line, fields, inKey, ...
                             dj.internal.shorthash(sprintf('`%s`.`%s`', self.schema.dbname, tableName)));
                         sql = sprintf('%s,\n', sql);
                         fields = [fields, newFields]; %#ok<AGROW>
