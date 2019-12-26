@@ -117,7 +117,8 @@ classdef Prep < matlab.unittest.TestCase
             dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..');
             subFolders = files(dirFlags);
             for k = 1 : length(subFolders)
-                delete([testCase.test_root '/test_schemas/' subFolders(k).name '/getSchema.m']);
+                delete([testCase.test_root '/test_schemas/' subFolders(k).name ...
+                    '/getSchema.m']);
                 % delete(['test_schemas/+University/getSchema.m'])
             end
             rmpath([testCase.test_root '/test_schemas']);

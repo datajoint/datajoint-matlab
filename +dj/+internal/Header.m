@@ -190,7 +190,8 @@ classdef Header < matlab.mixin.Copyable
             for i = 1:length(self.attributes)
                 if isempty(self.attributes(i).alias)
                     % if strcmp(self.attributes(i).type,'float')
-                    %     sql = sprintf('%s,1.0*`%s` as `%s`', sql, self.names{i}, self.names{i});  % cast to double to avoid rounding problems
+                    %     sql = sprintf('%s,1.0*`%s` as `%s`', sql, self.names{i}, ...
+                    %         self.names{i});  % cast to double to avoid rounding problems
                     % else
                         sql = sprintf('%s,`%s`', sql, self.names{i});
                     % end
