@@ -35,10 +35,6 @@ classdef Table < handle
         descendants    % names of all dependent tables, including self, recursively, in order of dependencies
     end
     
-    properties(Constant)
-        mysql_constants = {'CURRENT_TIMESTAMP'}
-    end
-    
     
     methods
         function self = Table(className)
@@ -274,7 +270,7 @@ classdef Table < handle
                     if attr.isnullable
                         default = '=null';
                     elseif ~isempty(default)
-                        if attr.isNumeric || any(strcmp(default,self.mysql_constants))
+                        if attr.isNumeric || any(strcmp(default,dj.internal.Declare.CONSTANT_LITERALS))
                             default = ['=' default]; %#ok<AGROW>
                         else
                             default = ['="' default '"']; %#ok<AGROW>
@@ -327,7 +323,7 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            sql = fieldToSQL(dj.internal.Declare.parseAttrDef(definition));
+            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef(definition));
             self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
@@ -341,7 +337,7 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = fieldToSQL(dj.internal.Declare.parseAttrDef(newDefinition));
+            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef(newDefinition));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
         
@@ -578,18 +574,6 @@ classdef Table < handle
         end
         
         
-        function definition = getDefinition(self)
-            % extract the table declaration with the first percent-brace comment
-            % block of the matching .m file.
-            file = which(self.className);
-            assert(~isempty(file), ...
-                'MissingTableDefinition:Could not find table definition file %s', self.className)
-            definition = readPercentBraceComment(file);
-            assert(~isempty(definition), ...
-                'MissingTableDefnition:Could not find the table declaration in %s', file)
-        end
-        
-        
         function alter(self, alterStatement)
             % dj.Table/alter
             % alter(self, alterStatement)
@@ -611,7 +595,7 @@ classdef Table < handle
         
         function create(self)
             % parses the table declration and declares the table
-            
+
             if self.isCreated
                 return
             end
@@ -619,134 +603,9 @@ classdef Table < handle
             if self.isCreated
                 return
             end
-            def = self.getDefinition();
-            
-            % split into a columnwise cell array
-            def = strtrim(regexp(def,'\n','split')');
-            
-            % append the next line to lines that end in a backslash
-            for i=find(cellfun(@(x) ~isempty(x) && x(end)=='\', def'))
-                def{i} = [def{i}(1:end-1) ' ' def{i+1}];
-                def(i+1) = '';
-            end
-            
-            % parse table schema, name, type, and comment
-            switch true
-                    
-                case {isa(self, 'dj.internal.UserRelation'), isa(self, 'dj.Part'), isa(self, 'dj.Jobs')}
-                    % New-style declaration using special classes for each tier
-                    tableInfo = struct;
-                    if isa(self, 'dj.Part')
-                        tableInfo.tier = 'part';
-                    else
-                        specialClass = find(cellfun(@(c) isa(self, c), dj.Schema.tierClasses));
-                        assert(length(specialClass)==1, 'Unknown type of UserRelation in %s', class(self))
-                        tableInfo.tier = dj.Schema.allowedTiers{specialClass};
-                    end
-                    % remove empty lines
-                    def(cellfun(@(x) isempty(x), def)) = [];
-                    if strncmp(def{1}, '#', 1)
-                        tableInfo.comment = strtrim(def{1}(2:end));
-                        def = def(2:end);
-                    else
-                        tableInfo.comment = '';
-                    end
-                    % remove pure comments
-                    def(cellfun(@(x) strncmp('#',strtrim(x),1), def)) = [];                    
-                    cname = strsplit(self.className, '.');
-                    tableInfo.package = strjoin(cname(1:end-1), '.');
-                    tableInfo.className = cname{end};
-                    if isa(self, 'dj.Part')
-                        tableName = sprintf('%s%s%s', self.schema.prefix, ...
-                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                            sprintf('%s__%s', self.master.plainTableName, ...
-                            dj.internal.fromCamelCase(self.className(length(self.master.className)+1:end)))); %#ok<MCNPN>
-                    else
-                        tableName = sprintf('%s%s%s', self.schema.prefix, ...
-                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                            dj.internal.fromCamelCase(tableInfo.className));
-                    end
-                    
-                otherwise
-                    % Old-style declaration for backward compatibility
-                    
-                    % remove empty lines and pure comment lines
-                    def(cellfun(@(x) isempty(x) || strncmp('#',x,1), def)) = [];
-                    firstLine = strtrim(def{1});
-                    def = def(2:end);
-                    pat = {
-                        '^(?<package>\w+)\.(?<className>\w+)\s*'  % package.TableName
-                        '\(\s*(?<tier>\w+)\s*\)\s*'               % (tier)
-                        '#\s*(?<comment>.*)$'                     % # comment
-                        };
-                    tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
-                    assert(numel(tableInfo)==1, ...
-                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1: \n  %s', firstLine)
-                    assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-                        'invalidTableTier:Invalid tier for table ', tableInfo.className)
-                    cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
-                    assert(strcmp(cname, self.className), ...
-                        'Table name %s does not match in file %s', cname, self.className)
-                    tableName = sprintf('%s%s%s', self.schema.prefix, ...
-                        dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                        dj.internal.fromCamelCase(tableInfo.className));
-            end
-            
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', self.schema.dbname, tableName);
-            
-            % fields and foreign keys
-            inKey = true;
-            primaryFields = {};
-            fields = {};
-            for iLine = 1:length(def)
-                line = def{iLine};
-                switch true
-                    case strncmp(line,'---',3)
-                        inKey = false;                        
-                        % foreign key
-                    case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-                        [sql, newFields] = dj.internal.Declare.makeFK( ...
-                            sql, line, fields, inKey, ...
-                            dj.internal.shorthash(sprintf('`%s`.`%s`', self.schema.dbname, tableName)));
-                        sql = sprintf('%s,\n', sql);
-                        fields = [fields, newFields]; %#ok<AGROW>
-                        if inKey
-                            primaryFields = [primaryFields, newFields]; %#ok<AGROW>
-                        end
-                        
-                        % index
-                    case regexpi(line, '^(unique\s+)?index[^:]*$')
-                        sql = sprintf('%s%s,\n', sql, line);    %  add checks
-                        
-                        % attribute
-                    case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
-                            '(=\s*\S+(\s+\S+)*\s*)?' ...              % opt. default
-                            ':\s*\w.*$'])                             % type, comment
-                        fieldInfo = dj.internal.Declare.parseAttrDef(line);
-                        assert(~inKey || ~fieldInfo.isnullable, ...
-                            'primary key attributes cannot be nullable')
-                        if inKey
-                            primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        end
-                        fields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, fieldToSQL(fieldInfo));
-                        
-                    otherwise
-                        error('Invalid table declaration line "%s"', line)
-                end
-            end
-            
-            % add primary key declaration
-            assert(~isempty(primaryFields), 'table must have a primary key')
-            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
-            
-            % finish the declaration
-            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
-            
-            % execute declaration
-            fprintf \n<SQL>\n
-            fprintf(sql)
-            fprintf \n</SQL>\n\n
+            def = dj.internal.Declare.getDefinition(self);
+
+            sql = dj.internal.Declare.declare(self, def);
             self.schema.conn.query(sql);
             self.schema.reload
         end
@@ -777,69 +636,4 @@ classdef Table < handle
             end
         end
     end
-end
-
-
-%          LOCAL FUNCTIONS
-
-function str = readPercentBraceComment(filename)
-    % reads the initial comment block %{ ... %} in filename
-
-    f = fopen(filename, 'rt');
-    assert(f~=-1, 'Could not open %s', filename)
-    str = '';
-
-    % skip all lines that do not begin with a %{
-    l = fgetl(f);
-    while ischar(l) && ~strcmp(strtrim(l),'%{')
-        l = fgetl(f);
-    end
-
-    % read the contents of the comment
-    if ischar(l)
-        while true
-            l = fgetl(f);
-            if strcmp(strtrim(l),'%}')
-                break
-            end
-            str = sprintf('%s%s\n', str, l);
-        end
-    end
-
-    fclose(f);
-end
-
-
-
-function sql = fieldToSQL(field)
-    % convert the structure field with header {'name' 'type' 'default' 'comment'}
-    % to the SQL column declaration
-
-    if field.isnullable   % all nullable attributes default to null
-        default = 'DEFAULT NULL';
-    else
-        default = 'NOT NULL';
-        if ~isempty(field.default)
-            % enclose value in quotes (even numeric), except special SQL values
-            % or values already enclosed by the user
-            if any(strcmpi(field.default, dj.Table.mysql_constants)) || ...
-                    ismember(field.default(1), {'''', '"'})
-                default = sprintf('%s DEFAULT %s', default, field.default);
-            else
-                default = sprintf('%s DEFAULT "%s"', default, field.default);
-            end
-        end
-    end
-    assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
-        'illegal characters in attribute comment "%s"', field.comment)
-    sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
-        field.name, field.type, default, field.comment);
-end
-
-
-
-
-function str = backquotedList(arr)
-    str = sprintf('`%s`,', arr{:});
-    str(end)=[];
 end

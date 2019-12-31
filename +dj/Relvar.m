@@ -192,6 +192,10 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % Duplicates, unmatched attributes, or missing required attributes will
             % cause an error, unless 'command' is specified.
             
+            function row_to_insert = makeRowToInsert(row)
+                row_to_insert = row;
+            end
+
             if isa(tuples,'cell')
                 % if a cell array, convert to structure assuming matching attributes
                 tuples = cell2struct(tuples, self.header.names, 2);
@@ -235,6 +239,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end));
             blobs = {};
             for tuple=tuples(:)'
+                tuple = makeRowToInsert(tuple);
                 valueStr = '';
                 for i = find(ix)
                     v = tuple.(header.attributes(i).name);

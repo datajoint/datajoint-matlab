@@ -31,5 +31,15 @@ classdef TestFetch < tests.Prep
             testCase.verifyEqual(res(1).number,  3.213);
             testCase.verifyEqual(res(1).blob,  [1, 2; 3, 4]);
         end
+        function testReverseEngineering(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            q = University.All;
+            raw_def = dj.internal.Declare.getDefinition(q);
+            assembled_def = describe(q);
+            raw_sql = dj.internal.Declare.declare(q, raw_def);
+            assembled_sql = dj.internal.Declare.declare(q, assembled_def);
+            testCase.verifyEqual(raw_sql,  assembled_sql);
+        end
     end
 end

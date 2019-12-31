@@ -205,6 +205,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
                 hdr.sql, sql_, limit));
             ret = dj.struct.fromFields(ret);
+            ret = get(self.header.attributes, ret);
             
             if nargout>1
                 % return primary key structure array
@@ -581,7 +582,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 if attr.isnullable
                     default = '=null';
                 elseif ~isempty(default)
-                    if attr.isNumeric || any(strcmp(default,dj.Table.mysql_constants))
+                    if attr.isNumeric || any(strcmp(default,dj.internal.Declare.CONSTANT_LITERALS))
                         default = ['=' default]; %#ok<AGROW>
                     else
                         default = ['="' default '"']; %#ok<AGROW>
@@ -889,4 +890,9 @@ function str = escapeString(str)
     % of \ have to be replaced with \\.
     str = strrep(str, '''', '''''');
     str = strrep(str, '\', '\\');
+end
+
+function data = get(attr, data)
+    % This function is called to translate all attributes
+
 end
