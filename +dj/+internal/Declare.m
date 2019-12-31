@@ -7,12 +7,10 @@ classdef Declare
         CONSTANT_LITERALS = {'CURRENT_TIMESTAMP'}
         TYPE_PATTERN = struct( ...
             'NUMERIC', '^((tiny|small|medium|big)?int|decimal|double|float)', ...
-            'STRING', '^((var)?char|enum|date|(var)?year|time|timestamp)', ...
-            'INTERNAL_BLOB', '^(tiny|medium|long)?blob', ...
-            'UUID', 'uuid$' ...
+            'STRING', '^((var)?char|enum|date|(var)?binary|year|time|timestamp)', ...
+            'INTERNAL_BLOB', '^(tiny|medium|long)?blob' ...
         )
-        UUID_DATA_TYPE = 'binary(16)'
-        SPECIAL_TYPES = {'UUID'}
+        SPECIAL_TYPES = {}
     end
     
     methods(Static)
@@ -277,9 +275,7 @@ classdef Declare
         end
 
         function field = substituteSpecialType(field, category)
-            if strcmpi(category, 'UUID')
-                field.type = dj.internal.Declare.UUID_DATA_TYPE;
-            end
+
         end
 
         function sql = compileAttribute(field)

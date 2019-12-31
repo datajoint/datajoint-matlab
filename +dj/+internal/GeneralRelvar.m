@@ -842,11 +842,6 @@ function cond = struct2cond(keys, header)
             assert(ischar(value), ...
                 'Value for key.%s must be a string', field{1})
             value = sprintf('''%s''', escapeString(value));
-        elseif attr.isUuid
-            value = strrep(value, '-', '');
-            assert(ischar(value) && length(value) == 32, ...
-                'Value for key.%s must be a uuid HEX string.', field{1})
-            value = sprintf('X''%s''', escapeString(value));
         else
             assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
                 'Value for key.%s must be a numeric scalar', field{1});
@@ -902,17 +897,5 @@ end
 
 function data = get(attr, data)
     % This function is called to translate all attributes
-    for i = 1:length(attr)
-        if attr(i).isUuid
-            for j = 1:length(data)
-                new_value = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
-                new_value = [new_value(1:8) '-' ...
-                            new_value(9:12) '-' ...
-                            new_value(13:16) '-' ...
-                            new_value(17:20) '-' ...
-                            new_value(21:end)];
-                data(j).(attr(i).name) = new_value;
-            end
-        end
-    end
+    
 end
