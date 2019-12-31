@@ -835,27 +835,35 @@ function cond = struct2cond(keys, header)
     end
     cond = cond(min(end,5):end);  % strip " OR "
 
+    function value = prepValue(field, value)
+        attr = header.byName(field{1});
+        assert(~attr.isBlob, 'The key must not include blob header.')
+        if attr.isString
+            assert(ischar(value), ...
+                'Value for key.%s must be a string', field{1})
+            value = sprintf('''%s''', escapeString(value));
+        elseif attr.isUuid
+            value = strrep(value, '-', '');
+            assert(ischar(value) && length(value) == 32, ...
+                'Value for key.%s must be a uuid HEX string.', field{1})
+            value = sprintf('X''%s''', escapeString(value));
+        else
+            assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
+                'Value for key.%s must be a numeric scalar', field{1});
+            if isa(value, 'uint64')
+                value = sprintf('%u', value);
+            elseif isa(value, 'int64')
+                value = sprintf('%i', value);
+            else
+                value = sprintf('%1.16g', value);
+            end
+        end
+    end
+
     function subcond = makeCond(key)
         subcond = '';
-        for field = fieldnames(key)'
-            value = key.(field{1});
-            attr = header.byName(field{1});
-            assert(~attr.isBlob, 'The key must not include blob header.')
-            if attr.isString
-                assert(ischar(value), ...
-                    'Value for key.%s must be a string', field{1})
-                value = sprintf('''%s''', escapeString(value));
-            else
-                assert((isnumeric(value) || islogical(value)) && isscalar(value), ...
-                    'Value for key.%s must be a numeric scalar', field{1});
-                if isa(value, 'uint64')
-                    value = sprintf('%u', value);
-                elseif isa(value, 'int64')
-                    value = sprintf('%i', value);
-                else
-                    value = sprintf('%1.16g', value);
-                end
-            end
+        for field = fieldnames(key)'  
+            value = prepValue(field, key.(field{1}));
             subcond = sprintf('%s AND `%s`=%s', subcond, field{1}, value);
         end
         subcond = subcond(min(6,end):end);  % strip " AND "
@@ -894,5 +902,17 @@ end
 
 function data = get(attr, data)
     % This function is called to translate all attributes
-
+    for i = 1:length(attr)
+        if attr(i).isUuid
+            for j = 1:length(data)
+                new_value = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
+                new_value = [new_value(1:8) '-' ...
+                            new_value(9:12) '-' ...
+                            new_value(13:16) '-' ...
+                            new_value(17:20) '-' ...
+                            new_value(21:end)];
+                data(j).(attr(i).name) = new_value;
+            end
+        end
+    end
 end

@@ -79,10 +79,18 @@ classdef Header < matlab.mixin.Copyable
             attrs.isNumeric = false(length(attrs.isnullable), 1);
             attrs.isString = false(length(attrs.isnullable), 1);
             attrs.isBlob = false(length(attrs.isnullable), 1);
+            attrs.isUuid = false(length(attrs.isnullable), 1);
             attrs.alias = cell(length(attrs.isnullable),1);
             attrs.sqlType = cell(length(attrs.isnullable),1);
             attrs.sqlComment = cell(length(attrs.isnullable),1);
             for i = 1:length(attrs.isnullable)
+                attrs.sqlType{i} = attrs.type{i};
+                attrs.sqlComment{i} = attrs.comment{i};
+                special = regexp(attrs.comment{i}, ':([^:]+):(.*)', 'tokens');
+                if ~isempty(special)
+                    attrs.type{i} = special{1}{1};
+                    attrs.comment{i} = special{1}{2};
+                end 
                 attrs.isnullable{i} = strcmpi(attrs.isnullable{i}, 'YES');
                 attrs.iskey{i} = strcmpi(attrs.iskey{i}, 'PRI');
                 attrs.isautoincrement(i) = ~isempty(regexpi(attrs.Extra{i}, ...
@@ -93,20 +101,15 @@ classdef Header < matlab.mixin.Copyable
                     'STRING');
                 attrs.isBlob(i) = strcmpi(dj.internal.Declare.matchType(attrs.type{i}), ...
                     'INTERNAL_BLOB');
+                attrs.isUuid(i) = strcmpi(dj.internal.Declare.matchType(attrs.type{i}), ...
+                    'UUID');
                 % strip field lengths off integer types
                 attrs.type{i} = regexprep(sprintf('%s',attrs.type{i}), ...
                     '((tiny|small|medium|big)?int)\(\d+\)','$1');
                 attrs.alias{i} = '';
-                attrs.sqlType{i} = attrs.type{i};
-                attrs.sqlComment{i} = attrs.comment{i};
-                special = regexp(attrs.comment{i}, ':([^:]+):(.*)', 'tokens');
-                if ~isempty(special)
-                    attrs.type{i} = special{1}{1};
-                    attrs.comment{i} = special{1}{2};
-                end 
             end
 
-            validFields = [attrs.isNumeric] | [attrs.isString] | [attrs.isBlob];
+            validFields = [attrs.isNumeric] | [attrs.isString] | [attrs.isBlob] | [attrs.isUuid];
             if ~all(validFields)
                 ix = find(~validFields, 1, 'first');
                 error('unsupported field type "%s" in `%s`.`%s`', ...
@@ -163,6 +166,7 @@ classdef Header < matlab.mixin.Copyable
                                 'isNumeric', true, ...  % only numeric computations allowed for now, deal with character string expressions somehow
                                 'isString', false, ...
                                 'isBlob', false, ...
+                                'isUuid', false, ...
                                 'alias', toks{1}{1}, ...
                                 'sqlType', self.computedTypeString, ...
                                 'sqlComment', '' ...

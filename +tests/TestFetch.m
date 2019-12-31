@@ -31,7 +31,7 @@ classdef TestFetch < tests.Prep
             testCase.verifyEqual(res(1).number,  3.213);
             testCase.verifyEqual(res(1).blob,  [1, 2; 3, 4]);
         end
-        function testReverseEngineering(testCase)
+        function testDescribe(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             q = University.All;

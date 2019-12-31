@@ -7,9 +7,12 @@ classdef Declare
         CONSTANT_LITERALS = {'CURRENT_TIMESTAMP'}
         TYPE_PATTERN = struct( ...
             'NUMERIC', '^((tiny|small|medium|big)?int|decimal|double|float)', ...
-            'STRING', '^((var)?char|enum|date|(var)?binary|year|time|timestamp)', ...
-            'INTERNAL_BLOB', '^(tiny|medium|long)?blob' ...
+            'STRING', '^((var)?char|enum|date|(var)?year|time|timestamp)', ...
+            'INTERNAL_BLOB', '^(tiny|medium|long)?blob', ...
+            'UUID', 'uuid$' ...
         )
+        UUID_DATA_TYPE = 'binary(16)'
+        SPECIAL_TYPES = {'UUID'}
     end
     
     methods(Static)
@@ -29,14 +32,19 @@ classdef Declare
             % parse table schema, name, type, and comment
             switch true
                     
-                case {isa(table_instance, 'dj.internal.UserRelation'), isa(table_instance, 'dj.Part'), isa(table_instance, 'dj.Jobs')}
+                case {isa(table_instance, 'dj.internal.UserRelation'), isa( ...
+                        table_instance, 'dj.Part'), isa(table_instance, ...
+                        'dj.Jobs')}
                     % New-style declaration using special classes for each tier
                     tableInfo = struct;
                     if isa(table_instance, 'dj.Part')
                         tableInfo.tier = 'part';
                     else
-                        specialClass = find(cellfun(@(c) isa(table_instance, c), dj.Schema.tierClasses));
-                        assert(length(specialClass)==1, 'Unknown type of UserRelation in %s', class(table_instance))
+                        specialClass = find(cellfun(@(c) isa(table_instance, ...
+                            c), dj.Schema.tierClasses));
+                        assert(length(specialClass)==1, ...
+                            'Unknown type of UserRelation in %s', ...
+                            class(table_instance))
                         tableInfo.tier = dj.Schema.allowedTiers{specialClass};
                     end
                     % remove empty lines
@@ -53,13 +61,19 @@ classdef Declare
                     tableInfo.package = strjoin(cname(1:end-1), '.');
                     tableInfo.className = cname{end};
                     if isa(table_instance, 'dj.Part')
-                        tableName = sprintf('%s%s%s', table_instance.schema.prefix, ...
-                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                            sprintf('%s__%s', table_instance.master.plainTableName, ...
-                            dj.internal.fromCamelCase(table_instance.className(length(table_instance.master.className)+1:end)))); %#ok<MCNPN>
+                        tableName = sprintf('%s%s%s', ...
+                            table_instance.schema.prefix, ...
+                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, ...
+                            dj.Schema.allowedTiers)}, sprintf('%s__%s', ...
+                            table_instance.master.plainTableName, ...
+                            dj.internal.fromCamelCase( ...
+                            table_instance.className(length( ...
+                            table_instance.master.className)+1:end)))); 
+                            %#ok<MCNPN>
                     else
-                        tableName = sprintf('%s%s%s', table_instance.schema.prefix, ...
-                            dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
+                        tableName = sprintf('%s%s%s', ...
+                            table_instance.schema.prefix, dj.Schema.tierPrefixes{ ...
+                            strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                             dj.internal.fromCamelCase(tableInfo.className));
                     end
                     
@@ -77,18 +91,23 @@ classdef Declare
                         };
                     tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
                     assert(numel(tableInfo)==1, ...
-                        'invalidTableDeclaration:Incorrect syntax in table declaration, line 1: \n  %s', firstLine)
+                        ['invalidTableDeclaration:Incorrect syntax in table ' ...
+                        'declaration, line 1: \n  %s'], firstLine)
                     assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-                        'invalidTableTier:Invalid tier for table ', tableInfo.className)
+                        'invalidTableTier:Invalid tier for table ', ...
+                        tableInfo.className)
                     cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
                     assert(strcmp(cname, table_instance.className), ...
-                        'Table name %s does not match in file %s', cname, table_instance.className)
+                        'Table name %s does not match in file %s', cname, ...
+                        table_instance.className)
                     tableName = sprintf('%s%s%s', table_instance.schema.prefix, ...
-                        dj.Schema.tierPrefixes{strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
-                        dj.internal.fromCamelCase(tableInfo.className));
+                        dj.Schema.tierPrefixes{strcmp(tableInfo.tier, ...
+                        dj.Schema.allowedTiers)}, dj.internal.fromCamelCase( ...
+                        stableInfo.className));
             end
             
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, tableName);
+            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', ...
+                table_instance.schema.dbname, tableName);
             
             % fields and foreign keys
             inKey = true;
@@ -103,7 +122,8 @@ classdef Declare
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
                         [sql, newFields] = dj.internal.Declare.makeFK( ...
                             sql, line, fields, inKey, ...
-                            dj.internal.shorthash(sprintf('`%s`.`%s`', table_instance.schema.dbname, tableName)));
+                            dj.internal.shorthash(sprintf('`%s`.`%s`', ...
+                            table_instance.schema.dbname, tableName)));
                         sql = sprintf('%s,\n', sql);
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
@@ -125,7 +145,8 @@ classdef Declare
                             primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
                         end
                         fields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute(fieldInfo));
+                        sql = sprintf('%s%s', sql, ...
+                            dj.internal.Declare.compileAttribute(fieldInfo));
                         
                     otherwise
                         error('Invalid table declaration line "%s"', line)
@@ -134,10 +155,12 @@ classdef Declare
             
             % add primary key declaration
             assert(~isempty(primaryFields), 'table must have a primary key')
-            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
+            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, ...
+                backquotedList(primaryFields));
             
             % finish the declaration
-            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), tableInfo.comment);
+            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), ...
+                tableInfo.comment);
             
             % execute declaration
             fprintf \n<SQL>\n
@@ -151,10 +174,10 @@ classdef Declare
                 'invalid attribute name in %s', line)
             pat = {
                 '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
-                ['=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)' ...
-                    '\s*'] % default value
-                [':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN][cC][rR][eE]' ...
-                    '[mM][eE][nN][tT])?)\s*']       % datatype
+                ['=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?' ...
+                    '[0-9]+)?)\s*'] % default value
+                [':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN]' ...
+                    '[cC][rR][eE][mM][eE][nN][tT])?)\s*']       % datatype
                 '#(?<comment>.*)'           % comment
                 '$'  % end of line
                 };
@@ -194,7 +217,8 @@ classdef Declare
             fk = regexp(line, pat, 'names');
             if exist(fk.cname, 'class')
                 rel = feval(fk.cname);
-                assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', fk.cname)
+                assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', ...
+                    fk.cname)
             else
                 rel = dj.Relvar(fk.cname);
             end
@@ -211,7 +235,8 @@ classdef Declare
                 % unambiguous single attribute
                 if length(rel.primaryKey)==1
                     attrs = rel.primaryKey;
-                elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
+                elseif isempty(attrs) && length(setdiff(rel.primaryKey, ...
+                        existingFields))==1
                     attrs = setdiff(rel.primaryKey, existingFields);
                 end
             end
@@ -219,7 +244,8 @@ classdef Declare
                 'Mapped fields (%s) and (%s) must match in the foreign key.', ...
                 strjoin(newattrs,','), strjoin(attrs,','))
             
-            % prepend unspecified primary key attributes that have not yet been included 
+            % prepend unspecified primary key attributes that have not yet been
+            % included 
             pk = rel.primaryKey;
             pk(ismember(pk,attrs) | ismember(pk,existingFields))=[];
             attrs = [pk attrs];
@@ -236,30 +262,39 @@ classdef Declare
                     rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-                sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute(fieldInfo));
+                sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute( ...
+                    fieldInfo));
             end
             
             fkattrs = rel.primaryKey;
             fkattrs(ismember(fkattrs, attrs))=newattrs;
             hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
             sql = sprintf(...
-                ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE CASCADE ' ...
-                'ON DELETE RESTRICT'], sql, hash, backquotedList(fkattrs), ...
-                rel.fullTableName, backquotedList(rel.primaryKey));
+                ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
+                'ON UPDATE CASCADE ON DELETE RESTRICT'], sql, hash, ...
+                backquotedList(fkattrs), rel.fullTableName, ...
+                backquotedList(rel.primaryKey));
+        end
+
+        function field = substituteSpecialType(field, category)
+            if strcmpi(category, 'UUID')
+                field.type = dj.internal.Declare.UUID_DATA_TYPE;
+            end
         end
 
         function sql = compileAttribute(field)
-            % convert the structure field with header {'name' 'type' 'default' 'comment'}
-            % to the SQL column declaration
+            % convert the structure field with header {'name' 'type' 'default' 
+            % 'comment'} to the SQL column declaration
         
             if field.isnullable   % all nullable attributes default to null
                 default = 'DEFAULT NULL';
             else
                 default = 'NOT NULL';
                 if ~isempty(field.default)
-                    % enclose value in quotes (even numeric), except special SQL values
-                    % or values already enclosed by the user
-                    if any(strcmpi(field.default, dj.internal.Declare.CONSTANT_LITERALS)) || ...
+                    % enclose value in quotes (even numeric), except special 
+                    % SQL values or values already enclosed by the user
+                    if any(strcmpi(field.default, ...
+                            dj.internal.Declare.CONSTANT_LITERALS)) || ...
                             ismember(field.default(1), {'''', '"'})
                         default = sprintf('%s DEFAULT %s', default, field.default);
                     else
@@ -271,6 +306,10 @@ classdef Declare
                 'illegal characters in attribute comment "%s"', field.comment)
 
             category = dj.internal.Declare.matchType(field.type);
+            if any(strcmpi(category, dj.internal.Declare.SPECIAL_TYPES))
+                field.comment = [':' strip(field.type) ':' field.comment];
+                field = dj.internal.Declare.substituteSpecialType(field, category);
+            end
             sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
                 field.name, strtrim(field.type), default, field.comment);
         end
@@ -280,22 +319,26 @@ classdef Declare
             % block of the matching .m file.
             file = which(self.className);
             assert(~isempty(file), ...
-                'MissingTableDefinition:Could not find table definition file %s', self.className)
+                'MissingTableDefinition:Could not find table definition file %s', ...
+                self.className)
             definition = readPercentBraceComment(file);
             assert(~isempty(definition), ...
-                'MissingTableDefnition:Could not find the table declaration in %s', file)
+                'MissingTableDefnition:Could not find the table declaration in %s', ...
+                file)
         end
 
         function matched_type = matchType(attribute_type)
             fn = fieldnames(dj.internal.Declare.TYPE_PATTERN);
             for k=1:numel(fn)
-                if ~isempty(regexpi(attribute_type, dj.internal.Declare.TYPE_PATTERN.(fn{k})))
+                if ~isempty(regexpi(strtrim(attribute_type), ...
+                        dj.internal.Declare.TYPE_PATTERN.(fn{k})))
                     matched_type = fn{k};
                     break;
                 end
             end
             assert(exist('matched_type','var') == 1, ...
-                'UnsupportedType: Attribute type ''%s'' is not a valid type.', attribute_type);
+                'UnsupportedType: Attribute type ''%s'' is not a valid type.', ...
+                attribute_type);
         end
     end
 end

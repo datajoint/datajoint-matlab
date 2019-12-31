@@ -192,8 +192,46 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % Duplicates, unmatched attributes, or missing required attributes will
             % cause an error, unless 'command' is specified.
             
-            function row_to_insert = makeRowToInsert(row)
-                row_to_insert = row;
+            function [value, placeholder] = makePlaceholder(attr_idx, value)
+                if header.attributes(attr_idx).isString
+                    assert(dj.lib.isString(value), ...
+                        'The field %s must be a character string', ...
+                        header.attributes(attr_idx).name)
+                    if isempty(value)
+                        placeholder = '""';
+                    else
+                        placeholder = '"{S}"';
+                        value = char(value);
+                    end
+                elseif header.attributes(attr_idx).isUuid
+                    placeholder = '"{B}"';
+                    value = strrep(value, '-', '');
+                    hexstring = value';
+                    reshapedString = reshape(hexstring,2,16);
+                    hexMtx = reshapedString.';
+                    decMtx = hex2dec(hexMtx);
+                    value = uint8(decMtx);
+                elseif header.attributes(attr_idx).isBlob
+                    placeholder = '"{M}"';
+                else
+                    assert((isnumeric(value) || islogical(value)) && (isscalar(value) || isempty(value)),...
+                        'The field %s must be a numeric scalar value', ...
+                        header.attributes(attr_idx).name)
+                    if isempty(value) || isnan(value) % empty numeric values and nans are passed as nulls
+                        placeholder = 'NULL';
+                    elseif isinf(value)
+                        error 'Infinite values are not allowed in numeric fields'
+                    else  % numeric values
+                        type = header.attributes(i).type;
+                        if length(type)>=3 && strcmpi(type(end-2:end),'int')
+                            placeholder = sprintf('%d', value);
+                        elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
+                            placeholder = sprintf('%u', value);
+                        else
+                            placeholder = sprintf('%1.16g', value);
+                        end
+                    end
+                end
             end
 
             if isa(tuples,'cell')
@@ -239,42 +277,14 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end));
             blobs = {};
             for tuple=tuples(:)'
-                tuple = makeRowToInsert(tuple);
                 valueStr = '';
                 for i = find(ix)
-                    v = tuple.(header.attributes(i).name);
-                    if header.attributes(i).isString
-                        assert(dj.lib.isString(v), ...
-                            'The field %s must be a character string', ...
-                            header.attributes(i).name)
-                        if isempty(v)
-                            valueStr = sprintf('%s"",',valueStr);
-                        else
-                            valueStr = sprintf('%s"{S}",', valueStr);
-                            blobs{end+1} = char(v);  %#ok<AGROW>
-                        end
-                    elseif header.attributes(i).isBlob
-                        valueStr = sprintf('%s"{M}",', valueStr);
-                        blobs{end+1} = v;    %#ok<AGROW>
-                    else
-                        assert((isnumeric(v) || islogical(v)) && (isscalar(v) || isempty(v)),...
-                            'The field %s must be a numeric scalar value', ...
-                            header.attributes(i).name)
-                        if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
-                            valueStr = sprintf('%sNULL,', valueStr);
-                        elseif isinf(v)
-                            error 'Infinite values are not allowed in numeric fields'
-                        else  % numeric values
-                            type = header.attributes(i).type;
-                            if length(type)>=3 && strcmpi(type(end-2:end),'int')
-                                valueStr = sprintf('%s%d,', valueStr, v);
-                            elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
-                                valueStr = sprintf('%s%u,', valueStr, v);
-                            else
-                                valueStr = sprintf('%s%1.16g,',valueStr, v);
-                            end
-                        end
+                    [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
+                    if ~isempty(v) && ( ...
+                            (~isnumeric(v) && ~islogical(v)) || (~isscalar(v) && ~isempty(v)))
+                        blobs{end+1} = v;   %#ok<AGROW>
                     end
+                    valueStr = sprintf(['%s' placeholder ','],valueStr);
                 end
                 command = sprintf('%s(%s),', command, valueStr(1:end-1));
             end
