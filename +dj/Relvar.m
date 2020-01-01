@@ -263,8 +263,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     case {'REPLACE', 'replace'}
                         command = 'REPLACE';
                     otherwise
-                        error(['invalid insert option ''%s'': use ''REPLACE'' or ' ...
-                            '''IGNORE'''], command)
+                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''',...
+                            command)
                 end
             end
             header = self.header;
@@ -396,8 +396,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         value = {value};
                     end
                 case header.attributes(ix).isNumeric
-                    assert(isscalar(value) && isnumeric(value), ...
-                        'Numeric value must be scalar')
+                    assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
                     if isnan(value)
                         assert(header.attributes(ix).isnullable, ...
                             'attribute `%s` is not nullable. NaNs not allowed', attrname)

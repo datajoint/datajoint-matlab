@@ -60,8 +60,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if isempty(self.restrictions)
                 clause = '';
             else
-                clause = sprintf(' WHERE %s', makeWhereClause(self.header, ...
-                    self.restrictions));
+                clause = sprintf(' WHERE %s', makeWhereClause(self.header, self.restrictions));
             end
         end
         
@@ -240,8 +239,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             args = args(cellfun(@ischar, args)); % attribute specifiers
             
             assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
-                ['The number of fetch1() outputs must match the number of requested ' ...
-                'attributes'])
+                'The number of fetch1() outputs must match the number of requested attributes')
             assert(~isempty(args), 'insufficient inputs')
             assert(~any(strcmp(args,'*')), '"*" is not allowed in fetch1()')
             
