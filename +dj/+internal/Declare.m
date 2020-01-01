@@ -103,7 +103,8 @@ classdef Declare
                         stableInfo.className));
             end
             
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, tableName);
+            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, ...
+                tableName);
             
             % fields and foreign keys
             inKey = true;

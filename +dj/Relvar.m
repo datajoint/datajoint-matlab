@@ -40,7 +40,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             %                       in dependent tables.
             %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
             %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans
-            %                                   that do not have matching tuples in table Cells
+            %                                   that do not have matching tuples in table 
+            %                                   Cells
             % See also delQuick, drop
             
             function cleanup(self)
@@ -262,8 +263,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     case {'REPLACE', 'replace'}
                         command = 'REPLACE';
                     otherwise
-                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''', ...
-                            command)
+                        error(['invalid insert option ''%s'': use ''REPLACE'' or ' ...
+                            '''IGNORE'''], command)
                 end
             end
             header = self.header;
@@ -320,7 +321,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % parallel thread.  Call with no arguments to wait for the last
             % job to complete.
             %
-            % Initialize the parallel pool before inserting as parpool('local',1), for example.
+            % Initialize the parallel pool before inserting as parpool('local',1),for example.
             %
             % Requires MATLAB R2013b or later.
             
@@ -395,7 +396,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         value = {value};
                     end
                 case header.attributes(ix).isNumeric
-                    assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
+                    assert(isscalar(value) && isnumeric(value), ...
+                        'Numeric value must be scalar')
                     if isnan(value)
                         assert(header.attributes(ix).isnullable, ...
                             'attribute `%s` is not nullable. NaNs not allowed', attrname)

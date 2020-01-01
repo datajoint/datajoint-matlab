@@ -68,8 +68,8 @@ classdef Header < matlab.mixin.Copyable
         function self = initFromDatabase(schema,tableInfo)  % constructor
             self = dj.internal.Header;
             self.info = tableInfo;
-            attrs = schema.conn.query(...
-                sprintf('SHOW FULL COLUMNS FROM `%s` IN `%s`', self.info.name, schema.dbname));
+            attrs = schema.conn.query(sprintf('SHOW FULL COLUMNS FROM `%s` IN `%s`', ...
+                self.info.name, schema.dbname));
             attrs = dj.struct.rename(attrs,...
                 'Field','name','Type','type','Null','isnullable',...
                 'Default','default','Key','iskey','Comment','comment');
@@ -172,7 +172,8 @@ classdef Header < matlab.mixin.Copyable
                         else
                             % process a regular attribute
                             ix = find(strcmp(params{iAttr},self.names));
-                            assert(~isempty(ix), 'Attribute `%s` does not exist', params{iAttr})
+                            assert(~isempty(ix), 'Attribute `%s` does not exist', ...
+                                params{iAttr})
                         end
                     end
                     include(ix)=true;
@@ -194,8 +195,8 @@ classdef Header < matlab.mixin.Copyable
             % error if there are any matching dependent attributes
             commonDependent = intersect(hdr1.dependentFields,hdr2.dependentFields); 
             if ~isempty(commonDependent)
-                error(['Matching dependent attribute `%s` must be projected out or renamed ' ...
-                    'before relations can be joined.'], commonDependent{1})
+                error(['Matching dependent attribute `%s` must be projected out or ' ...
+                    'renamed before relations can be joined.'], commonDependent{1})
             end
 
             % merge dependent fields

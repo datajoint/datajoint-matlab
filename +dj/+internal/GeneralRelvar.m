@@ -60,7 +60,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if isempty(self.restrictions)
                 clause = '';
             else
-                clause = sprintf(' WHERE %s', makeWhereClause(self.header, self.restrictions));
+                clause = sprintf(' WHERE %s', makeWhereClause(self.header, ...
+                    self.restrictions));
             end
         end
         
@@ -119,8 +120,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 columnName = columns;
                 for iCol = 1:length(columns)
                     if self.header.attributes(iCol).iskey
-                        columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} ...
-                            '</b></font></html>'];
+                        columnName{iCol} = ['<html><b><font color="black">' ...
+                            columnName{iCol} '</b></font></html>'];
                     else
                         columnName{iCol} = ['<html><font color="blue">' columnName{iCol} ...
                             '</font></html>'];
@@ -161,7 +162,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % EXISTS - a fast check whether the relvar
             % contains any tuples
             [~, sql_] = self.compile(3);
-            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', ...
+            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes',...
                 sql_));
             yes = logical(yes.yes);
         end
@@ -239,7 +240,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             args = args(cellfun(@ischar, args)); % attribute specifiers
             
             assert(nargout==length(args) || (nargout==0 && length(args)==1), ...
-                'The number of fetch1() outputs must match the number of requested attributes')
+                ['The number of fetch1() outputs must match the number of requested ' ...
+                'attributes'])
             assert(~isempty(args), 'insufficient inputs')
             assert(~any(strcmp(args,'*')), '"*" is not allowed in fetch1()')
             
@@ -272,8 +274,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             [limit, args] = makeLimitClause(varargin{:});
             specs = args(cellfun(@ischar, args)); % attribute specifiers
             returnKey = nargout==length(specs)+1;
-            assert(returnKey || (nargout==length(specs) || (nargout==0 && length(specs)==1)), ...
-                'The number of fetchn() outputs must match the number of requested attributes')
+            assert(returnKey || (nargout==length(specs) || (nargout==0 && length( ...
+                specs)==1)), ['The number of fetchn() outputs must match the number of ' ...
+                'requested attributes'])
             assert(~isempty(specs),'insufficient inputs')
             assert(~any(strcmp(specs,'*')), '"*" is not allowed in fetchn()')
             
@@ -328,8 +331,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 savedTuples = savedTuples + numel(tuples);
                 tuplesPerChunk = min(5*tuplesPerChunk, ...
                     ceil(mbytesPerFile/savedMegaBytes*savedTuples));
-                fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, savedTuples, ...
-                    total, savedMegaBytes)
+                fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, ...
+                    savedTuples, total, savedMegaBytes)
                 fileNumber = fileNumber + 1;
             end
             
@@ -706,7 +709,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             if ~isempty(self.restrictions)
                 % clear aliases and enclose
                 if header.hasAliases
-                    sql = sprintf('(SELECT %s FROM %s) as `$s%x`', header.sql, sql, aliasCount);
+                    sql = sprintf('(SELECT %s FROM %s) as `$s%x`', header.sql, sql, ...
+                        aliasCount);
                     header.stripAliases;
                 end
                 % add WHERE clause
@@ -809,7 +813,8 @@ function clause = makeWhereClause(header, restrictions)
                 end
                 
                 % common attributes for matching. Blobs are not included
-                commonDependent = intersect(header.dependentFields,condHeader.dependentFields);
+                commonDependent = intersect(header.dependentFields, ...
+                    condHeader.dependentFields);
                 if ~isempty(commonDependent)
                     error(['Cannot restrict by dependent attribute `%s`. It must be' ...
                         ' projected out or renamed before restriction.'], ...

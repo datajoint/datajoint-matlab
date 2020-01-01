@@ -156,8 +156,8 @@ classdef Table < handle
             
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.internal.Table(self.schema.conn.tableToClass( ...
-                        name)),level+1), table.children())
+                    cellfun(@(name) recurse(dj.internal.Table( ...
+                        self.schema.conn.tableToClass(name)),level+1), table.children())
                     map(table.className)=level;
                 end
             end
@@ -256,7 +256,8 @@ classdef Table < handle
                 end
                 doInclude = ~any(arrayfun(@(x) ismember(attr.name, x.attrs), fk));
                 attributes_thus_far{end+1} = attr.name; %#ok<AGROW>
-                resolved = find(arrayfun(@(x) all(ismember(x.attrs, attributes_thus_far)), fk));
+                resolved = find(arrayfun(@(x) all(ismember(x.attrs, attributes_thus_far)),...
+                    fk));
                 for i = resolved
                     if isequal(fk(i).attrs, fk(i).ref_attrs)
                         str = sprintf('%s\n-> %s', str, ...
@@ -521,8 +522,8 @@ classdef Table < handle
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, self.tableHeader.names);
             assert(any(ix), 'Attribute "%s" not found', attr)
-            list = regexpi(self.tableHeader.attributes(ix).type,'^enum\((?<list>''.*'')\)$', ...
-                'names');
+            list = regexpi(self.tableHeader.attributes(ix).type, ...
+                '^enum\((?<list>''.*'')\)$', 'names');
             assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
             list = {list.item};
@@ -564,7 +565,8 @@ classdef Table < handle
                 else
                     try
                         for table = tables(end:-1:1)
-                            self.schema.conn.query(sprintf('DROP TABLE %s', table.fullTableName))
+                            self.schema.conn.query(sprintf('DROP TABLE %s', ...
+                                table.fullTableName))
                             fprintf('Dropped table %s\n', table.fullTableName)
                         end
                     catch err
