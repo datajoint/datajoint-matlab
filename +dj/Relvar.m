@@ -36,10 +36,12 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % an interactive confirmation before deleting the data.
             %
             % EXAMPLES:
-            %   del(common.Scans) % delete all tuples from table Scans and all tuples in dependent tables.
+            %   del(common.Scans) % delete all tuples from table Scans and all tuples
+            %                       in dependent tables.
             %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
             %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans
-            %                                   that do not have matching tuples in table Cells
+            %                                   that do not have matching tuples in table 
+            %                                   Cells
             % See also delQuick, drop
             
             function cleanup(self)
@@ -67,16 +69,22 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 % apply proper restrictions
                 restrictByMe = arrayfun(@(rel) ...
                     any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), ...
+                        'uni',false),...
                     list)),...
-                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
-                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                    rels);  % restrict by all association tables, i.e. tables that make
+                            % referenced to other tables
+                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions,
+                                                               % then restrict by self
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
+                    for ix = cellfun(@(child) find(strcmp( ...
+                            self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
-                            rels(ix).restrict(pro(rels(i)))  % TODO: handle renamed attributes  self.conn.foreignKeys(fullTableName).aliased
+                            % TODO: handle renamed attributes  self.conn.foreignKeys( ...
+                            %   fullTableName).aliased
+                            rels(ix).restrict(pro(rels(i)))
                         else
                             rels(ix).restrict(rels(i).restrictions{:});
                         end
@@ -88,14 +96,16 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 for i=1:numel(rels)
                     counts(i) = rels(i).count;
                     if counts(i)
-                        fprintf('\n%8d tuples from %s (%s)', counts(i), rels(i).fullTableName, rels(i).info.tier)
+                        fprintf('\n%8d tuples from %s (%s)', counts(i), ...
+                            rels(i).fullTableName, rels(i).info.tier)
                     end
                 end
                 fprintf \n\n
                 rels = rels(counts>0);
                 
                 % confirm and delete
-                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.internal.ask('Proceed to delete?'))
+                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.internal.ask( ...
+                        'Proceed to delete?'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
@@ -140,16 +150,18 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 rels(1) = rels(1) & self.restrictions;
                 
                 % apply proper restrictions
+                % restrict by all association tables, i.e. tables that make referenced to
+                % other tables
                 restrictByMe = arrayfun(@(rel) ...
-                    any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
-                    list)),...
-                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
-                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                    any(ismember(cellfun(@(r) self.schema.conn.tableToClass(r), ...
+                    rel.parents(false), 'uni', false), list)), rels);
+                % if self has restrictions, then restrict by self
+                restrictByMe(1) = ~isempty(self.restrictions);
                 counts = zeros(size(rels));
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
+                    for ix = cellfun(@(child) find(strcmp( ...
+                            self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
                             rels(ix).restrict(pro(rels(i)))
@@ -192,6 +204,47 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % Duplicates, unmatched attributes, or missing required attributes will
             % cause an error, unless 'command' is specified.
             
+            function [value, placeholder] = makePlaceholder(attr_idx, value)
+                % [value, placeholder] = MAKEPLACEHOLDER(attr_idx, value)
+                %   Process in-place data to be inserted and update placeholder.
+                %   value:      <var> Processed, in-place value ready for insert.
+                %   placeholder:<string> Placeholder for argument substitution.
+                %   attr_idx:   <num> Attribute order index.
+                if header.attributes(attr_idx).isString
+                    assert(dj.lib.isString(value), ...
+                        'The field %s must be a character string', ...
+                        header.attributes(attr_idx).name)
+                    if isempty(value)
+                        placeholder = '""';
+                    else
+                        placeholder = '"{S}"';
+                        value = char(value);
+                    end
+                elseif header.attributes(attr_idx).isBlob
+                    placeholder = '"{M}"';
+                else
+                    assert((isnumeric(value) || islogical(value)) && (isscalar( ...
+                        value) || isempty(value)),...
+                        'The field %s must be a numeric scalar value', ...
+                        header.attributes(attr_idx).name)
+                    % empty numeric values and nans are passed as nulls
+                    if isempty(value) || isnan(value)
+                        placeholder = 'NULL';
+                    elseif isinf(value)
+                        error 'Infinite values are not allowed in numeric fields'
+                    else  % numeric values
+                        type = header.attributes(i).type;
+                        if length(type)>=3 && strcmpi(type(end-2:end),'int')
+                            placeholder = sprintf('%d', value);
+                        elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
+                            placeholder = sprintf('%u', value);
+                        else
+                            placeholder = sprintf('%1.16g', value);
+                        end
+                    end
+                end
+            end
+
             if isa(tuples,'cell')
                 % if a cell array, convert to structure assuming matching attributes
                 tuples = cell2struct(tuples, self.header.names, 2);
@@ -210,7 +263,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     case {'REPLACE', 'replace'}
                         command = 'REPLACE';
                     otherwise
-                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''', command)
+                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''',...
+                            command)
                 end
             end
             header = self.header;
@@ -232,44 +286,18 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % form query
             ix = ismember(header.names, fnames);
             fields = sprintf(',`%s`',header.names{ix});
-            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end));
+            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, ...
+                fields(2:end));
             blobs = {};
             for tuple=tuples(:)'
                 valueStr = '';
                 for i = find(ix)
-                    v = tuple.(header.attributes(i).name);
-                    if header.attributes(i).isString
-                        assert(dj.lib.isString(v), ...
-                            'The field %s must be a character string', ...
-                            header.attributes(i).name)
-                        if isempty(v)
-                            valueStr = sprintf('%s"",',valueStr);
-                        else
-                            valueStr = sprintf('%s"{S}",', valueStr);
-                            blobs{end+1} = char(v);  %#ok<AGROW>
-                        end
-                    elseif header.attributes(i).isBlob
-                        valueStr = sprintf('%s"{M}",', valueStr);
-                        blobs{end+1} = v;    %#ok<AGROW>
-                    else
-                        assert((isnumeric(v) || islogical(v)) && (isscalar(v) || isempty(v)),...
-                            'The field %s must be a numeric scalar value', ...
-                            header.attributes(i).name)
-                        if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
-                            valueStr = sprintf('%sNULL,', valueStr);
-                        elseif isinf(v)
-                            error 'Infinite values are not allowed in numeric fields'
-                        else  % numeric values
-                            type = header.attributes(i).type;
-                            if length(type)>=3 && strcmpi(type(end-2:end),'int')
-                                valueStr = sprintf('%s%d,', valueStr, v);
-                            elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
-                                valueStr = sprintf('%s%u,', valueStr, v);
-                            else
-                                valueStr = sprintf('%s%1.16g,',valueStr, v);
-                            end
-                        end
+                    [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
+                    if ~isempty(v) && ( ...
+                            (~isnumeric(v) && ~islogical(v)) || (~isscalar(v) && ~isempty(v)))
+                        blobs{end+1} = v;   %#ok<AGROW>
                     end
+                    valueStr = sprintf(['%s' placeholder ','],valueStr);
                 end
                 command = sprintf('%s(%s),', command, valueStr(1:end-1));
             end
@@ -348,7 +376,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             header = self.header;
             ix = find(strcmp(attrname,header.names));
             assert(numel(ix)==1, 'invalid attribute name')
-            assert(~header.attributes(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
+            assert(~header.attributes(ix).iskey, ...
+                'cannot update a key value. Use insert(..,''REPLACE'') instead')
             
             switch true
                 case isNull
