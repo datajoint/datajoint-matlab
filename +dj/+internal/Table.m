@@ -31,8 +31,10 @@ classdef Table < handle
     properties(Dependent, SetAccess = private)
         info           % table information
         fullTableName  % `database`.`plain_table_name`
-        ancestors      % names of all referenced tables, including self, recursively, in order of dependencies
-        descendants    % names of all dependent tables, including self, recursively, in order of dependencies
+        ancestors      % names of all referenced tables, including self, recursively,
+                       % in order of dependencies
+        descendants    % names of all dependent tables, including self, recursively,
+                       % in order of dependencies
     end
     
     
@@ -136,7 +138,8 @@ classdef Table < handle
             
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)),level+1), table.parents())
+                    cellfun(@(name) recurse(dj.Table(self.schema.conn.tableToClass(name)), ...
+                        level+1), table.parents())
                     map(table.className)=level;
                 end
             end
@@ -153,7 +156,8 @@ classdef Table < handle
             
             function recurse(table,level)
                 if ~map.isKey(table.className) || level>map(table.className)
-                    cellfun(@(name) recurse(dj.internal.Table(self.schema.conn.tableToClass(name)),level+1), table.children())
+                    cellfun(@(name) recurse(dj.internal.Table(self.schema.conn.tableToClass( ...
+                        name)),level+1), table.children())
                     map(table.className)=level;
                 end
             end
@@ -163,8 +167,8 @@ classdef Table < handle
         function ret = sizeOnDisk(self)
             % return the table's size on disk in Mebibytes
             s = self.schema.conn.query(...
-                sprintf('SHOW TABLE STATUS FROM `%s` WHERE name="%s"', self.schema.dbname, self.plainTableName),...
-                'bigint_to_double');
+                sprintf('SHOW TABLE STATUS FROM `%s` WHERE name="%s"', self.schema.dbname, ...
+                    self.plainTableName), 'bigint_to_double');
             tableSize = (s.Data_length + s.Index_length)/1024/1024;
             if nargout
                 ret = tableSize;
@@ -217,7 +221,8 @@ classdef Table < handle
         
         function str = re(self)
             % alias for self.describe
-            warning 'dj.Table/re is deprecated and will be removed in future releases: Use dj.Table/describe instead'
+            warning(['dj.Table/re is deprecated and will be removed in future releases: ' ...
+                'Use dj.Table/describe instead']);
             str = self.describe;
         end
         
@@ -270,7 +275,8 @@ classdef Table < handle
                     if attr.isnullable
                         default = '=null';
                     elseif ~isempty(default)
-                        if attr.isNumeric || any(strcmp(default,dj.internal.Declare.CONSTANT_LITERALS))
+                        if attr.isNumeric || any(strcmp(default, ...
+                                dj.internal.Declare.CONSTANT_LITERALS))
                             default = ['=' default]; %#ok<AGROW>
                         else
                             default = ['="' default '"']; %#ok<AGROW>
@@ -291,7 +297,8 @@ classdef Table < handle
         
         
         function optimize(self)
-            % optimizes the table if it has become fragmented after repeated inserts and deletes.
+            % optimizes the table if it has become fragmented after repeated inserts and
+            % deletes.
             % See http://dev.mysql.com/doc/refman/5.6/en/optimize-table.html
             fprintf 'optimizing ...'
             status = self.schema.conn.query(...
@@ -323,7 +330,8 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef(definition));
+            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+                definition));
             self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
@@ -337,7 +345,8 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef(newDefinition));
+            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+                newDefinition));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
         
@@ -463,7 +472,8 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if ~dj.set('suppressPrompt') ...
-                        && ~strcmpi('yes', dj.internal.ask(sprintf('Update the table definition and class definition in %s?',path)))
+                        && ~strcmpi('yes', dj.internal.ask(sprintf(['Update the table ' ...
+                        'definition and class definition in %s?'],path)))
                     disp 'No? Table definition left untouched.'
                 else
                     % read old file
@@ -496,7 +506,8 @@ classdef Table < handle
                     for i=p2+1:length(lines)
                         s = lines{i};
                         if ~isempty(regexp(s, '^\s*classdef', 'once'))
-                            s = regexprep(s, 'dj\.Relvar\s*(&\s*dj\.AutoPopulate)?', lookup.(self.info.tier));
+                            s = regexprep(s, 'dj\.Relvar\s*(&\s*dj\.AutoPopulate)?', ...
+                                lookup.(self.info.tier));
                         end
                         fprintf(f,'%s\n', s);
                     end
@@ -510,7 +521,8 @@ classdef Table < handle
             % returns the list of allowed values for the attribute attr of type enum
             ix = strcmpi(attr, self.tableHeader.names);
             assert(any(ix), 'Attribute "%s" not found', attr)
-            list = regexpi(self.tableHeader.attributes(ix).type,'^enum\((?<list>''.*'')\)$', 'names');
+            list = regexpi(self.tableHeader.attributes(ix).type,'^enum\((?<list>''.*'')\)$', ...
+                'names');
             assert(~isempty(list), 'Attribute "%s" not of type ENUM', attr)
             list = regexp(list.list,'''(?<item>[^'']+)''','names');
             list = {list.item};

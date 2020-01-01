@@ -36,7 +36,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % an interactive confirmation before deleting the data.
             %
             % EXAMPLES:
-            %   del(common.Scans) % delete all tuples from table Scans and all tuples in dependent tables.
+            %   del(common.Scans) % delete all tuples from table Scans and all tuples
+            %                       in dependent tables.
             %   del(common.Scans & 'mouse_id=12') % delete all Scans for mouse 12
             %   del(common.Scans - tp.Cells)  % delete all tuples from table common.Scans
             %                                   that do not have matching tuples in table Cells
@@ -67,16 +68,22 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 % apply proper restrictions
                 restrictByMe = arrayfun(@(rel) ...
                     any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
+                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), ...
+                        'uni',false),...
                     list)),...
-                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
-                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                    rels);  % restrict by all association tables, i.e. tables that make
+                            % referenced to other tables
+                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions,
+                                                               % then restrict by self
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
+                    for ix = cellfun(@(child) find(strcmp( ...
+                            self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
-                            rels(ix).restrict(pro(rels(i)))  % TODO: handle renamed attributes  self.conn.foreignKeys(fullTableName).aliased
+                            % TODO: handle renamed attributes  self.conn.foreignKeys( ...
+                            %   fullTableName).aliased
+                            rels(ix).restrict(pro(rels(i)))
                         else
                             rels(ix).restrict(rels(i).restrictions{:});
                         end
@@ -88,14 +95,16 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 for i=1:numel(rels)
                     counts(i) = rels(i).count;
                     if counts(i)
-                        fprintf('\n%8d tuples from %s (%s)', counts(i), rels(i).fullTableName, rels(i).info.tier)
+                        fprintf('\n%8d tuples from %s (%s)', counts(i), ...
+                            rels(i).fullTableName, rels(i).info.tier)
                     end
                 end
                 fprintf \n\n
                 rels = rels(counts>0);
                 
                 % confirm and delete
-                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.internal.ask('Proceed to delete?'))
+                if ~dj.set('suppressPrompt') && ~strcmpi('yes',dj.internal.ask( ...
+                        'Proceed to delete?'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
@@ -140,16 +149,18 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 rels(1) = rels(1) & self.restrictions;
                 
                 % apply proper restrictions
+                % restrict by all association tables, i.e. tables that make referenced to
+                % other tables
                 restrictByMe = arrayfun(@(rel) ...
-                    any(ismember(...
-                    cellfun(@(r) self.schema.conn.tableToClass(r), rel.parents(false), 'uni',false),...
-                    list)),...
-                    rels);  % restrict by all association tables, i.e. tables that make referenced to other tables
-                restrictByMe(1) = ~isempty(self.restrictions); % if self has restrictions, then restrict by self
+                    any(ismember(cellfun(@(r) self.schema.conn.tableToClass(r), ...
+                    rel.parents(false), 'uni', false), list)), rels);
+                % if self has restrictions, then restrict by self
+                restrictByMe(1) = ~isempty(self.restrictions);
                 counts = zeros(size(rels));
                 for i=1:length(rels)
                     % iterate through all tables that reference rels(i)
-                    for ix = cellfun(@(child) find(strcmp(self.schema.conn.tableToClass(child),list)), rels(i).children)
+                    for ix = cellfun(@(child) find(strcmp( ...
+                            self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
                             rels(ix).restrict(pro(rels(i)))
@@ -193,6 +204,11 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % cause an error, unless 'command' is specified.
             
             function [value, placeholder] = makePlaceholder(attr_idx, value)
+                % [value, placeholder] = MAKEPLACEHOLDER(attr_idx, value)
+                %   Process in-place data to be inserted and update placeholder.
+                %   value:      <var> Processed, in-place value ready for insert.
+                %   placeholder:<string> Placeholder for argument substitution.
+                %   attr_idx:   <num> Attribute order index.
                 if header.attributes(attr_idx).isString
                     assert(dj.lib.isString(value), ...
                         'The field %s must be a character string', ...
@@ -206,10 +222,12 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 elseif header.attributes(attr_idx).isBlob
                     placeholder = '"{M}"';
                 else
-                    assert((isnumeric(value) || islogical(value)) && (isscalar(value) || isempty(value)),...
+                    assert((isnumeric(value) || islogical(value)) && (isscalar( ...
+                        value) || isempty(value)),...
                         'The field %s must be a numeric scalar value', ...
                         header.attributes(attr_idx).name)
-                    if isempty(value) || isnan(value) % empty numeric values and nans are passed as nulls
+                    % empty numeric values and nans are passed as nulls
+                    if isempty(value) || isnan(value)
                         placeholder = 'NULL';
                     elseif isinf(value)
                         error 'Infinite values are not allowed in numeric fields'
@@ -244,7 +262,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     case {'REPLACE', 'replace'}
                         command = 'REPLACE';
                     otherwise
-                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''', command)
+                        error('invalid insert option ''%s'': use ''REPLACE'' or ''IGNORE''', ...
+                            command)
                 end
             end
             header = self.header;
@@ -266,7 +285,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % form query
             ix = ismember(header.names, fnames);
             fields = sprintf(',`%s`',header.names{ix});
-            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, fields(2:end));
+            command = sprintf('%s INTO %s (%s) VALUES ', command, self.fullTableName, ...
+                fields(2:end));
             blobs = {};
             for tuple=tuples(:)'
                 valueStr = '';
@@ -355,7 +375,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             header = self.header;
             ix = find(strcmp(attrname,header.names));
             assert(numel(ix)==1, 'invalid attribute name')
-            assert(~header.attributes(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
+            assert(~header.attributes(ix).iskey, ...
+                'cannot update a key value. Use insert(..,''REPLACE'') instead')
             
             switch true
                 case isNull

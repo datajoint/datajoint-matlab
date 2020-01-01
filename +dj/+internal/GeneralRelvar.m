@@ -71,7 +71,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             tic
             fprintf('\nObject %s\n\n',class(self))
             hdr = self.header;
-            if isprop(self, 'tableHeader')   % tableHeader exists in tables but not in derived relations.
+            % tableHeader exists in tables but not in derived relations.
+            if isprop(self, 'tableHeader')
                 fprintf(' :: %s ::\n\n', self.tableHeader.info.comment)
             end
             
@@ -90,8 +91,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 preview = struct2table(preview(1:min(end,maxRows)), 'asArray', true);
                 % convert primary key to upper case:
                 funs = {@(x) x; @upper};
-                preview.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, self.primaryKey)}(x), ...
-                    preview.Properties.VariableNames, 'uni', false);
+                preview.Properties.VariableNames = cellfun(@(x) funs{1+ismember(x, ...
+                    self.primaryKey)}(x), preview.Properties.VariableNames, 'uni', false);
                 disp(preview)
                 if hasMore
                     fprintf '          ...\n\n'
@@ -118,9 +119,11 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 columnName = columns;
                 for iCol = 1:length(columns)
                     if self.header.attributes(iCol).iskey
-                        columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} '</b></font></html>'];
+                        columnName{iCol} = ['<html><b><font color="black">' columnName{iCol} ...
+                            '</b></font></html>'];
                     else
-                        columnName{iCol} = ['<html><font color="blue">' columnName{iCol} '</font></html>'];
+                        columnName{iCol} = ['<html><font color="blue">' columnName{iCol} ...
+                            '</font></html>'];
                     end
                 end
                 format = cell(1,length(columns));
@@ -140,7 +143,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         function clip(self)
             % CLIP - copy into clipboard the matlab code to re-generate
             % the contents of the relation. Only scalar numeric or string values are allowed.
-            % This function may be useful for creating matlab code that fills a table with values.
+            % This function may be useful for creating matlab code that fills a table with 
+            % values.
             %
             % USAGE:
             %    r.clip
@@ -157,7 +161,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % EXISTS - a fast check whether the relvar
             % contains any tuples
             [~, sql_] = self.compile(3);
-            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', sql_));
+            yes = self.conn.query(sprintf('SELECT EXISTS(SELECT 1 FROM %s LIMIT 1) as yes', ...
+                sql_));
             yes = logical(yes.yes);
         end
         
@@ -287,7 +292,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             end
             
             if returnKey
-                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.proj(ret, self.primaryKey{:}));
+                varargout{length(specs)+1} = dj.struct.fromFields(dj.struct.proj(ret, ...
+                    self.primaryKey{:}));
             end
         end
         
@@ -313,14 +319,17 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             total = self.count;
             fileNumber = 0;
             while savedTuples < total
-                tuples = self.fetch('*',sprintf('LIMIT %u OFFSET %u', tuplesPerChunk, savedTuples));
+                tuples = self.fetch('*',sprintf('LIMIT %u OFFSET %u', tuplesPerChunk, ...
+                    savedTuples));
                 mbytes = sizeMB(tuples);
                 fname = sprintf('%s-%04d.mat', outfilePrefix, fileNumber);
                 save(fname, 'tuples')
                 savedMegaBytes = savedMegaBytes + mbytes;
                 savedTuples = savedTuples + numel(tuples);
-                tuplesPerChunk = min(5*tuplesPerChunk, ceil(mbytesPerFile/savedMegaBytes*savedTuples));
-                fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, savedTuples, total, savedMegaBytes)
+                tuplesPerChunk = min(5*tuplesPerChunk, ...
+                    ceil(mbytesPerFile/savedMegaBytes*savedTuples));
+                fprintf('file %s.  Tuples: [%4u/%d]  Total MB: %6.1f\n', fname, savedTuples, ...
+                    total, savedMegaBytes)
                 fileNumber = fileNumber + 1;
             end
             
@@ -346,7 +355,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % All conditions must be true for a tuple to pass.
             %
             % Examples:
-            %    rel.restrict('session_date>2012-01-01', 'not', struct('anesthesia', 'urethane'))
+            %    rel.restrict('session_date>2012-01-01', 'not', struct('anesthesia', 
+            %       'urethane'))
             %    rel2.restrict(rel)    % all tuples in rel2 that at least on tuple in rel
             
             for arg = varargin
@@ -477,7 +487,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 % if the first argument is a relvar, perform aggregation
                 ret = self.aggr(varargin{1}, varargin{2:end});
             else
-                assert(iscellstr(varargin), 'proj() requires a list of strings as attribute args')
+                assert(iscellstr(varargin), ...
+                    'proj() requires a list of strings as attribute args')
                 ret = init(dj.internal.GeneralRelvar, 'proj', [{self} varargin]);
             end
         end
@@ -535,15 +546,18 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         %%%%% DEPRECATED RELATIIONAL OPERATORS (for backward compatibility)
         function ret = times(self, arg)
-            warning 'The relational operator .* (semijoin) will be removed in a future release.  Please use & instead.'
+            warning(['The relational operator .* (semijoin) will be removed in a future ' ... 
+                'release.  Please use & instead.']);
             ret = self & arg;
         end
         function ret = rdivide(self, arg)
-            warning 'The relational operator / (antijoin) will be removed in a future release.  Please use - instead.'
+            warning(['The relational operator / (antijoin) will be removed in a future ' ...
+                'release.  Please use - instead.']);
             ret = self - arg;
         end
         function ret = plus(self, arg)
-            warning 'The relational operator + (union) will be removed in a future release.  Please use | instead'
+            warning(['The relational operator + (union) will be removed in a future ' ...
+                'release.  Please use | instead']);
             ret = self | arg;
         end
         
@@ -582,7 +596,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                 if attr.isnullable
                     default = '=null';
                 elseif ~isempty(default)
-                    if attr.isNumeric || any(strcmp(default,dj.internal.Declare.CONSTANT_LITERALS))
+                    if attr.isNumeric || any(strcmp( ...
+                            default,dj.internal.Declare.CONSTANT_LITERALS))
                         default = ['=' default]; %#ok<AGROW>
                     else
                         default = ['="' default '"']; %#ok<AGROW>
@@ -670,7 +685,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     commonBlobs = intersect(header.blobNames, header2.blobNames);
                     assert(isempty(commonBlobs), 'join cannot be done on blob attributes')
                     pkey = sprintf(',`%s`', header.primaryKey{:});
-                    sql = sprintf('%s NATURAL LEFT JOIN %s GROUP BY %s', sql, sql2, pkey(2:end));
+                    sql = sprintf('%s NATURAL LEFT JOIN %s GROUP BY %s', sql, sql2, ...
+                        pkey(2:end));
                     header.project(self.operands(3:end));
                     assert(~all(arrayfun(@(x) isempty(x.alias), header.attributes)),...
                         'Aggregate operators must define at least one computation')
@@ -703,7 +719,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             % enclose in subquery if necessary
             if enclose==1 && header.hasAliases ...
-                    || enclose==2 && (~ismember(self.operator, {'table', 'join'}) || ~isempty(self.restrictions)) ...
+                    || enclose==2 && (~ismember(self.operator, ...
+                        {'table', 'join'}) || ~isempty(self.restrictions)) ...
                     || enclose==3 && strcmp(self.operator, 'aggregate')
                 sql = sprintf('(SELECT %s FROM %s) AS `$a%x`', header.sql, sql, aliasCount);
                 header.stripAliases;
@@ -836,6 +853,10 @@ function cond = struct2cond(keys, header)
     cond = cond(min(end,5):end);  % strip " OR "
 
     function value = prepValue(field, value)
+        % value = PREPVALUE(field, value)
+        %   Convert DataJoint query values into SQL query values.
+        %   value:  <string> Modified, in-place query value.
+        %   field:  <cell_array> Field to be restricted, 1x1.
         attr = header.byName(field{1});
         assert(~attr.isBlob, 'The key must not include blob header.')
         if attr.isString
@@ -896,6 +917,8 @@ function str = escapeString(str)
 end
 
 function data = get(attr, data)
-    % This function is called to translate all attributes
-    
+    % data = GET(attr, data)
+    %   Process in place fetched data.
+    %   data:   <struct_array> Fetched records.
+    %   attr:   <struct_array> Query fields details.
 end

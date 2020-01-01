@@ -1,7 +1,6 @@
 classdef Declare
-    % This static class hosts functions to convert DataJoint table 
-    % definitions into mysql table definitions, and to declare the 
-    % corresponding mysql tables.
+    % This static class hosts functions to convert DataJoint table definitions into mysql 
+    % table definitions, and to declare the corresponding mysql tables.
 
     properties(Constant)
         CONSTANT_LITERALS = {'CURRENT_TIMESTAMP'}
@@ -15,7 +14,11 @@ classdef Declare
     
     methods(Static)
         function sql = declare(table_instance, def)
-            % parses the table declration and declares the table
+            % sql = DECLARE(query, definition)  
+            %   Parse table declaration and declares the table.
+            %   sql:        <string> Generated SQL to create a table.
+            %   query:      <class>  DataJoint Table instance.
+            %   definition: <string> DataJoint Table definition.
             
             def = strrep(def, '%{', '');
             def = strrep(def, '%}', '');
@@ -30,19 +33,17 @@ classdef Declare
             % parse table schema, name, type, and comment
             switch true
                     
-                case {isa(table_instance, 'dj.internal.UserRelation'), isa( ...
-                        table_instance, 'dj.Part'), isa(table_instance, ...
-                        'dj.Jobs')}
+                case {isa(table_instance, 'dj.internal.UserRelation'), isa(table_instance, ...
+                        'dj.Part'), isa(table_instance, 'dj.Jobs')}
                     % New-style declaration using special classes for each tier
                     tableInfo = struct;
                     if isa(table_instance, 'dj.Part')
                         tableInfo.tier = 'part';
                     else
-                        specialClass = find(cellfun(@(c) isa(table_instance, ...
-                            c), dj.Schema.tierClasses));
+                        specialClass = find(cellfun(@(c) isa(table_instance, c), ...
+                            dj.Schema.tierClasses));
                         assert(length(specialClass)==1, ...
-                            'Unknown type of UserRelation in %s', ...
-                            class(table_instance))
+                            'Unknown type of UserRelation in %s', class(table_instance))
                         tableInfo.tier = dj.Schema.allowedTiers{specialClass};
                     end
                     % remove empty lines
@@ -64,8 +65,7 @@ classdef Declare
                             dj.Schema.tierPrefixes{strcmp(tableInfo.tier, ...
                             dj.Schema.allowedTiers)}, sprintf('%s__%s', ...
                             table_instance.master.plainTableName, ...
-                            dj.internal.fromCamelCase( ...
-                            table_instance.className(length( ...
+                            dj.internal.fromCamelCase(table_instance.className(length( ...
                             table_instance.master.className)+1:end)))); 
                             %#ok<MCNPN>
                     else
@@ -89,11 +89,10 @@ classdef Declare
                         };
                     tableInfo = regexp(firstLine, cat(2,pat{:}), 'names');
                     assert(numel(tableInfo)==1, ...
-                        ['invalidTableDeclaration:Incorrect syntax in table ' ...
-                        'declaration, line 1: \n  %s'], firstLine)
+                        ['invalidTableDeclaration:Incorrect syntax in table declaration, ' ...
+                        'line 1: \n  %s'], firstLine)
                     assert(ismember(tableInfo.tier, dj.Schema.allowedTiers),...
-                        'invalidTableTier:Invalid tier for table ', ...
-                        tableInfo.className)
+                        'invalidTableTier:Invalid tier for table ', tableInfo.className)
                     cname = sprintf('%s.%s', tableInfo.package, tableInfo.className);
                     assert(strcmp(cname, table_instance.className), ...
                         'Table name %s does not match in file %s', cname, ...
@@ -104,8 +103,7 @@ classdef Declare
                         stableInfo.className));
             end
             
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', ...
-                table_instance.schema.dbname, tableName);
+            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, tableName);
             
             % fields and foreign keys
             inKey = true;
@@ -153,8 +151,7 @@ classdef Declare
             
             % add primary key declaration
             assert(~isempty(primaryFields), 'table must have a primary key')
-            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, ...
-                backquotedList(primaryFields));
+            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
             
             % finish the declaration
             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), ...
@@ -167,6 +164,10 @@ classdef Declare
         end
 
         function fieldInfo = parseAttrDef(line)
+            % fieldInfo = PARSEATTRDEF(line)
+            %   Parse DataJoint line declaration and extracts attributes.
+            %   fieldInfo:  <struct> Extracted field attributes.
+            %   line:       <string> DataJoint definition, single line.
             line = strtrim(line);
             assert(~isempty(regexp(line, '^[a-z][a-z\d_]*', 'once')), ...
                 'invalid attribute name in %s', line)
@@ -205,7 +206,14 @@ classdef Declare
         end
 
         function [sql, newattrs] = makeFK(sql, line, existingFields, inKey, hash)
-            % add foreign key to SQL table definition
+            % [sql, newattrs] = MAKEFK(sql, line, existingFields, inKey, hash)
+            %   Add foreign key to SQL table definition.
+            %   sql:            <string> Modified in-place SQL to include foreign keys.
+            %   newattrs:       <cell_array> Extracted new field attributes.
+            %   line:           <string> DataJoint definition, single line.
+            %   existingFields: <struct> Existing field attributes.
+            %   inKey:          <logical> Set as primary key.
+            %   hash:           <string> Current hash as base.
             pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
                 '\s*->\s*' ...
                 '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
@@ -215,8 +223,7 @@ classdef Declare
             fk = regexp(line, pat, 'names');
             if exist(fk.cname, 'class')
                 rel = feval(fk.cname);
-                assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', ...
-                    fk.cname)
+                assert(isa(rel, 'dj.Relvar'), 'class %s is not a DataJoint relation', fk.cname)
             else
                 rel = dj.Relvar(fk.cname);
             end
@@ -233,8 +240,7 @@ classdef Declare
                 % unambiguous single attribute
                 if length(rel.primaryKey)==1
                     attrs = rel.primaryKey;
-                elseif isempty(attrs) && length(setdiff(rel.primaryKey, ...
-                        existingFields))==1
+                elseif isempty(attrs) && length(setdiff(rel.primaryKey, existingFields))==1
                     attrs = setdiff(rel.primaryKey, existingFields);
                 end
             end
@@ -260,8 +266,7 @@ classdef Declare
                     rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-                sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute( ...
-                    fieldInfo));
+                sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute(fieldInfo));
             end
             
             fkattrs = rel.primaryKey;
@@ -269,19 +274,23 @@ classdef Declare
             hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
             sql = sprintf(...
                 ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT'], sql, hash, ...
-                backquotedList(fkattrs), rel.fullTableName, ...
-                backquotedList(rel.primaryKey));
+                'ON UPDATE CASCADE ON DELETE RESTRICT'], sql, hash, backquotedList(fkattrs), ...
+                rel.fullTableName, backquotedList(rel.primaryKey));
         end
 
         function field = substituteSpecialType(field, category)
-
+            % field = SUBSTITUTESPECIALTYPE(field, category)
+            %   Substitute DataJoint type with sql type.
+            %   field:      <struct> Modified in-place field attributes.
+            %   category:   <string> DataJoint type match based on TYPE_PATTERN.
         end
 
         function sql = compileAttribute(field)
-            % convert the structure field with header {'name' 'type' 'default' 
-            % 'comment'} to the SQL column declaration
-        
+            % sql = COMPILEATTRIBUTE(field)
+            %   Convert the structure field with header {'name' 'type' 'default' 'comment'}
+            %       to the SQL column declaration.
+            %   sql:    <string> Generated SQL for field statement.
+            %   field:  <struct> Parsed DataJoint attribute declaration.        
             if field.isnullable   % all nullable attributes default to null
                 default = 'DEFAULT NULL';
             else
@@ -311,8 +320,11 @@ classdef Declare
         end
 
         function definition = getDefinition(self)
-            % extract the table declaration with the first percent-brace comment
-            % block of the matching .m file.
+            % definition = GETDEFINITION(self)
+            %   Extract the table declaration with the first percent-brace comment block of
+            %       the matching .m file.
+            %   definition: <string> DataJoint definition extracted from classdef.
+            %   self:       <class> DataJoint Table instance.
             file = which(self.className);
             assert(~isempty(file), ...
                 'MissingTableDefinition:Could not find table definition file %s', ...
@@ -324,6 +336,10 @@ classdef Declare
         end
 
         function matched_type = matchType(attribute_type)
+            % matched_type = MATCHTYPE(attribute_type)
+            %   Classify DataJoint definition as DataJoint types based on TYPE_PATTERN.
+            %   matched_type:   <string> DataJoint classified category.
+            %   attribute_type: <string> DataJoint defined type.
             fn = fieldnames(dj.internal.Declare.TYPE_PATTERN);
             for k=1:numel(fn)
                 if ~isempty(regexpi(strtrim(attribute_type), ...
@@ -340,12 +356,13 @@ classdef Declare
 end
 
 function str = backquotedList(arr)
+    % Convert cell array to backquoted, comma-delimited string.
     str = sprintf('`%s`,', arr{:});
     str(end)=[];
 end
 
 function str = readPercentBraceComment(filename)
-    % reads the initial comment block %{ ... %} in filename
+    % Read the initial comment block %{ ... %} in filename
 
     f = fopen(filename, 'rt');
     assert(f~=-1, 'Could not open %s', filename)
