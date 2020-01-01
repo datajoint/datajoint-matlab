@@ -168,7 +168,7 @@ classdef Table < handle
             % return the table's size on disk in Mebibytes
             s = self.schema.conn.query(...
                 sprintf('SHOW TABLE STATUS FROM `%s` WHERE name="%s"', self.schema.dbname, ...
-                    self.plainTableName), 'bigint_to_double');
+                self.plainTableName), 'bigint_to_double');
             tableSize = (s.Data_length + s.Index_length)/1024/1024;
             if nargout
                 ret = tableSize;

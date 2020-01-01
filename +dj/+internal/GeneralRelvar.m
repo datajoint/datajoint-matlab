@@ -273,8 +273,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             specs = args(cellfun(@ischar, args)); % attribute specifiers
             returnKey = nargout==length(specs)+1;
             assert(returnKey || (nargout==length(specs) || (nargout==0 && length( ...
-                specs)==1)), ['The number of fetchn() outputs must match the number of ' ...
-                'requested attributes'])
+                specs)==1)), ...
+                'The number of fetchn() outputs must match the number of requested attributes')
             assert(~isempty(specs),'insufficient inputs')
             assert(~any(strcmp(specs,'*')), '"*" is not allowed in fetchn()')
             

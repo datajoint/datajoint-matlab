@@ -321,7 +321,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % parallel thread.  Call with no arguments to wait for the last
             % job to complete.
             %
-            % Initialize the parallel pool before inserting as parpool('local',1),for example.
+            % Initialize the parallel pool before inserting as parpool('local',1), for example.
             %
             % Requires MATLAB R2013b or later.
             
