@@ -15,11 +15,13 @@ end
 if ~dbname
     disp 'No database name entered. Quitting.'
 elseif isempty(regexp(dbname,'^[a-z][a-z0-9_]*$','once'))
-    error 'Invalid database name. Begin with a letter, only lowercase alphanumerical and underscores.'
+    error(['Invalid database name. Begin with a letter, only lowercase alphanumerical and ' ...
+        'underscores.'])
 else
     % create database
     s = query(dj.conn, ...
-        sprintf('SELECT schema_name FROM information_schema.schemata WHERE schema_name = "%s"', dbname));
+        sprintf(['SELECT schema_name as `schema_name` ' ...
+            'FROM information_schema.schemata WHERE schema_name = "%s"'], dbname));
 
     if ~isempty(s.schema_name)
         disp 'database already exists'
@@ -38,8 +40,10 @@ else
     else
         if nargin < 3
             if usejava('desktop')
-                fprintf('Please select folder to create package %s in. Opening UI...\n', ['+', package])
-                folder = uigetdir('./', sprintf('Select folder to create package %s in', ['+', package]));
+                fprintf('Please select folder to create package %s in. Opening UI...\n', ...
+                    ['+', package])
+                folder = uigetdir('./', sprintf('Select folder to create package %s in', ...
+                    ['+', package]));
             else
                 folder = input('Enter parent folder path >> ','s');
             end
@@ -73,7 +77,8 @@ else
             fprintf(f,'function obj = getSchema\n');
             fprintf(f,'persistent schemaObject\n');
             fprintf(f,'if isempty(schemaObject)\n');
-            fprintf(f,'    schemaObject = dj.Schema(dj.conn, ''%s'', ''%s'');\n', package, dbname);
+            fprintf(f,'    schemaObject = dj.Schema(dj.conn, ''%s'', ''%s'');\n', ...
+                package, dbname);
             fprintf(f,'end\n');
             fprintf(f,'obj = schemaObject;\n');
             fprintf(f,'end\n');
@@ -83,7 +88,8 @@ else
         % test that getSchema is on the path
         whichpath = which(sprintf('%s.getSchema',package));
         if isempty(whichpath)
-            warning('Could not open %s.getSchema. Ensure that %s is on the path', package, filepath)
+            warning('Could not open %s.getSchema. Ensure that %s is on the path', ...
+                package, filepath)
         end
     end
 end
