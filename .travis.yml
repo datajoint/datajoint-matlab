@@ -33,3 +33,15 @@ jobs:
       env:
       - MATLAB_VERSION: R2018b
       - MYSQL_TAG: 5.6
+    - <<: *slim
+      env:
+      - MATLAB_VERSION: R2019a
+      - MYSQL_TAG: 8.0
+    - <<: *slim
+      env:
+      - MATLAB_VERSION: R2019a
+      - MYSQL_TAG: 5.7
+    - <<: *slim
+      env:
+      - MATLAB_VERSION: R2019a
+      - MYSQL_TAG: 5.6
