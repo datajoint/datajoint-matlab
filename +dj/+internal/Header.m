@@ -109,7 +109,8 @@ classdef Header < matlab.mixin.Copyable
                 attrs.alias{i} = '';
             end
 
-            validFields = [attrs.isNumeric] | [attrs.isString] | [attrs.isBlob] | [attrs.isUuid];
+            validFields = [attrs.isNumeric] | [attrs.isString] | [attrs.isBlob] | ...
+                [attrs.isUuid];
             if ~all(validFields)
                 ix = find(~validFields, 1, 'first');
                 error('unsupported field type "%s" in `%s`.`%s`', ...
