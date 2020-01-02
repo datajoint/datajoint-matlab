@@ -220,6 +220,14 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         placeholder = '"{S}"';
                         value = char(value);
                     end
+                elseif header.attributes(attr_idx).isUuid
+                    placeholder = '"{B}"';
+                    value = strrep(value, '-', '');
+                    hexstring = value';
+                    reshapedString = reshape(hexstring,2,16);
+                    hexMtx = reshapedString.';
+                    decMtx = hex2dec(hexMtx);
+                    value = uint8(decMtx);
                 elseif header.attributes(attr_idx).isBlob
                     placeholder = '"{M}"';
                 else
