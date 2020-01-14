@@ -144,7 +144,7 @@ classdef ERD < handle
             for i=1:self.graph.numnodes
                 if tiers(i)<7  % ignore jobs, logs, etc.
                     isPart = tiers(i)==6;
-                    fs = dj.set('erdFontSize')*(1 - 0.3*isPart);
+                    fs = dj.config('displayDiagram_font_size')*(1 - 0.3*isPart);
                     fc = isPart*0.3*[1 1 1];
                     name = self.conn.tableToClass(self.graph.Nodes.Name{i});
                     text(h.XData(i)+0.1, h.YData(i), name, ...

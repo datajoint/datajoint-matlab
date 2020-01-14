@@ -1,0 +1,31 @@
+{
+    "database.host": "",
+    "database.password": "",
+    "database.user": "",
+    "database.port": 3306,
+    "database.reconnect": true,
+    "connection.init_function": null,
+    "connection.charset": "",
+    "loglevel": "INFO",
+    "safemode": true,
+    "fetch_format": "array",
+    "display.limit": [12, 5],
+    "display.width": 14,
+    "display.show_tuple_count": true,
+    "database.use_tls": null,
+    "enable_python_native_blobs": false,
+    "custom.lib" : {
+            "item.type": "keyboard",
+            "location" : "/"
+    },
+    "stores.lib" : [
+        {
+            "protocol.type": "file",
+            "location" : "/tmp"
+        },
+        {
+            "protocol.type": "s3",
+            "location" : "/home"
+        }
+    ]
+}

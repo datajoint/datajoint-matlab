@@ -2,3 +2,5 @@
 mym/
 *.mltbx
 *.env
+notebook
+docker-compose.yml

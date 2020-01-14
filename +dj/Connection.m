@@ -150,7 +150,7 @@ classdef Connection < handle
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             if ~ret && self.inTransaction
-                if dj.set('reconnectTimedoutTransaction')
+                if dj.config('databaseReconnect_transaction')
                     warning 'Reconnected after server disconnected during a transaction'
                 else
                     error 'Server disconnected during a transaction'
@@ -170,7 +170,7 @@ classdef Connection < handle
                 end
             end
             v = varargin;
-            if dj.set('bigint_to_double')
+            if dj.config('queryBigint_to_double')
                 v{end+1} = 'bigint_to_double';
             end
             if nargout>0

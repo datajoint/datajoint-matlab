@@ -111,12 +111,12 @@ classdef AutoPopulate < dj.internal.UserRelation
             %
             % See also dj.internal.AutoPopulate/parpopulate
             
-            if ~dj.set('populateAncestors')
+            if ~dj.config('queryPopulate_ancestors')
                 rels = {self};
             else
                 % get all ancestors to be populated before self
                 assert(nargout==0, ...
-                    'parpopulate cannot return output when populateAncestors is true')
+                    'parpopulate cannot return output when queryPopulate_ancestors is true')
                 rels = cellfun(@feval, self.ancestors, 'uni', false);
                 rels = rels(cellfun(@(x) isa(x,'dj.internal.AutoPopulate'), rels));
             end
@@ -171,7 +171,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             %
             % See also dj.internal.AutoPopulate/populate
             
-            if ~dj.set('populateAncestors')
+            if ~dj.config('queryPopulate_ancestors')
                 rels = {self};
             else
                 % get all ancestors to be populated before self
@@ -375,7 +375,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                                 success = false;
                             end
                         end
-                        if ~success && dj.set('verbose')
+                        if ~success && strcmpi(dj.config('loglevel'), 'DEBUG')
                             fprintf('** %s: skipping already reserved\n', self.className)
                             disp(key)
                         end
@@ -433,8 +433,8 @@ classdef AutoPopulate < dj.internal.UserRelation
         function populateSanityChecks(self)
             % Performs sanity checks that are common to populate,
             % parpopulate and batch_populate.
-            % To disable the sanity check: dj.set('populateCheck',false)
-            if dj.set('populateCheck')
+            % To disable the sanity check: dj.config('queryPopulate_check',false)
+            if dj.config('queryPopulate_check')
                 source = self.getKeySource;
                 abovePopRel = setdiff(self.primaryKey(1:min(end,length(source.primaryKey))), source.primaryKey);
                 if ~all(ismember(source.primaryKey, self.primaryKey))
