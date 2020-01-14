@@ -51,7 +51,8 @@ classdef TestConfig < tests.Prep
             if strcmpi(type, 'load-custom')
                 tmp = rmfield(base, intersect(fieldnames(base), fieldnames(obj1)));
                 names = [fieldnames(tmp); fieldnames(obj1)];
-                obj1 = orderfields(cell2struct([struct2cell(tmp); struct2cell(obj1)], names, 1));
+                obj1 = orderfields(cell2struct([struct2cell(tmp); ...
+                    struct2cell(obj1)], names, 1));
             end
             % stringify
             file = jsonencode(obj1);
@@ -146,7 +147,8 @@ classdef TestConfig < tests.Prep
             disp(['---------------' st(1).name '---------------']);
             dj.config.restore;
             obj1 = tests.TestConfig.configRemoveEnvVars(dj.config(), 'config');
-            obj2 = tests.TestConfig.configRemoveEnvVars(orderfields(dj.internal.Settings.DEFAULTS), 'config');
+            obj2 = tests.TestConfig.configRemoveEnvVars( ...
+                orderfields(dj.internal.Settings.DEFAULTS), 'config');
             testCase.verifyEqual(jsonencode(obj1), jsonencode(obj2));
         end
         function testSave(testCase)
@@ -174,15 +176,18 @@ classdef TestConfig < tests.Prep
             default_file = [pkg.path '/test_schemas/default.json'];
             dj.config.restore;
             dj.config.save(default_file);
-            defaults = tests.TestConfig.configRemoveEnvVars(jsondecode(fileread(default_file)), 'file');
+            defaults = tests.TestConfig.configRemoveEnvVars( ...
+                jsondecode(fileread(default_file)), 'file');
             delete(default_file);
             % load test config
-            tests.TestConfig.configSingleFileTest(testCase, 'load-custom', [pkg.path '/test_schemas/config.json'], defaults);
+            tests.TestConfig.configSingleFileTest(testCase, 'load-custom', ...
+                [pkg.path '/test_schemas/config.json'], defaults);
             % load new config on top of existing
             base = tests.TestConfig.configRemoveEnvVars(dj.config, 'config');
             base = jsonencode(base);
             base = regexprep(base,'[a-z0-9][A-Z]','${$0(1)}_${lower($0(2))}');
-            tests.TestConfig.configSingleFileTest(testCase, 'load-custom', [pkg.path '/test_schemas/config_lite.json'], jsondecode(base));
+            tests.TestConfig.configSingleFileTest(testCase, 'load-custom', ...
+                [pkg.path '/test_schemas/config_lite.json'], jsondecode(base));
             % cleanup
             dj.config.restore;
         end
@@ -212,7 +217,8 @@ classdef TestConfig < tests.Prep
             dj.config.load([pkg.path '/test_schemas/config.json']);
             validateEnvVarConfig('env', env);
             % check if overriding env vars is persisted
-            validateEnvVarConfig('set', {'localhost', 'john', 'secure', 'SET SESSION sql_mode="TRADITIONAL";'});
+            validateEnvVarConfig('set', ...
+                {'localhost', 'john', 'secure', 'SET SESSION sql_mode="TRADITIONAL";'});
             % cleanup
             setenv('DJ_INIT', '');
             dj.config.restore;
