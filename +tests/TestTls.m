@@ -1,4 +1,4 @@
-classdef TestTls < matlab.unittest.TestCase
+classdef TestTls < tests.Prep
     % TestTls tests TLS connection scenarios.
     methods (Test)
         function testSecureConn(testCase)
