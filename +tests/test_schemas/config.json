@@ -14,11 +14,11 @@
     "display.show_tuple_count": true,
     "database.use_tls": null,
     "enable_python_native_blobs": false,
-    "custom.lib" : {
+    "custom.accessories" : {
             "item.type": "keyboard",
-            "location" : "/"
+            "location" : "office"
     },
-    "stores.lib" : [
+    "stores.options" : [
         {
             "protocol.type": "file",
             "location" : "/tmp"
