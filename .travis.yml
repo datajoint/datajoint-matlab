@@ -9,7 +9,6 @@ env:
   global:
     - DOCKER_CLIENT_TIMEOUT: 120
     - COMPOSE_HTTP_TIMEOUT: 120
-    - MATLAB_USER: datajoint
     - MATLAB_UID: 2000
     - MATLAB_GID: 2000
 slim: &slim
