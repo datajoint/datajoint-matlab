@@ -3,4 +3,5 @@ mym/
 *.mltbx
 *.env
 notebook
+*getSchema.m
 docker-compose.yml

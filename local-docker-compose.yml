@@ -1,0 +1,58 @@
+# docker-compose -f local-docker-compose.yml up
+version: '2.4'
+x-net: &net
+  networks:
+    - main
+services:
+  app:
+    <<: *net
+    environment:
+    - DJ_HOST=db
+    - DJ_USER=root
+    - DJ_PASS=simple
+    - DJ_TEST_HOST=db
+    - DJ_TEST_USER=datajoint
+    - DJ_TEST_PASSWORD=datajoint
+    - MATLAB_USER
+    - MATLAB_LICENSE
+    - JUPYTER_PASSWORD=datajoint
+    - DISPLAY
+    image: raphaelguzman/matlab:${MATLAB_VERSION}-GUI
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8888:8888"
+    user: ${MATLAB_UID}:${MATLAB_GID}
+    working_dir: /home/muser/notebooks
+    command: > 
+      /bin/bash -c "
+        ## Remove mym
+        rm -R /src/mym;
+        ## Set dj path
+        matlab -nodisplay -r \"\
+            addpath('/src');\
+            savepath;\
+          \";
+        ## Interactive Jupyter Notebook environment
+        jupyter notebook;
+      "
+    mac_address: $MATLAB_HOSTID
+    volumes:
+      ## Dev mounts
+      - .:/src
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      ## Additional mounts may go here
+      # - ./notebook:/home/muser/notebooks
+  db:
+    <<: *net
+    image: datajoint/mysql:${MYSQL_TAG}
+    environment:
+      - MYSQL_ROOT_PASSWORD=simple
+    ports:
+      - "3306:3306"
+    ## To persist MySQL data
+    # volumes:
+    #   - ./mysql/data:/var/lib/mysql
+networks:
+  main:

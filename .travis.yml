@@ -1,6 +1,7 @@
 branches:
-  only:
-  - master
+  except:
+  - master-stage
+  - stage
 sudo: required
 services: 
 - docker
@@ -8,7 +9,6 @@ env:
   global:
     - DOCKER_CLIENT_TIMEOUT: 120
     - COMPOSE_HTTP_TIMEOUT: 120
-    - MATLAB_USER: muser
     - MATLAB_UID: 2000
     - MATLAB_GID: 2000
 slim: &slim
@@ -18,7 +18,7 @@ slim: &slim
   script:
     - license=MATLAB_LICENSE_${MATLAB_VERSION}
     - export MATLAB_LICENSE=$(eval echo "\$$license")
-    - docker-compose -f LNX-docker-compose.yml up --exit-code-from dj
+    - docker-compose -f LNX-docker-compose.yml up --exit-code-from app
 jobs:
   include:
     - <<: *slim
@@ -32,4 +32,16 @@ jobs:
     - <<: *slim
       env:
       - MATLAB_VERSION: R2018b
+      - MYSQL_TAG: 5.6
+    - <<: *slim
+      env:
+      - MATLAB_VERSION: R2019a
+      - MYSQL_TAG: 8.0
+    - <<: *slim
+      env:
+      - MATLAB_VERSION: R2019a
+      - MYSQL_TAG: 5.7
+    - <<: *slim
+      env:
+      - MATLAB_VERSION: R2019a
       - MYSQL_TAG: 5.6
