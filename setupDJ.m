@@ -27,7 +27,7 @@ function setupDJ(skipPathAddition, force)
         fprintf('mym missing. Downloading...\n')
         target = fullfile(base, 'mym.zip');
         % mymURL = 'https://github.com/datajoint/mym/archive/master.zip';
-        mymURL = 'https://github.com/datajoint/mym/archive/external-storage.zip';
+        mymURL = 'https://github.com/guzman-raphael/mym/archive/ext-serialize.zip';
         target = websave(target, mymURL);
         if isunix && ~ismac
             % on Linux Matlab unzip doesn't work properly so use system unzip
@@ -37,7 +37,7 @@ function setupDJ(skipPathAddition, force)
         end
         % rename extracted mym-master directory to mym
         % movefile(fullfile(base, 'mym-master'), mymdir)
-        movefile(fullfile(base, 'mym-external-storage'), mymdir)
+        movefile(fullfile(base, 'mym-ext-serialize'), mymdir)
         delete(target)
     end
     
