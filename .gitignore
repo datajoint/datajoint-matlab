@@ -5,3 +5,4 @@ mym/
 notebook
 *getSchema.m
 docker-compose.yml
+.vscode
