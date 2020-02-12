@@ -66,7 +66,6 @@ classdef External
                     address(end) = [];
                 end
             end
-
             validateInput({}, config);
             validateConfig({}, validation_config);
         end

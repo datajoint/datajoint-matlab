@@ -33,11 +33,45 @@ classdef File
         location
         blob_config
     end
+    methods (Static)
+        function result = exists(external_filepath)
+            result = isfile(external_filepath);
+        end
+        function remove_object(external_filepath)
+            delete(external_filepath);
+        end
+        function upload_buffer(buffer, external_filepath)
+            fileID = fopen(external_filepath, 'w');
+            fwrite(fileID, buffer);
+            fclose(fileID);
+        end
+        function result = download_buffer(external_filepath)
+            fileID = fopen(external_filepath, 'r');
+            result = fread(fileID);
+        end
+    end
     methods
-        function file_store = File(config)
-            file_store.protocol = config.store_config.protocol;
-            file_store.location = config.store_config.location;
-            file_store.blob_config = config.type_config.blob;
+        function self = File(config)
+            self.protocol = config.store_config.protocol;
+            self.location = config.store_config.location;
+            self.blob_config = config.type_config.blob;
+        end
+        function external_filepath = make_external_filepath(self, relative_filepath)
+            external_filepath = [self.location '/' relative_filepath];
         end
     end
 end
+
+
+%x make_external_filepath -- (validation) (for file use filesystem style
+% directly, for s3 convert to posix path)
+
+%x upload_file -- (for uploading filepath, attach)
+%x download_file -- (for downloading filepath, attach)
+%x upload_buffer -- (for uploading blob)
+%x download_buffer -- (for downloading blob)
+%x remove_object -- (for deleting object from storage)
+%x exists -- (verify if object exists in storage)
+
+
+
