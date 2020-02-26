@@ -228,7 +228,17 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     decMtx = hex2dec(hexMtx);
                     value = uint8(decMtx);
                 elseif header.attributes(attr_idx).isBlob
-                    placeholder = '"{M}"';
+                    if ~header.attributes(attr_idx).isExternal
+                        placeholder = '"{M}"';
+                    else
+                        placeholder = '"{B}"';
+                        value = self.schema.external.tables.(header.attributes(attr_idx).store).upload_buffer(value);
+                        hexstring = value';
+                        reshapedString = reshape(hexstring,2,16);
+                        hexMtx = reshapedString.';
+                        decMtx = hex2dec(hexMtx);
+                        value = uint8(decMtx);
+                    end
                 else
                     assert((isnumeric(value) || islogical(value)) && (isscalar( ...
                         value) || isempty(value)),...

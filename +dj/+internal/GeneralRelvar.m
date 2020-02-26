@@ -210,7 +210,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
                 hdr.sql, sql_, limit));
             ret = dj.struct.fromFields(ret);
-            ret = get(self.header.attributes, ret);
+            ret = get(self.conn, self.header.attributes, ret);
             
             if nargout>1
                 % return primary key structure array
@@ -924,7 +924,7 @@ function str = escapeString(str)
     str = strrep(str, '\', '\\');
 end
 
-function data = get(attr, data)
+function data = get(connection, attr, data)
     % data = GET(attr, data)
     %   Process in place fetched data.
     %   data:   <struct_array> Fetched records.
@@ -939,6 +939,11 @@ function data = get(attr, data)
                             new_value(17:20) '-' ...
                             new_value(21:end)];
                 data(j).(attr(i).name) = new_value;
+            end
+        elseif attr(i).isBlob && attr(i).isExternal
+            for j = 1:length(data)
+                uuid = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
+                data(j).(attr(i).name) = connection.schemas.(attr(i).database).external.tables.(attr(i).store).download_buffer(uuid);
             end
         end
     end

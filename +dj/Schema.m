@@ -21,6 +21,7 @@ classdef Schema < handle
         tableNames   % tables indexed by classNames
         headers    % dj.internal.Header objects indexed by table names
         v          % virtual class generator
+        external
     end
     
     
@@ -63,6 +64,8 @@ classdef Schema < handle
             self.headers    = containers.Map('KeyType','char','ValueType','any');
             self.tableNames = containers.Map('KeyType','char','ValueType','char');
             self.v = dj.internal.TableAccessor(self);
+            self.external = dj.internal.ExternalMapping(self);
+            conn.register(self);
         end
         
         

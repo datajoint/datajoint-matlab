@@ -3,19 +3,23 @@ classdef Declare
     % table definitions, and to declare the corresponding mysql tables.
 
     properties(Constant)
+        UUID_DATA_TYPE = 'binary(16)'
         CONSTANT_LITERALS = {'CURRENT_TIMESTAMP'}
+        EXTERNAL_TABLE_ROOT = '~external'
         TYPE_PATTERN = struct( ...
             'NUMERIC', '^((tiny|small|medium|big)?int|decimal|double|float)', ...
             'STRING', '^((var)?char|enum|date|(var)?year|time|timestamp)', ...
-            'INTERNAL_BLOB', '^(tiny|medium|long)?blob', ...
+            'INTERNAL_BLOB', '^(tiny|medium|long)?blob$', ...
+            'EXTERNAL_BLOB', 'blob@(?<store>[a-z]\w*)$', ...
             'UUID', 'uuid$' ...
         )
-        UUID_DATA_TYPE = 'binary(16)'
-        SPECIAL_TYPES = {'UUID'}
+        SPECIAL_TYPES = {'UUID', 'EXTERNAL_BLOB'}
+        EXTERNAL_TYPES = {'EXTERNAL_BLOB'}  % data referenced by a UUID in external tables
+        SERIALIZED_TYPES = {'EXTERNAL_BLOB'}  % requires packing data
     end
     
     methods(Static)
-        function sql = declare(table_instance, def)
+        function [sql, external_stores] = declare(table_instance, def)
             % sql = DECLARE(query, definition)  
             %   Parse table declaration and declares the table.
             %   sql:        <string> Generated SQL to create a table.
@@ -36,12 +40,13 @@ classdef Declare
             switch true
                     
                 case {isa(table_instance, 'dj.internal.UserRelation'), isa(table_instance, ...
-                        'dj.Part'), isa(table_instance, 'dj.Jobs')}
+                        'dj.Part'), isa(table_instance, 'dj.Jobs'), ...
+                        isa(table_instance, 'dj.internal.ExternalTable')}
                     % New-style declaration using special classes for each tier
                     tableInfo = struct;
                     if isa(table_instance, 'dj.Part')
                         tableInfo.tier = 'part';
-                    else
+                    elseif ~isa(table_instance, 'dj.internal.ExternalTable')
                         specialClass = find(cellfun(@(c) isa(table_instance, c), ...
                             dj.Schema.tierClasses));
                         assert(length(specialClass)==1, ...
@@ -70,11 +75,13 @@ classdef Declare
                             dj.internal.fromCamelCase(table_instance.className(length( ...
                             table_instance.master.className)+1:end)))); 
                             %#ok<MCNPN>
-                    else
+                    elseif ~isa(table_instance, 'dj.internal.ExternalTable')
                         tableName = sprintf('%s%s%s', ...
                             table_instance.schema.prefix, dj.Schema.tierPrefixes{ ...
                             strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                             dj.internal.fromCamelCase(tableInfo.className));
+                    else
+                        tableName = [dj.internal.Declare.EXTERNAL_TABLE_ROOT '_' table_instance.store];
                     end
                     
                 otherwise
@@ -111,6 +118,7 @@ classdef Declare
             % fields and foreign keys
             inKey = true;
             primaryFields = {};
+            external_stores = {};
             fields = {};
             for iLine = 1:length(def)
                 line = def{iLine};
@@ -144,9 +152,11 @@ classdef Declare
                             primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
                         end
                         fields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, ...
-                            dj.internal.Declare.compileAttribute(fieldInfo));
-                        
+                        [attr_sql, store] = dj.internal.Declare.compileAttribute(fieldInfo);
+                        sql = sprintf('%s%s', sql, attr_sql);
+                        if ~isempty(store)
+                            external_stores{end+1} = store; %#ok<AGROW>
+                        end
                     otherwise
                         error('Invalid table declaration line "%s"', line)
                 end
@@ -178,7 +188,7 @@ classdef Declare
                 '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
                 ['=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?' ...
                     '[0-9]+)?)\s*'] % default value
-                [':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN]' ...
+                [':\s*(?<type>\w[@\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN]' ...
                     '[cC][rR][eE][mM][eE][nN][tT])?)\s*']       % datatype
                 '#(?<comment>.*)'           % comment
                 '$'  % end of line
@@ -269,7 +279,8 @@ classdef Declare
                     rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-                sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute(fieldInfo));
+                [attr_sql, ~] = dj.internal.Declare.compileAttribute(fieldInfo);
+                sql = sprintf('%s%s', sql, attr_sql);
             end
             
             fkattrs = rel.primaryKey;
@@ -288,10 +299,13 @@ classdef Declare
             %   category:   <string> DataJoint type match based on TYPE_PATTERN.
             if strcmpi(category, 'UUID')
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;
+            elseif any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
+                field.store = field.type((strfind(field.type,'@')+1):end);
+                field.type = dj.internal.Declare.UUID_DATA_TYPE;
             end
         end
 
-        function sql = compileAttribute(field)
+        function [sql, store] = compileAttribute(field)
             % sql = COMPILEATTRIBUTE(field)
             %   Convert the structure field with header {'name' 'type' 'default' 'comment'}
             %       to the SQL column declaration.
@@ -317,9 +331,13 @@ classdef Declare
                 'illegal characters in attribute comment "%s"', field.comment)
 
             category = dj.internal.Declare.matchType(field.type);
+            store = [];
             if any(strcmpi(category, dj.internal.Declare.SPECIAL_TYPES))
                 field.comment = [':' strip(field.type) ':' field.comment];
                 field = dj.internal.Declare.substituteSpecialType(field, category);
+                if isfield(field, 'store')
+                    store = field.store;                    
+                end
             end
             sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
                 field.name, strtrim(field.type), default, field.comment);

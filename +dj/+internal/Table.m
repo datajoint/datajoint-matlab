@@ -20,10 +20,10 @@ classdef Table < handle
     
     properties(SetAccess = protected)
         className    % the name of the corresponding base dj.Relvar class
+        schema          % handle to a schema object
     end
     
     properties(SetAccess = private)
-        schema          % handle to a schema object
         plainTableName  % just the table name
         tableHeader     % attribute information
     end
@@ -54,6 +54,10 @@ classdef Table < handle
                 name = class(self);
                 if any(strcmp(name,{'dj.Table','dj.Relvar'}))
                     name = '';
+                elseif isa(self,'dj.internal.ExternalTable')
+                    store = self.store;
+                    store(1) = upper(store(1));
+                    name = [self.schema.package '.External' store];
                 end
             end
         end
@@ -331,7 +335,7 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+            [sql, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
                 definition));
             self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
@@ -346,7 +350,7 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+            [sql, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
                 newDefinition));
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
@@ -582,11 +586,6 @@ classdef Table < handle
     
     methods(Access=private)
         
-        function yes = isCreated(self)
-            yes = self.schema.tableNames.isKey(self.className);
-        end
-        
-        
         function alter(self, alterStatement)
             % dj.Table/alter
             % alter(self, alterStatement)
@@ -606,6 +605,10 @@ classdef Table < handle
     
     methods
         
+        function yes = isCreated(self)
+            yes = self.schema.tableNames.isKey(self.className);
+        end
+        
         function create(self)
             % parses the table declration and declares the table
 
@@ -618,7 +621,11 @@ classdef Table < handle
             end
             def = dj.internal.Declare.getDefinition(self);
 
-            sql = dj.internal.Declare.declare(self, def);
+            [sql, external_stores] = dj.internal.Declare.declare(self, def);
+            for k=1:length(external_stores)
+                table = self.schema.external.table(external_stores{k});
+                table.create;
+            end
             self.schema.conn.query(sql);
             self.schema.reload
         end

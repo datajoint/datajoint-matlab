@@ -78,31 +78,39 @@ classdef Header < matlab.mixin.Copyable
             attrs.isautoincrement = false(length(attrs.isnullable), 1);
             attrs.isNumeric = false(length(attrs.isnullable), 1);
             attrs.isString = false(length(attrs.isnullable), 1);
-            attrs.isBlob = false(length(attrs.isnullable), 1);
             attrs.isUuid = false(length(attrs.isnullable), 1);
+            attrs.isBlob = false(length(attrs.isnullable), 1);
+            attrs.isExternal = false(length(attrs.isnullable), 1);
+            attrs.database = cell(length(attrs.isnullable),1);
+            attrs.store = cell(length(attrs.isnullable),1);
             attrs.alias = cell(length(attrs.isnullable),1);
             attrs.sqlType = cell(length(attrs.isnullable),1);
             attrs.sqlComment = cell(length(attrs.isnullable),1);
             for i = 1:length(attrs.isnullable)
+                attrs.database{i} = schema.dbname;
                 attrs.sqlType{i} = attrs.type{i};
                 attrs.sqlComment{i} = attrs.comment{i};
                 special = regexp(attrs.comment{i}, ':([^:]+):(.*)', 'tokens');
                 if ~isempty(special)
                     attrs.type{i} = special{1}{1};
                     attrs.comment{i} = special{1}{2};
+                    category = dj.internal.Declare.matchType(attrs.type{i});
+                    assert(any(strcmpi(category, dj.internal.Declare.SPECIAL_TYPES)));
+                else
+                    category = dj.internal.Declare.matchType(attrs.sqlType{i});
                 end 
                 attrs.isnullable{i} = strcmpi(attrs.isnullable{i}, 'YES');
                 attrs.iskey{i} = strcmpi(char(attrs.iskey{i}), 'PRI');
                 attrs.isautoincrement(i) = ~isempty(regexpi(attrs.Extra{i}, ...
                     'auto_increment', 'once'));
-                attrs.isNumeric(i) = any(strcmpi( ...
-                    dj.internal.Declare.matchType(attrs.type{i}), {'NUMERIC'}));
-                attrs.isString(i) = strcmpi(dj.internal.Declare.matchType(attrs.type{i}), ...
-                    'STRING');
-                attrs.isBlob(i) = strcmpi(dj.internal.Declare.matchType(attrs.type{i}), ...
-                    'INTERNAL_BLOB');
-                attrs.isUuid(i) = strcmpi(dj.internal.Declare.matchType(attrs.type{i}), ...
-                    'UUID');
+                attrs.isNumeric(i) = any(strcmpi(category, {'NUMERIC'}));
+                attrs.isString(i) = strcmpi(category, 'STRING');
+                attrs.isUuid(i) = strcmpi(category, 'UUID');
+                attrs.isBlob(i) = any(strcmpi(category, {'INTERNAL_BLOB', 'EXTERNAL_BLOB'}));
+                if any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
+                    attrs.isExternal(i) = true;
+                    attrs.store{i} = attrs.type{i}(regexp(attrs.type{i}, '@', 'once')+1:end);
+                end                
                 % strip field lengths off integer types
                 attrs.type{i} = regexprep(sprintf('%s',attrs.type{i}), ...
                     '((tiny|small|medium|big)?int)\(\d+\)','$1');
@@ -170,6 +178,9 @@ classdef Header < matlab.mixin.Copyable
                                 'isString', false, ...
                                 'isBlob', false, ...
                                 'isUuid', false, ...
+                                'isExternal', false, ...
+                                'store', [], ...
+                                'database', [], ...
                                 'alias', toks{1}{1}, ...
                                 'sqlType', self.computedTypeString, ...
                                 'sqlComment', '' ...

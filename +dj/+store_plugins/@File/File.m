@@ -41,6 +41,8 @@ classdef File
             delete(external_filepath);
         end
         function upload_buffer(buffer, external_filepath)
+            [~,start_idx,~] = regexp(external_filepath, '/', 'match', 'start', 'end');
+            mkdir(external_filepath(1:(start_idx(end)-1)));
             fileID = fopen(external_filepath, 'w');
             fwrite(fileID, buffer);
             fclose(fileID);

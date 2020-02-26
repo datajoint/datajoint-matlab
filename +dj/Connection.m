@@ -8,6 +8,7 @@ classdef Connection < handle
         inTransaction = false
         connId       % connection handle
         packages     % maps database names to package names
+        schemas      % registered schema objects
         
         % dependency lookups by table name
         foreignKeys   % maps table names to their referenced table names     (primary foreign key)
@@ -48,9 +49,14 @@ classdef Connection < handle
             end
             self.foreignKeys  = struct([]);
             self.packages = containers.Map;
+            self.schemas = struct();
         end
         
         
+        function register(self, schema)
+            self.schemas.(schema.dbname) = schema;
+        end
+
         function addPackage(self, dbname, package)
             self.packages(dbname) = package;
         end
