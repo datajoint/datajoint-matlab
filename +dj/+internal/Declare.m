@@ -6,10 +6,12 @@ classdef Declare
         CONSTANT_LITERALS = {'CURRENT_TIMESTAMP'}
         TYPE_PATTERN = struct( ...
             'NUMERIC', '^((tiny|small|medium|big)?int|decimal|double|float)', ...
-            'STRING', '^((var)?char|enum|date|(var)?binary|year|time|timestamp)', ...
-            'INTERNAL_BLOB', '^(tiny|medium|long)?blob' ...
+            'STRING', '^((var)?char|enum|date|(var)?year|time|timestamp)', ...
+            'INTERNAL_BLOB', '^(tiny|medium|long)?blob', ...
+            'UUID', 'uuid$' ...
         )
-        SPECIAL_TYPES = {}
+        UUID_DATA_TYPE = 'binary(16)'
+        SPECIAL_TYPES = {'UUID'}
     end
     
     methods(Static)
@@ -284,6 +286,9 @@ classdef Declare
             %   Substitute DataJoint type with sql type.
             %   field:      <struct> Modified in-place field attributes.
             %   category:   <string> DataJoint type match based on TYPE_PATTERN.
+            if strcmpi(category, 'UUID')
+                field.type = dj.internal.Declare.UUID_DATA_TYPE;
+            end
         end
 
         function sql = compileAttribute(field)
