@@ -16,19 +16,27 @@ classdef ExternalTable < dj.Relvar
             self.connection = connection;
             stores = dj.config('stores');
             assert(isstruct(stores.(store)), 'Store `%s` not configured as struct.', store);
-            assert(any(strcmp('store_config', fieldnames(stores.(store)))), 'Store `%s` missing `store_config` key.', store);
-            assert(isstruct(stores.(store).store_config), 'Store `%s` set `store_config` as `%s` but expecting `struct`.', store, class(stores.(store).store_config));
-            assert(any(strcmp('protocol', fieldnames(stores.(store).store_config))), 'Store `%s` missing `store_config.protocol` key.', store);
+            assert(any(strcmp('store_config', fieldnames(stores.(store)))), ...
+                'Store `%s` missing `store_config` key.', store);
+            assert(isstruct(stores.(store).store_config), ...
+                'Store `%s` set `store_config` as `%s` but expecting `struct`.', store, ...
+                class(stores.(store).store_config));
+            assert(any(strcmp('protocol', fieldnames(stores.(store).store_config))), ...
+                'Store `%s` missing `store_config.protocol` key.', store);
             if isstring(stores.(store).store_config.protocol)
                 storePlugin = char(stores.(store).store_config.protocol);
             else
-                assert(ischar(stores.(store).store_config.protocol), 'Store `%s` set `store_config.protocol` as `%s` but expecting `char||string`.', store, class(stores.(store).store_config.protocol));
+                assert(ischar(stores.(store).store_config.protocol), ...
+                    ['Store `%s` set `store_config.protocol` as `%s` but ' ...
+                    'expecting `char||string`.'], store, ...
+                    class(stores.(store).store_config.protocol));
                 storePlugin = stores.(store).store_config.protocol;
             end
 
             storePlugin(1) = upper(storePlugin(1));
             try
-                config = buildConfig(stores.(store), dj.store_plugins.(storePlugin).validation_config, store);
+                config = buildConfig(stores.(store), ...
+                    dj.store_plugins.(storePlugin).validation_config, store);
                 self.spec = dj.store_plugins.(storePlugin)(config);
             catch ME
                 if strcmp(ME.identifier,'MATLAB:undefinedVarOrClass')
@@ -68,7 +76,8 @@ classdef ExternalTable < dj.Relvar
         end
         function uuid_path = make_uuid_path(self, uuid, suffix)
             uuid = strrep(uuid, '-', '');
-            uuid_path = self.spec.make_external_filepath([self.schema.dbname '/' strjoin(subfold(uuid, self.spec.blob_config.subfolding), '/') '/' uuid suffix]);
+            uuid_path = self.spec.make_external_filepath([self.schema.dbname '/' strjoin(...
+                subfold(uuid, self.spec.blob_config.subfolding), '/') '/' uuid suffix]);
         end
         function uuid = upload_buffer(self, blob)
             packed_cell = mym('serialize {M}', blob);
@@ -76,11 +85,14 @@ classdef ExternalTable < dj.Relvar
             uuid = dj.lib.DataHash(packed_cell{1}, 'bin', 'hex', 'MD5');
             self.spec.upload_buffer(packed_cell{1}, self.make_uuid_path(uuid, ''));
             %  insert tracking info
-            sql = sprintf('INSERT INTO %s (hash, size) VALUES (X''%s'', %i) ON DUPLICATE KEY UPDATE timestamp=CURRENT_TIMESTAMP', self.fullTableName, uuid, length(packed_cell{1}));
+            sql = sprintf(['INSERT INTO %s (hash, size) VALUES (X''%s'', %i) ON ' ...
+                'DUPLICATE KEY UPDATE timestamp=CURRENT_TIMESTAMP'], self.fullTableName, ...
+                uuid, length(packed_cell{1}));
             self.connection.query(sql);
         end
         function blob = download_buffer(self, uuid)
-            blob = mym('deserialize', uint8(self.spec.download_buffer(self.make_uuid_path(uuid, ''))));
+            blob = mym('deserialize', uint8(self.spec.download_buffer(self.make_uuid_path(...
+                uuid, ''))));
         end
         function refs = references(self)
             sql = {...
@@ -93,11 +105,15 @@ classdef ExternalTable < dj.Relvar
         end
         function used = used(self)
             ref = self.references;
-            used = self & cellfun(@(column, table) sprintf('hex(`hash`) in (select hex(`%s`) from %s)', column, table), ref.column_name, ref.referencing_table, 'UniformOutput', false);
+            used = self & cellfun(@(column, table) sprintf(...
+                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
+                ref.column_name, ref.referencing_table, 'UniformOutput', false);
         end
         function unused = unused(self)
             ref = self.references;
-            unused = self - cellfun(@(column, table) sprintf('hex(`hash`) in (select hex(`%s`) from %s)', column, table), ref.column_name, ref.referencing_table, 'UniformOutput', false);
+            unused = self - cellfun(@(column, table) sprintf(...
+                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
+                ref.column_name, ref.referencing_table, 'UniformOutput', false);
         end
         function paths = fetch_external_paths(self, varargin)
             external_content = fetch(self, 'hash', 'attachment_name', 'filepath', varargin{:});
@@ -130,7 +146,8 @@ classdef ExternalTable < dj.Relvar
     end
 end
 function folded_array = subfold(name, folds)
-    folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds, 1:length(folds), cumsum(folds), 'UniformOutput', false);
+    folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds, 1:length(folds), ...
+        cumsum(folds), 'UniformOutput', false);
 end
 function config = buildConfig(config, validation_config, store_name)
     function validateInput(address, target)
@@ -147,13 +164,16 @@ function config = buildConfig(config, validation_config, store_name)
                     if ~type_check(value)
                         % Throw error for config that fails type validation
                         error('DataJoint:StoreConfig:WrongType', ...
-                            'Unexpected type `%s` for config `%s` in store `%s`. Expecting `%s`.', class(value), strjoin(address, ''), store_name, char(type_check));
+                            ['Unexpected type `%s` for config `%s` in store `%s`. ' ...
+                            'Expecting `%s`.'], class(value), strjoin(address, ''), ...
+                            store_name, char(type_check));
                     end
                 catch ME
                     if strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Throw error for extra config
                         error('DataJoint:StoreConfig:ExtraConfig', ...
-                            'Unexpected additional config `%s` specified in store `%s`.', strjoin(address, ''), store_name);
+                            'Unexpected additional config `%s` specified in store `%s`.', ...
+                            strjoin(address, ''), store_name);
                     else
                         rethrow(ME);
                     end
@@ -182,7 +202,8 @@ function config = buildConfig(config, validation_config, store_name)
                     if required && strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Throw error for required config
                         error('DataJoint:StoreConfig:MissingRequired', ...
-                            'Missing required config `%s` in store `%s`.', strjoin(address, ''), store_name);
+                            'Missing required config `%s` in store `%s`.', ...
+                            strjoin(address, ''), store_name);
                     elseif strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Set default for optional config
                         default = vconfig.default;

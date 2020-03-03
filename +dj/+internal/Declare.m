@@ -81,7 +81,8 @@ classdef Declare
                             strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                             dj.internal.fromCamelCase(tableInfo.className));
                     else
-                        tableName = [dj.internal.Declare.EXTERNAL_TABLE_ROOT '_' table_instance.store];
+                        tableName = [dj.internal.Declare.EXTERNAL_TABLE_ROOT '_' ...
+                            table_instance.store];
                     end
                     
                 otherwise
@@ -112,9 +113,6 @@ classdef Declare
                         stableInfo.className));
             end
             
-%             sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, ...
-%                 tableName);
-            
             % fields and foreign keys
             inKey = true;
             primaryFields = {};
@@ -130,11 +128,6 @@ classdef Declare
                         inKey = false;                        
                         % foreign key
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-%                         [sql, newFields] = dj.internal.Declare.makeFK2( ...
-%                             sql, line, fields, inKey, ...
-%                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
-%                             table_instance.schema.dbname, tableName)));
-%                         sql = sprintf('%s,\n', sql);
                         [fk_attr_sql, fk_sql, newFields] = dj.internal.Declare.makeFK( ...
                             line, fields, inKey, ...
                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
@@ -148,7 +141,6 @@ classdef Declare
                         
                         % index
                     case regexpi(line, '^(unique\s+)?index[^:]*$')
-%                         sql = sprintf('%s%s,\n', sql, line);    %  add checks
                         indexSql = [indexSql, line]; %#ok<AGROW>
                         
                         % attribute
@@ -162,8 +154,8 @@ classdef Declare
                             primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
                         end
                         fields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        [attr_sql, store, foreignKeySql] = dj.internal.Declare.compileAttribute(fieldInfo, foreignKeySql);
-%                         sql = sprintf('%s%s', sql, attr_sql);
+                        [attr_sql, store, foreignKeySql] = ...
+                            dj.internal.Declare.compileAttribute(fieldInfo, foreignKeySql);
                         attributeSql = [attributeSql, attr_sql]; %#ok<AGROW>
                         if ~isempty(store)
                             external_stores{end+1} = store; %#ok<AGROW>
@@ -173,17 +165,15 @@ classdef Declare
                 end
             end
             
-%             % add primary key declaration
-%             assert(~isempty(primaryFields), 'table must have a primary key')
-%             sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
-%             
-%             % finish the declaration
-%             sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), ...
-%                 tableInfo.comment);
-            
-            create_sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, tableName);
-            table_sql = {attributeSql', {['PRIMARY KEY (`' strjoin(primaryFields, '`,`') '`)']}, foreignKeySql', indexSql'};
+            % create declaration
+            create_sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname,...
+                tableName);
+            % add attribute, primary key, foreign key, and index declaration
+            assert(~isempty(primaryFields), 'table must have a primary key')
+            table_sql = {attributeSql', {['PRIMARY KEY (`' strjoin(primaryFields, '`,`') ...
+                '`)']}, foreignKeySql', indexSql'};
             table_sql = sprintf([strjoin(cat(1, table_sql{:}), ',\n') '\n']);
+            % finish the declaration
             engine_sql = sprintf(') ENGINE = InnoDB, COMMENT "%s"', tableInfo.comment);
 
             sql = sprintf('%s%s%s', create_sql, table_sql, engine_sql);
@@ -194,12 +184,6 @@ classdef Declare
             fprintf(sql)
             fprintf \n</SQL>\n\n
         end
-        % table_comment => tableInfo.comment
-        % primary_key => tableInfo.primary_key
-        % attribute_sql => tableInfo.attribute_sql
-        % foreign_key_sql => tableInfo.foreign_key_sql
-        % index_sql     => tableInfo.index_sql
-        % external_stores => tableInfo.external_stores
 
         function fieldInfo = parseAttrDef(line)
             % fieldInfo = PARSEATTRDEF(line)
@@ -316,8 +300,8 @@ classdef Declare
             hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
             fk_sql = sprintf(...
                 ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT'], fk_sql, hash, backquotedList(fkattrs), ...
-                rel.fullTableName, backquotedList(rel.primaryKey));
+                'ON UPDATE CASCADE ON DELETE RESTRICT'], fk_sql, hash, ...
+                backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
         end
 
         function [field, foreignKeySql] = substituteSpecialType(field, category, foreignKeySql)
@@ -330,7 +314,10 @@ classdef Declare
             elseif any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
                 field.store = field.type((strfind(field.type,'@')+1):end);
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;
-                foreignKeySql = [foreignKeySql, sprintf('FOREIGN KEY (`%s`) REFERENCES `{database}`.`%s_%s` (`hash`) ON UPDATE RESTRICT ON DELETE RESTRICT', field.name, dj.internal.Declare.EXTERNAL_TABLE_ROOT, field.store)]; %#ok<AGROW>
+                foreignKeySql = [foreignKeySql, sprintf( ...
+                    ['FOREIGN KEY (`%s`) REFERENCES `{database}`.`%s_%s` (`hash`) ON ' ...
+                    'UPDATE RESTRICT ON DELETE RESTRICT'], field.name, ...
+                    dj.internal.Declare.EXTERNAL_TABLE_ROOT, field.store)]; %#ok<AGROW>
             end
         end
 
@@ -363,7 +350,8 @@ classdef Declare
             store = [];
             if any(strcmpi(category, dj.internal.Declare.SPECIAL_TYPES))
                 field.comment = [':' strip(field.type) ':' field.comment];
-                [field, foreignKeySql] = dj.internal.Declare.substituteSpecialType(field, category, foreignKeySql);
+                [field, foreignKeySql] = dj.internal.Declare.substituteSpecialType(field, ...
+                    category, foreignKeySql);
                 if isfield(field, 'store')
                     store = field.store;                    
                 end

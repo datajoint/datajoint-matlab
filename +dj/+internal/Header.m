@@ -110,7 +110,7 @@ classdef Header < matlab.mixin.Copyable
                 if any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
                     attrs.isExternal(i) = true;
                     attrs.store{i} = attrs.type{i}(regexp(attrs.type{i}, '@', 'once')+1:end);
-                end                
+                end
                 % strip field lengths off integer types
                 attrs.type{i} = regexprep(sprintf('%s',attrs.type{i}), ...
                     '((tiny|small|medium|big)?int)\(\d+\)','$1');

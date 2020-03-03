@@ -63,17 +63,3 @@ classdef File
         end
     end
 end
-
-
-%x make_external_filepath -- (validation) (for file use filesystem style
-% directly, for s3 convert to posix path)
-
-%x upload_file -- (for uploading filepath, attach)
-%x download_file -- (for downloading filepath, attach)
-%x upload_buffer -- (for uploading blob)
-%x download_buffer -- (for downloading blob)
-%x remove_object -- (for deleting object from storage)
-%x exists -- (verify if object exists in storage)
-
-
-

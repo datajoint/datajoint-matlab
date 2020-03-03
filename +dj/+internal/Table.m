@@ -248,7 +248,8 @@ classdef Table < handle
             % get foreign keys
             fk = self.schema.conn.foreignKeys;
             if ~isempty(fk)
-                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName) && ~contains(s.ref, '~external'), fk));
+                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName) && ...
+                    ~contains(s.ref, '~external'), fk));
             end
             
             attributes_thus_far = {};
@@ -335,8 +336,8 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            [sql, ~, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
-                definition), NaN);
+            [sql, ~, ~] = dj.internal.Declare.compileAttribute(...
+                dj.internal.Declare.parseAttrDef(definition), NaN);
             self.alter(sprintf('ADD COLUMN %s%s', sql, after));
         end
         
@@ -350,8 +351,8 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            [sql, ~, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
-                newDefinition), NaN);
+            [sql, ~, ~] = dj.internal.Declare.compileAttribute(...
+                dj.internal.Declare.parseAttrDef(newDefinition), NaN);
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql));
         end
         
@@ -477,7 +478,8 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if dj.config('safemode') ...
-                        && ~strcmpi('yes', dj.internal.ask(sprintf('Update the table definition and class definition in %s?',path)))
+                        && ~strcmpi('yes', dj.internal.ask(sprintf(...
+                        'Update the table definition and class definition in %s?',path)))
                     disp 'No? Table definition left untouched.'
                 else
                     % read old file
