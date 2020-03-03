@@ -368,9 +368,9 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            sql = dj.internal.Declare.makeFK2('', target, self.primaryKey, ...
+            [attr_sql, fk_sql, ~] = dj.internal.Declare.makeFK2('', target, self.primaryKey, ...
                 true, dj.internal.shorthash(self.fullTableName));
-            self.alter(sprintf('ADD %s', sql))
+            self.alter(sprintf('ADD %s%s', attr_sql, fk_sql))
         end
         
         function dropForeignKey(self, target)

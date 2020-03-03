@@ -19,7 +19,7 @@ classdef Declare
     end
     
     methods(Static)
-        function [sql, newattrs] = makeFK2(line, existingFields, inKey, hash)
+        function [all_attr_sql, fk_sql, newattrs] = makeFK2(line, existingFields, inKey, hash)
             % [sql, newattrs] = MAKEFK(sql, line, existingFields, inKey, hash)
             %   Add foreign key to SQL table definition.
             %   sql:            <string> Modified in-place SQL to include foreign keys.
@@ -28,7 +28,8 @@ classdef Declare
             %   existingFields: <struct> Existing field attributes.
             %   inKey:          <logical> Set as primary key.
             %   hash:           <string> Current hash as base.
-            sql = '';
+            fk_sql = '';
+            all_attr_sql = '';
             pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
                 '\s*->\s*' ...
                 '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
@@ -82,15 +83,16 @@ classdef Declare
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
                 [attr_sql, ~, ~] = dj.internal.Declare.compileAttribute(fieldInfo, NaN);
-                sql = sprintf('%s%s,\n', sql, attr_sql);
+                all_attr_sql = sprintf('%s%s,\n', all_attr_sql, attr_sql);
             end
+            all_attr_sql = all_attr_sql(1:end-2);
             
             fkattrs = rel.primaryKey;
             fkattrs(ismember(fkattrs, attrs))=newattrs;
             hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
-            sql = sprintf(...
+            fk_sql = sprintf(...
                 ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT'], sql, hash, backquotedList(fkattrs), ...
+                'ON UPDATE CASCADE ON DELETE RESTRICT'], fk_sql, hash, backquotedList(fkattrs), ...
                 rel.fullTableName, backquotedList(rel.primaryKey));
         end
         function [sql, external_stores] = declare2(table_instance, def)
@@ -209,10 +211,11 @@ classdef Declare
 %                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
 %                             table_instance.schema.dbname, tableName)));
 %                         sql = sprintf('%s,\n', sql);
-                        [fk_sql, newFields] = dj.internal.Declare.makeFK2( ...
+                        [fk_attr_sql, fk_sql, newFields] = dj.internal.Declare.makeFK2( ...
                             line, fields, inKey, ...
                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
                             table_instance.schema.dbname, tableName)));
+                        attributeSql = [attributeSql, fk_attr_sql]; %#ok<AGROW>
                         foreignKeySql = [foreignKeySql, fk_sql]; %#ok<AGROW>
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
