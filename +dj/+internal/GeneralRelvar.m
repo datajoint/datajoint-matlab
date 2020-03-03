@@ -433,10 +433,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function ret = minus(self, arg)
             % MINUS -- relational antijoin
-            if iscell(arg)
-                throwAsCaller(MException('DataJoint:invalidOperator',...
-                    'Antijoin only accepts single restrictions'))
-            end
+%             if iscell(arg)
+%                 throwAsCaller(MException('DataJoint:invalidOperator',...
+%                     'Antijoin only accepts single restrictions'))
+%             end
             ret = self.copy;
             ret.restrict('not', arg)
         end
@@ -932,18 +932,22 @@ function data = get(connection, attr, data)
     for i = 1:length(attr)
         if attr(i).isUuid
             for j = 1:length(data)
-                new_value = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
-                new_value = [new_value(1:8) '-' ...
-                            new_value(9:12) '-' ...
-                            new_value(13:16) '-' ...
-                            new_value(17:20) '-' ...
-                            new_value(21:end)];
-                data(j).(attr(i).name) = new_value;
+                if ~isempty(data(j).(attr(i).name))
+                    new_value = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
+                    new_value = [new_value(1:8) '-' ...
+                                new_value(9:12) '-' ...
+                                new_value(13:16) '-' ...
+                                new_value(17:20) '-' ...
+                                new_value(21:end)];
+                    data(j).(attr(i).name) = new_value;
+                end
             end
         elseif attr(i).isBlob && attr(i).isExternal
             for j = 1:length(data)
-                uuid = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
-                data(j).(attr(i).name) = connection.schemas.(attr(i).database).external.tables.(attr(i).store).download_buffer(uuid);
+                if ~isempty(data(j).(attr(i).name))
+                    uuid = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
+                    data(j).(attr(i).name) = connection.schemas.(attr(i).database).external.tables.(attr(i).store).download_buffer(uuid);
+                end
             end
         end
     end

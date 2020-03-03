@@ -248,7 +248,7 @@ classdef Table < handle
             % get foreign keys
             fk = self.schema.conn.foreignKeys;
             if ~isempty(fk)
-                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName), fk));
+                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName) && ~contains(s.ref, '~external'), fk));
             end
             
             attributes_thus_far = {};
@@ -335,9 +335,9 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            [sql, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
-                definition));
-            self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
+            [sql, ~, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+                definition), NaN);
+            self.alter(sprintf('ADD COLUMN %s%s', sql, after));
         end
         
         function dropAttribute(self, attrName)
@@ -350,9 +350,9 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            [sql, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
-                newDefinition));
-            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
+            [sql, ~, ~] = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+                newDefinition), NaN);
+            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql));
         end
         
         function addForeignKey(self, target)
@@ -368,7 +368,7 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            sql = dj.internal.Declare.makeFK('', target, self.primaryKey, ...
+            sql = dj.internal.Declare.makeFK2('', target, self.primaryKey, ...
                 true, dj.internal.shorthash(self.fullTableName));
             self.alter(sprintf('ADD %s', sql))
         end
@@ -621,7 +621,8 @@ classdef Table < handle
             end
             def = dj.internal.Declare.getDefinition(self);
 
-            [sql, external_stores] = dj.internal.Declare.declare(self, def);
+            [sql, external_stores] = dj.internal.Declare.declare2(self, def);
+            sql = strrep(sql, '{database}', self.schema.dbname);
             for k=1:length(external_stores)
                 table = self.schema.external.table(external_stores{k});
                 table.create;

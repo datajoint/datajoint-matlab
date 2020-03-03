@@ -20,11 +20,15 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             id = ret.lid;
         end
         
-        function delQuick(self)
+        function count = delQuick(self, getCount)
             % DELQUICK - remove all tuples of the relation from its table.
             % Unlike del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
+            count = [];
+            if nargin > 1 && getCount
+                count = self.schema.conn.query(sprintf('SELECT count(*) as count FROM %s', self.sql)).count;
+            end
         end
         
         

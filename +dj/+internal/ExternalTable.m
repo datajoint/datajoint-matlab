@@ -1,5 +1,6 @@
 % dj.internal.External - an external static method class.
-classdef ExternalTable < dj.internal.Table
+% classdef ExternalTable < dj.internal.Table
+classdef ExternalTable < dj.Relvar
     properties
         store
         spec
@@ -61,23 +62,70 @@ classdef ExternalTable < dj.internal.Table
             };
             def = sprintf('%s\n',def{:});
 
-            [sql, ~] = dj.internal.Declare.declare(self, def);
+            [sql, ~] = dj.internal.Declare.declare2(self, def);
             self.schema.conn.query(sql);
             self.schema.reload
         end
         function uuid_path = make_uuid_path(self, uuid, suffix)
+            uuid = strrep(uuid, '-', '');
             uuid_path = self.spec.make_external_filepath([self.schema.dbname '/' strjoin(subfold(uuid, self.spec.blob_config.subfolding), '/') '/' uuid suffix]);
         end
         function uuid = upload_buffer(self, blob)
-            uuid = '1d751e2e1e74faf84ab485fde8ef72be';
             packed_cell = mym('serialize {M}', blob);
+            % https://www.mathworks.com/matlabcentral/fileexchange/25921-getmd5
+            uuid = dj.lib.DataHash(packed_cell{1}, 'bin', 'hex', 'MD5');
             self.spec.upload_buffer(packed_cell{1}, self.make_uuid_path(uuid, ''));
             %  insert tracking info
-            sql = sprintf('INSERT INTO %s (hash, size) VALUES (X''%s'', %s) ON DUPLICATE KEY UPDATE timestamp=CURRENT_TIMESTAMP', self.fullTableName, uuid, length(packed_cell{1}));
-            self.schema.conn.query(sql);
+            sql = sprintf('INSERT INTO %s (hash, size) VALUES (X''%s'', %i) ON DUPLICATE KEY UPDATE timestamp=CURRENT_TIMESTAMP', self.fullTableName, uuid, length(packed_cell{1}));
+            self.connection.query(sql);
         end
         function blob = download_buffer(self, uuid)
             blob = mym('deserialize', uint8(self.spec.download_buffer(self.make_uuid_path(uuid, ''))));
+        end
+        function refs = references(self)
+            sql = {...
+            'SELECT concat(''`'', table_schema, ''`.`'', table_name, ''`'') as referencing_table, column_name '
+            'FROM information_schema.key_column_usage '
+            'WHERE referenced_table_name="{S}" and referenced_table_schema="{S}"'
+            };
+            sql = sprintf('%s',sql{:});
+            refs = self.connection.query(sql, self.plainTableName, self.schema.dbname);
+        end
+        function used = used(self)
+            ref = self.references;
+            used = self & cellfun(@(column, table) sprintf('hex(`hash`) in (select hex(`%s`) from %s)', column, table), ref.column_name, ref.referencing_table, 'UniformOutput', false);
+        end
+        function unused = unused(self)
+            ref = self.references;
+            unused = self - cellfun(@(column, table) sprintf('hex(`hash`) in (select hex(`%s`) from %s)', column, table), ref.column_name, ref.referencing_table, 'UniformOutput', false);
+        end
+        function paths = fetch_external_paths(self, varargin)
+            external_content = fetch(self, 'hash', 'attachment_name', 'filepath', varargin{:});
+            paths = cell(length(external_content),1);
+            for i = 1:length(external_content)
+                if ~isempty(external_content(i).attachment_name)
+                elseif ~isempty(external_content(i).filepath)
+                else
+                    paths{i}{2} = self.make_uuid_path(external_content(i).hash, '');
+                end
+                paths{i}{1} = external_content(i).hash;
+            end
+        end
+        function delete(self, delete_external_files, limit)
+            if ~delete_external_files
+                delQuick(self.unused);
+            else
+                if ~isempty(limit)
+                    items = fetch_external_paths(self.unused, sprintf('LIMIT %i', limit));
+                else
+                    items = fetch_external_paths(self.unused);
+                end
+                for i = 1:length(items)
+                    count = delQuick(self & struct('hash',items{i}{1}), true);
+                    assert(count == 0);
+                    self.spec.remove_object(items{i}{2});
+                end
+            end
         end
     end
 end
