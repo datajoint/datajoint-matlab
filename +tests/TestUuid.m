@@ -57,8 +57,8 @@ classdef TestUuid < tests.Prep
             q = University.Message;
             raw_def = dj.internal.Declare.getDefinition(q);
             assembled_def = describe(q);
-            [raw_sql, ~] = dj.internal.Declare.declare2(q, raw_def);
-            [assembled_sql, ~] = dj.internal.Declare.declare2(q, assembled_def);
+            [raw_sql, ~] = dj.internal.Declare.declare(q, raw_def);
+            [assembled_sql, ~] = dj.internal.Declare.declare(q, assembled_def);
             testCase.verifyEqual(raw_sql,  assembled_sql);
         end
     end

@@ -368,7 +368,7 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            [attr_sql, fk_sql, ~] = dj.internal.Declare.makeFK2('', target, self.primaryKey, ...
+            [attr_sql, fk_sql, ~] = dj.internal.Declare.makeFK('', target, self.primaryKey, ...
                 true, dj.internal.shorthash(self.fullTableName));
             self.alter(sprintf('ADD %s%s', attr_sql, fk_sql))
         end
@@ -621,7 +621,7 @@ classdef Table < handle
             end
             def = dj.internal.Declare.getDefinition(self);
 
-            [sql, external_stores] = dj.internal.Declare.declare2(self, def);
+            [sql, external_stores] = dj.internal.Declare.declare(self, def);
             sql = strrep(sql, '{database}', self.schema.dbname);
             for k=1:length(external_stores)
                 table = self.schema.external.table(external_stores{k});

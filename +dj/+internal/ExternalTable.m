@@ -62,7 +62,7 @@ classdef ExternalTable < dj.Relvar
             };
             def = sprintf('%s\n',def{:});
 
-            [sql, ~] = dj.internal.Declare.declare2(self, def);
+            [sql, ~] = dj.internal.Declare.declare(self, def);
             self.schema.conn.query(sql);
             self.schema.reload
         end

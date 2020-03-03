@@ -19,7 +19,7 @@ classdef Declare
     end
     
     methods(Static)
-        function [sql, external_stores] = declare2(table_instance, def)
+        function [sql, external_stores] = declare(table_instance, def)
             % sql = DECLARE(query, definition)  
             %   Parse table declaration and declares the table.
             %   sql:        <string> Generated SQL to create a table.
@@ -135,7 +135,7 @@ classdef Declare
 %                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
 %                             table_instance.schema.dbname, tableName)));
 %                         sql = sprintf('%s,\n', sql);
-                        [fk_attr_sql, fk_sql, newFields] = dj.internal.Declare.makeFK2( ...
+                        [fk_attr_sql, fk_sql, newFields] = dj.internal.Declare.makeFK( ...
                             line, fields, inKey, ...
                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
                             table_instance.schema.dbname, tableName)));
@@ -243,7 +243,7 @@ classdef Declare
             fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
         end
 
-        function [all_attr_sql, fk_sql, newattrs] = makeFK2(line, existingFields, inKey, hash)
+        function [all_attr_sql, fk_sql, newattrs] = makeFK(line, existingFields, inKey, hash)
             % [sql, newattrs] = MAKEFK(sql, line, existingFields, inKey, hash)
             %   Add foreign key to SQL table definition.
             %   sql:            <string> Modified in-place SQL to include foreign keys.
