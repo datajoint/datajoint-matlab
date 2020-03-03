@@ -337,7 +337,7 @@ classdef Table < handle
             end
             
             [sql, ~, ~] = dj.internal.Declare.compileAttribute(...
-                dj.internal.Declare.parseAttrDef(definition), NaN);
+                dj.internal.Declare.parseAttrDef(definition), []);
             self.alter(sprintf('ADD COLUMN %s%s', sql, after));
         end
         
@@ -352,7 +352,7 @@ classdef Table < handle
             % attrName using its new line from the table definition
             % "newDefinition"
             [sql, ~, ~] = dj.internal.Declare.compileAttribute(...
-                dj.internal.Declare.parseAttrDef(newDefinition), NaN);
+                dj.internal.Declare.parseAttrDef(newDefinition), []);
             self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql));
         end
         

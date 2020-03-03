@@ -290,7 +290,7 @@ classdef Declare
                     rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-                [attr_sql, ~, ~] = dj.internal.Declare.compileAttribute(fieldInfo, NaN);
+                [attr_sql, ~, ~] = dj.internal.Declare.compileAttribute(fieldInfo, []);
                 all_attr_sql = sprintf('%s%s,\n', all_attr_sql, attr_sql);
             end
             all_attr_sql = all_attr_sql(1:end-2);

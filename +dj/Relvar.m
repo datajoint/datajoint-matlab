@@ -27,7 +27,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
             count = [];
             if nargin > 1 && getCount
-                count = self.schema.conn.query(sprintf('SELECT count(*) as count FROM %s', self.sql)).count;
+                count = self.schema.conn.query(sprintf('SELECT count(*) as count FROM %s', ...
+                    self.sql)).count;
             end
         end
         
@@ -108,7 +109,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 rels = rels(counts>0);
                 
                 % confirm and delete
-                if dj.config('safemode') && ~strcmpi('yes',dj.internal.ask('Proceed to delete?'))
+                if dj.config('safemode') && ~strcmpi('yes', ...
+                        dj.internal.ask('Proceed to delete?'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
@@ -236,7 +238,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         placeholder = '"{M}"';
                     else
                         placeholder = '"{B}"';
-                        value = self.schema.external.tables.(header.attributes(attr_idx).store).upload_buffer(value);
+                        value = self.schema.external.tables.(...
+                            header.attributes(attr_idx).store).upload_buffer(value);
                         hexstring = value';
                         reshapedString = reshape(hexstring,2,16);
                         hexMtx = reshapedString.';
