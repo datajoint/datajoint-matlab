@@ -1,6 +1,9 @@
 % dj.internal.External - an external static method class.
 % classdef ExternalTable < dj.internal.Table
 classdef ExternalTable < dj.Relvar
+    properties (Hidden, Constant)
+        BACKWARD_SUPPORT = true
+    end
     properties
         store
         spec
@@ -48,16 +51,19 @@ classdef ExternalTable < dj.Relvar
             try
                 config = buildConfig(stores.(store), ...
                     dj.store_plugins.(storePlugin).validation_config, store);
-                self.spec = dj.store_plugins.(storePlugin)(config);
             catch ME
                 if strcmp(ME.identifier,'MATLAB:undefinedVarOrClass')
                     % Throw error if plugin not found
                     error('DataJoint:StorePlugin:Missing', ...
                         'Missing store plugin `%s`.', storePlugin);
+                elseif dj.internal.ExternalTable.BACKWARD_SUPPORT && contains(ME.identifier,'DataJoint:StoreConfig')
+                    config = buildConfig(stores.(store), ...
+                        dj.store_plugins.(storePlugin).backward_validation_config, store);
                 else
                     rethrow(ME);
                 end
             end
+            self.spec = dj.store_plugins.(storePlugin)(config);
         end
         function create(self)
             % parses the table declration and declares the table
@@ -207,27 +213,32 @@ function config = buildConfig(config, validation_config, store_name)
                 subscript = substruct(address{:});
                 vconfig = subsref(validation_config, subscript);
                 mode = vconfig.mode;
-                if mode(config.datajoint_type)==-1
-                    % Throw error for rejected config
-                    error('DataJoint:StoreConfig:ExtraConfig', ...
-                        'Incompatible additional config `%s` specified in store `%s`.', ...
-                        strjoin(address, ''), store_name);
+                if any(strcmp('datajoint_type', fieldnames(config)))
+                    mode_result = mode(config.datajoint_type);
+                else
+                    mode_result = mode('not_necessary');
                 end
                 try
                     value = subsref(config, subscript);
                 catch ME
-                    if mode(config.datajoint_type)==1 && strcmp(ME.identifier,'MATLAB:nonExistentField')
+                    if mode_result==1 && strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Throw error for required config
                         error('DataJoint:StoreConfig:MissingRequired', ...
                             'Missing required config `%s` in store `%s`.', ...
                             strjoin(address, ''), store_name);
-                    elseif mode(config.datajoint_type)==0 && strcmp(ME.identifier,'MATLAB:nonExistentField')
+                    elseif mode_result==0 && strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Set default for optional config
                         default = vconfig.default;
                         config = subsasgn(config, subscript, default);
                     else
                         rethrow(ME);
                     end
+                end
+                if mode_result==-1
+                    % Throw error for rejected config
+                    error('DataJoint:StoreConfig:ExtraConfig', ...
+                        'Incompatible additional config `%s` specified in store `%s`.', ...
+                        strjoin(address, ''), store_name);
                 end
                 break;
             else
