@@ -16,23 +16,34 @@ classdef ExternalTable < dj.Relvar
             self.connection = connection;
             stores = dj.config('stores');
             assert(isstruct(stores.(store)), 'Store `%s` not configured as struct.', store);
-            assert(any(strcmp('store_config', fieldnames(stores.(store)))), ...
-                'Store `%s` missing `store_config` key.', store);
-            assert(isstruct(stores.(store).store_config), ...
-                'Store `%s` set `store_config` as `%s` but expecting `struct`.', store, ...
-                class(stores.(store).store_config));
-            assert(any(strcmp('protocol', fieldnames(stores.(store).store_config))), ...
-                'Store `%s` missing `store_config.protocol` key.', store);
-            if isstring(stores.(store).store_config.protocol)
-                storePlugin = char(stores.(store).store_config.protocol);
+%             assert(any(strcmp('store_config', fieldnames(stores.(store)))), ...
+%                 'Store `%s` missing `store_config` key.', store);
+%             assert(isstruct(stores.(store).store_config), ...
+%                 'Store `%s` set `store_config` as `%s` but expecting `struct`.', store, ...
+%                 class(stores.(store).store_config));
+%             assert(any(strcmp('protocol', fieldnames(stores.(store).store_config))), ...
+%                 'Store `%s` missing `store_config.protocol` key.', store);
+            assert(any(strcmp('protocol', fieldnames(stores.(store)))), ...
+                'Store `%s` missing `protocol` key.', store);
+%             if isstring(stores.(store).store_config.protocol)
+%                 storePlugin = char(stores.(store).store_config.protocol);
+%             else
+%                 assert(ischar(stores.(store).store_config.protocol), ...
+%                     ['Store `%s` set `store_config.protocol` as `%s` but ' ...
+%                     'expecting `char||string`.'], store, ...
+%                     class(stores.(store).store_config.protocol));
+%                 storePlugin = stores.(store).store_config.protocol;
+%             end
+            if isstring(stores.(store).protocol)
+                storePlugin = char(stores.(store).protocol);
             else
-                assert(ischar(stores.(store).store_config.protocol), ...
-                    ['Store `%s` set `store_config.protocol` as `%s` but ' ...
+                assert(ischar(stores.(store).protocol), ...
+                    ['Store `%s` set `protocol` as `%s` but ' ...
                     'expecting `char||string`.'], store, ...
-                    class(stores.(store).store_config.protocol));
-                storePlugin = stores.(store).store_config.protocol;
+                    class(stores.(store).protocol));
+                storePlugin = stores.(store).protocol;
             end
-
+            
             storePlugin(1) = upper(storePlugin(1));
             try
                 config = buildConfig(stores.(store), ...
@@ -77,7 +88,7 @@ classdef ExternalTable < dj.Relvar
         function uuid_path = make_uuid_path(self, uuid, suffix)
             uuid = strrep(uuid, '-', '');
             uuid_path = self.spec.make_external_filepath([self.schema.dbname '/' strjoin(...
-                subfold(uuid, self.spec.blob_config.subfolding), '/') '/' uuid suffix]);
+                subfold(uuid, self.spec.type_config.subfolding), '/') '/' uuid suffix]);
         end
         function uuid = upload_buffer(self, blob)
             packed_cell = mym('serialize {M}', blob);
@@ -190,24 +201,32 @@ function config = buildConfig(config, validation_config, store_name)
             fn = fieldnames(target);
             address{end+1} = '.';
             address{end+1} = fn{k};
-            if any(strcmp('required',fieldnames(target)))
+            if any(strcmp('mode',fieldnames(target)))
                 address(end) = [];
                 address(end) = [];
                 subscript = substruct(address{:});
                 vconfig = subsref(validation_config, subscript);
-                required = vconfig.required;
+                mode = vconfig.mode;
+                if mode(config.datajoint_type)==-1
+                    % Throw error for rejected config
+                    error('DataJoint:StoreConfig:ExtraConfig', ...
+                        'Incompatible additional config `%s` specified in store `%s`.', ...
+                        strjoin(address, ''), store_name);
+                end
                 try
                     value = subsref(config, subscript);
                 catch ME
-                    if required && strcmp(ME.identifier,'MATLAB:nonExistentField')
+                    if mode(config.datajoint_type)==1 && strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Throw error for required config
                         error('DataJoint:StoreConfig:MissingRequired', ...
                             'Missing required config `%s` in store `%s`.', ...
                             strjoin(address, ''), store_name);
-                    elseif strcmp(ME.identifier,'MATLAB:nonExistentField')
+                    elseif mode(config.datajoint_type)==0 && strcmp(ME.identifier,'MATLAB:nonExistentField')
                         % Set default for optional config
                         default = vconfig.default;
                         config = subsasgn(config, subscript, default);
+                    else
+                        rethrow(ME);
                     end
                 end
                 break;
