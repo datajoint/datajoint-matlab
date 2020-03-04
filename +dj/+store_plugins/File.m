@@ -86,6 +86,7 @@ classdef File
         function result = download_buffer(external_filepath)
             fileID = fopen(external_filepath, 'r');
             result = fread(fileID);
+            fclose(fileID);
         end
     end
     methods
@@ -93,7 +94,7 @@ classdef File
 %             self.protocol = config.store_config.protocol;
 %             self.location = config.store_config.location;
             self.protocol = config.protocol;
-            self.location = config.location;
+            self.location = strrep(config.location, '\', '/');
             self.type_config = struct();
             
             if dj.internal.ExternalTable.BACKWARD_SUPPORT && ~any(strcmp('datajoint_type', fieldnames(config)))
