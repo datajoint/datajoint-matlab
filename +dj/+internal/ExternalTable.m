@@ -108,8 +108,49 @@ classdef ExternalTable < dj.Relvar
             self.connection.query(sql);
         end
         function blob = download_buffer(self, uuid)
-            blob = mym('deserialize', uint8(self.spec.download_buffer(self.make_uuid_path(...
-                uuid, ''))));
+            try
+                cache_folder = strrep(dj.config('blobCache'), '\', '/');
+            catch ME
+                if strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
+                    cache_folder = [];
+                else
+                    rethrow(ME);
+                end
+            end
+            if dj.internal.ExternalTable.BACKWARD_SUPPORT && isempty(cache_folder)
+                try
+                    cache_folder = strrep(dj.config('cache'), '\', '/');
+                catch ME
+                    if strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
+                        cache_folder = [];
+                    else
+                        rethrow(ME);
+                    end
+                end
+            end
+            blob = [];
+            if ~isempty(cache_folder)
+                cache_file = [cache_folder '/' self.schema.dbname '/' strjoin(...
+                    subfold(uuid, self.spec.type_config.subfolding), '/') '/' uuid ''];
+                try
+                    fileID = fopen(cache_file, 'r');
+                    result = fread(fileID);
+                    fclose(fileID);
+                    blob = mym('deserialize', uint8(result));
+                catch
+                end
+            end
+            if isempty(blob)
+                blob_binary = uint8(self.spec.download_buffer(self.make_uuid_path(uuid, '')));
+                blob = mym('deserialize', blob_binary);
+                if ~isempty(cache_folder)
+                    [~,start_idx,~] = regexp(cache_file, '/', 'match', 'start', 'end');
+                    mkdir(cache_file(1:(start_idx(end)-1)));
+                    fileID = fopen(cache_file, 'w');
+                    fwrite(fileID, blob_binary);
+                    fclose(fileID);
+                end
+            end
         end
         function refs = references(self)
             sql = {...
