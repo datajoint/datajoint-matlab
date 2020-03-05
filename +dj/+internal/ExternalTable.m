@@ -1,8 +1,8 @@
-% dj.internal.External - an external static method class.
-% classdef ExternalTable < dj.internal.Table
+% dj.internal.ExternalTable - The table tracking externally stored objects.
+%   Declare as dj.internal.ExternalTable(connection, store, schema)
 classdef ExternalTable < dj.Relvar
     properties (Hidden, Constant)
-        BACKWARD_SUPPORT = true
+        BACKWARD_SUPPORT_DJPY012 = true
     end
     properties
         store
@@ -13,30 +13,14 @@ classdef ExternalTable < dj.Relvar
     end
     methods
         function self = ExternalTable(connection, store, schema)
-%             curr_schema = self.schema;
+            % construct table using config validation criteria supplied by store plugin
             self.store = store;
             self.schema = schema;
             self.connection = connection;
             stores = dj.config('stores');
             assert(isstruct(stores.(store)), 'Store `%s` not configured as struct.', store);
-%             assert(any(strcmp('store_config', fieldnames(stores.(store)))), ...
-%                 'Store `%s` missing `store_config` key.', store);
-%             assert(isstruct(stores.(store).store_config), ...
-%                 'Store `%s` set `store_config` as `%s` but expecting `struct`.', store, ...
-%                 class(stores.(store).store_config));
-%             assert(any(strcmp('protocol', fieldnames(stores.(store).store_config))), ...
-%                 'Store `%s` missing `store_config.protocol` key.', store);
             assert(any(strcmp('protocol', fieldnames(stores.(store)))), ...
                 'Store `%s` missing `protocol` key.', store);
-%             if isstring(stores.(store).store_config.protocol)
-%                 storePlugin = char(stores.(store).store_config.protocol);
-%             else
-%                 assert(ischar(stores.(store).store_config.protocol), ...
-%                     ['Store `%s` set `store_config.protocol` as `%s` but ' ...
-%                     'expecting `char||string`.'], store, ...
-%                     class(stores.(store).store_config.protocol));
-%                 storePlugin = stores.(store).store_config.protocol;
-%             end
             if isstring(stores.(store).protocol)
                 storePlugin = char(stores.(store).protocol);
             else
@@ -56,7 +40,8 @@ classdef ExternalTable < dj.Relvar
                     % Throw error if plugin not found
                     error('DataJoint:StorePlugin:Missing', ...
                         'Missing store plugin `%s`.', storePlugin);
-                elseif dj.internal.ExternalTable.BACKWARD_SUPPORT && contains(ME.identifier,'DataJoint:StoreConfig')
+                elseif dj.internal.ExternalTable.BACKWARD_SUPPORT_DJPY012 && contains(...
+                        ME.identifier,'DataJoint:StoreConfig')
                     config = buildConfig(stores.(store), ...
                         dj.store_plugins.(storePlugin).backward_validation_config, store);
                 else
@@ -92,11 +77,14 @@ classdef ExternalTable < dj.Relvar
             self.schema.reload
         end
         function uuid_path = make_uuid_path(self, uuid, suffix)
+            % create external path based on the uuid hash
             uuid = strrep(uuid, '-', '');
             uuid_path = self.spec.make_external_filepath([self.schema.dbname '/' strjoin(...
                 subfold(uuid, self.spec.type_config.subfolding), '/') '/' uuid suffix]);
         end
+        % -- BLOBS --
         function uuid = upload_buffer(self, blob)
+            % put blob
             packed_cell = mym('serialize {M}', blob);
             % https://www.mathworks.com/matlabcentral/fileexchange/25921-getmd5
             uuid = dj.lib.DataHash(packed_cell{1}, 'bin', 'hex', 'MD5');
@@ -108,6 +96,7 @@ classdef ExternalTable < dj.Relvar
             self.connection.query(sql);
         end
         function blob = download_buffer(self, uuid)
+            % get blob via uuid (with caching support)
             try
                 cache_folder = strrep(dj.config('blobCache'), '\', '/');
             catch ME
@@ -117,7 +106,7 @@ classdef ExternalTable < dj.Relvar
                     rethrow(ME);
                 end
             end
-            if dj.internal.ExternalTable.BACKWARD_SUPPORT && isempty(cache_folder)
+            if dj.internal.ExternalTable.BACKWARD_SUPPORT_DJPY012 && isempty(cache_folder)
                 try
                     cache_folder = strrep(dj.config('cache'), '\', '/');
                 catch ME
@@ -152,7 +141,9 @@ classdef ExternalTable < dj.Relvar
                 end
             end
         end
+        % -- UTILITIES --
         function refs = references(self)
+            % generator of referencing table names and their referencing columns
             sql = {...
             'SELECT concat(''`'', table_schema, ''`.`'', table_name, ''`'') as referencing_table, column_name '
             'FROM information_schema.key_column_usage '
@@ -161,19 +152,9 @@ classdef ExternalTable < dj.Relvar
             sql = sprintf('%s',sql{:});
             refs = self.connection.query(sql, self.plainTableName, self.schema.dbname);
         end
-        function used = used(self)
-            ref = self.references;
-            used = self & cellfun(@(column, table) sprintf(...
-                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
-                ref.column_name, ref.referencing_table, 'UniformOutput', false);
-        end
-        function unused = unused(self)
-            ref = self.references;
-            unused = self - cellfun(@(column, table) sprintf(...
-                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
-                ref.column_name, ref.referencing_table, 'UniformOutput', false);
-        end
         function paths = fetch_external_paths(self, varargin)
+            % generate complete external filepaths from the query.
+            % Each element is a cell: {uuid, path}
             external_content = fetch(self, 'hash', 'attachment_name', 'filepath', varargin{:});
             paths = cell(length(external_content),1);
             for i = 1:length(external_content)
@@ -185,7 +166,26 @@ classdef ExternalTable < dj.Relvar
                 paths{i}{1} = external_content(i).hash;
             end
         end
+        function unused = unused(self)
+            % query expression for unused hashes
+            ref = self.references;
+            unused = self - cellfun(@(column, table) sprintf(...
+                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
+                ref.column_name, ref.referencing_table, 'UniformOutput', false);
+        end
+        function used = used(self)
+            % query expression for used hashes
+            ref = self.references;
+            used = self & cellfun(@(column, table) sprintf(...
+                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
+                ref.column_name, ref.referencing_table, 'UniformOutput', false);
+        end        
         function delete(self, delete_external_files, limit)
+            % DELETE(self, delete_external_files, limit)  
+            %   Remove external tracking table records and optionally remove from ext storage
+            %   self:                   <dj.internal.ExternalTable> Store Table instance.
+            %   delete_external_files:  <boolean>  Remove from external storage.
+            %   limit:                  <number> Limit the number of external objects to remove
             if ~delete_external_files
                 delQuick(self.unused);
             else
@@ -204,11 +204,14 @@ classdef ExternalTable < dj.Relvar
     end
 end
 function folded_array = subfold(name, folds)
+    % subfolding for external storage:   e.g.  subfold('aBCdefg', [2, 3])  -->  {'ab','cde'}
     folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds, 1:length(folds), ...
         cumsum(folds), 'UniformOutput', false);
 end
 function config = buildConfig(config, validation_config, store_name)
+    % builds out store config with defaults set
     function validateInput(address, target)
+        % validates supplied config
         for k=1:numel(fieldnames(target))
             fn = fieldnames(target);
             address{end+1} = '.';
@@ -244,6 +247,7 @@ function config = buildConfig(config, validation_config, store_name)
         end
     end
     function validateConfig(address, target)
+        % verifies if input contains all expected config
         for k=1:numel(fieldnames(target))
             fn = fieldnames(target);
             address{end+1} = '.';

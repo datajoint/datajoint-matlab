@@ -11,7 +11,7 @@ classdef Connection < handle
         schemas      % registered schema objects
         
         % dependency lookups by table name
-        foreignKeys   % maps table names to their referenced table names     (primary foreign key)
+        foreignKeys   % maps table names to their referenced table names  (primary foreign key)
     end
     
     properties(Access = private)
@@ -70,7 +70,8 @@ classdef Connection < handle
                 '\((?<ref_attrs>[`\w, ]+)\)');
             
             for tabName = schema.headers.keys
-                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
+                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, ...
+                    tabName{1}));
                 fk = strtrim(regexp(fk.('Create Table'){1},'\n','split')');
                 fk = regexp(fk, pat, 'names');
                 fk = [fk{:}];
@@ -136,7 +137,8 @@ classdef Connection < handle
             s = regexp(fullTableName, '^`(?<dbname>.+)`.`(?<tablename>[#~\w\d]+)`$','names');
             className = fullTableName;
             if ~isempty(s) && self.packages.isKey(s.dbname)
-                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(s.tablename));
+                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(...
+                    s.tablename));
             elseif strict
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
             end

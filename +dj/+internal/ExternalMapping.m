@@ -1,4 +1,8 @@
-% dj.internal.External - an external static method class.
+% dj.internal.ExternalMapping - The external manager contains all the tables for all external 
+% stores for a given schema.
+%   :Example:
+%       e = dj.internal.ExternalMapping(schema)
+%       external_table = e.table(store)
 classdef ExternalMapping < handle
     properties
         schema

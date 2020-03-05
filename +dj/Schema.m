@@ -8,14 +8,17 @@
 % to exist in Matlab. Tab completion of table names is possible because the
 % table names are added as dynamic properties of TableAccessor.
 %
-%Complete documentation is available at <a href=https://github.com/datajoint/datajoint-matlab/wiki>Datajoint wiki</a>
+%Complete documentation is available at 
+% <a href=https://github.com/datajoint/datajoint-matlab/wiki>Datajoint wiki</a>
 
 classdef Schema < handle
     
     properties(SetAccess = private)
-        package    % the package (directory starting with a +) that stores schema classes, must be on path
+        package    % the package (directory starting with a +) that stores schema classes, 
+                   %    must be on path
         dbname     % database (schema) name
-        prefix=''  % optional table prefix, allowing multiple schemas per database -- remove this feature if not used
+        prefix=''  % optional table prefix, allowing multiple schemas per database -- remove 
+                   %    this feature if not used
         conn       % handle to the dj.Connection object
         loaded = false
         tableNames   % tables indexed by classNames
@@ -113,7 +116,8 @@ classdef Schema < handle
             else
                 existingTable = [];
                 choice = dj.internal.ask(...
-                    '\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  C=computed\n  P=part\n',...
+                    ['\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  ' ...
+                    'C=computed\n  P=part\n'],...
                     {'L','M','I','C','P'});
                 tierClass = tierClassMap.(choice);
                 isAuto = ismember(tierClass, {'dj.Imported', 'dj.Computed'});
@@ -189,8 +193,9 @@ classdef Schema < handle
                 tableInfo = dj.struct.rename(tableInfo,'Name','name','Comment','comment');
                 
                 % determine table tier (see dj.internal.Table)
+                % regular expressions to determine table tier
                 re = cellfun(@(x) sprintf('^%s%s[a-z][a-z0-9_]*$',self.prefix,x), ...
-                    dj.Schema.tierPrefixes, 'UniformOutput', false); % regular expressions to determine table tier
+                    dj.Schema.tierPrefixes, 'UniformOutput', false);
                 
                 if strcmpi(dj.config('loglevel'), 'DEBUG')
                     fprintf('%.3g s\nloading field information... ', toc), tic
@@ -199,7 +204,8 @@ classdef Schema < handle
                     tierIdx = ~cellfun(@isempty, regexp(info.name, re, 'once'));
                     assert(sum(tierIdx)==1)
                     info.tier = dj.Schema.allowedTiers{tierIdx};
-                    self.tableNames(sprintf('%s.%s',self.package,dj.internal.toCamelCase(info.name(length(self.prefix)+1:end)))) = info.name;
+                    self.tableNames(sprintf('%s.%s',self.package,dj.internal.toCamelCase(...
+                        info.name(length(self.prefix)+1:end)))) = info.name;
                     self.headers(info.name) = dj.internal.Header.initFromDatabase(self,info);
                 end
                 
