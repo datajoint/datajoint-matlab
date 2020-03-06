@@ -5,7 +5,9 @@ classdef TestExternalFile < tests.Prep
             % load config
             pkg = what('tests');
             dj.config.load([pkg.path '/test_schemas/store_config.json']);
-            dj.config(['stores.' store '.location'], strrep(dj.config(['stores.' store '.location']), '{{external_file_store_root}}', test_instance.external_file_store_root));
+            dj.config(['stores.' store '.location'], strrep(dj.config(...
+                ['stores.' store '.location']), '{{external_file_store_root}}', ...
+                test_instance.external_file_store_root));
             dj.config('stores.main', dj.config(['stores.' store]));
             dj.config(cache, [test_instance.external_file_store_root '/cache']);
             % create schema
@@ -32,12 +34,15 @@ classdef TestExternalFile < tests.Prep
             subfold_path = strrep(uuid_path, dj.config('stores.main.location'), '');
             subfold_path = strrep(subfold_path, ['/' schema.dbname '/'], '');
             subfold_path = strrep(subfold_path, ['/' uuid], '');
-            test_instance.verifyEqual(cellfun(@(x) length(x), split(subfold_path, '/')), schema.external.table('main').spec.type_config.subfolding);
+            test_instance.verifyEqual(cellfun(@(x) length(x), split(subfold_path, '/')), ...
+                schema.external.table('main').spec.type_config.subfolding);
             % delete value to rely on cache
             if ispc
-                [status,cmdout] = system(['rmdir /Q /s "' test_instance.external_file_store_root '\base"']);
+                [status,cmdout] = system(['rmdir /Q /s "' ...
+                    test_instance.external_file_store_root '\base"']);
             else
-                [status,cmdout] = system(['rm -R ' test_instance.external_file_store_root '/base']);
+                [status,cmdout] = system(['rm -R ' ...
+                    test_instance.external_file_store_root '/base']);
             end
             res = q.fetch('dimension');
             value_check = res(1).dimension;
@@ -61,7 +66,9 @@ classdef TestExternalFile < tests.Prep
             test_instance.verifyTrue(schema.external.table('main').unused.count==2);
             % check delete from external
             schema.external.table('main').delete(true, '');
-            test_instance.verifyEqual(lastwarn,  ['File ''' dj.config('stores.main.location') '/' schema.dbname '/' subfold_path '/' uuid ''' not found.']);
+            test_instance.verifyEqual(lastwarn,  ['File ''' ...
+                dj.config('stores.main.location') '/' schema.dbname '/' subfold_path '/' ...
+                uuid ''' not found.']);
             % reverse engineer
             q = External.Dimension;
             raw_def = dj.internal.Declare.getDefinition(q);
@@ -76,9 +83,11 @@ classdef TestExternalFile < tests.Prep
             test_instance.verifyTrue(schema.external.table('main').unused.count==0);
             % remove external storage content
             if ispc
-                [status,cmdout] = system(['rmdir /Q /s "' test_instance.external_file_store_root '"']);
+                [status,cmdout] = system(['rmdir /Q /s "' ...
+                    test_instance.external_file_store_root '"']);
             else
-                [status,cmdout] = system(['rm -R ' test_instance.external_file_store_root]);
+                [status,cmdout] = system(['rm -R ' ...
+                    test_instance.external_file_store_root]);
             end
             % drop database
             schema.conn.query(['DROP DATABASE `' test_instance.PREFIX '_external`']);
@@ -94,7 +103,8 @@ classdef TestExternalFile < tests.Prep
         function TestExternalFile_testLocalDefault(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'new_local_default', 'blobCache');
+            tests.TestExternalFile.TestExternalFile_checks(testCase, 'new_local_default', ...
+                'blobCache');
         end
         function TestExternalFile_testBackward(testCase)
             st = dbstack;
