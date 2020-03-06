@@ -9,8 +9,8 @@ services:
     image: datajoint/mysql:${MYSQL_TAG}
     environment:
       - MYSQL_ROOT_PASSWORD=simple
-    ports:
-      - "3306:3306"
+    # ports:
+    #   - "3306:3306"
     ## To persist MySQL data
     # volumes:
     #   - ./mysql/data:/var/lib/mysql

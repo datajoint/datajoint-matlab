@@ -15,9 +15,6 @@ services:
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
-    ports:
-      - "443:443"
-      - "3306:3306"
     depends_on:
       db:
         condition: service_healthy
