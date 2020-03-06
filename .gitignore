@@ -7,3 +7,4 @@ notebook
 docker-compose.yml
 .vscode
 matlab.prf
+win.*

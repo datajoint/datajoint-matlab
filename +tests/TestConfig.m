@@ -39,6 +39,9 @@ classdef TestConfig < tests.Prep
                 case 'save-global'
                     dj.config.saveGlobal();
                     fname = dj.internal.Settings.GLOBALFILE;
+                    if ispc
+                        fname = strrep(fname, '~', strrep(getenv('USERPROFILE'), '\', '/'));
+                    end
                 case 'save-custom'
                     dj.config.save(fname);
                 case 'load-custom'

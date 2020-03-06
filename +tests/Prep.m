@@ -22,7 +22,7 @@ classdef Prep < matlab.unittest.TestCase
             [test_root, ~, ~] = fileparts(test_pkg_details.path);
             obj.test_root = [test_root '/+tests'];
             if ispc
-                obj.external_file_store_root = '%TEMP%\root';
+                obj.external_file_store_root = [getenv('TEMP') '\root'];
             else
                 obj.external_file_store_root = '/tmp/root';
             end

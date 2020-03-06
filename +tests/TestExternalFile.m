@@ -4,12 +4,13 @@ classdef TestExternalFile < tests.Prep
         function TestExternalFile_checks(test_instance, store, cache)
             % load config
             pkg = what('tests');
-            dj.config.load([pkg.path '/test_schemas/store_config.json']);
+            ext_root = strrep(test_instance.external_file_store_root, '\', '/');
+            dj.config.load([strrep(pkg.path, '\', '/') '/test_schemas/store_config.json']);
             dj.config(['stores.' store '.location'], strrep(dj.config(...
                 ['stores.' store '.location']), '{{external_file_store_root}}', ...
-                test_instance.external_file_store_root));
+                ext_root));
             dj.config('stores.main', dj.config(['stores.' store]));
-            dj.config(cache, [test_instance.external_file_store_root '/cache']);
+            dj.config(cache, [ext_root '/cache']);
             % create schema
             package = 'External';
             dj.createSchema(package,[test_instance.test_root '/test_schemas'], ...
