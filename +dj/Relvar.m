@@ -117,7 +117,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     try
                         for rel = fliplr(rels)
                             fprintf('Deleting from %s\n', rel.className)
-                            rel.delQuick
+                            rel.delQuick;
                         end
                         self.schema.conn.commitTransaction
                         disp committed

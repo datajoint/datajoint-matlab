@@ -180,9 +180,11 @@ classdef Declare
             
             
             % execute declaration
-            fprintf \n<SQL>\n
-            fprintf(sql)
-            fprintf \n</SQL>\n\n
+            if strcmpi(dj.config('loglevel'), 'DEBUG')
+                fprintf \n<SQL>\n
+                fprintf(sql)
+                fprintf \n</SQL>\n\n
+            end
         end
 
         function fieldInfo = parseAttrDef(line)
@@ -312,7 +314,7 @@ classdef Declare
             if strcmpi(category, 'UUID')
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;
             elseif any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
-                field.store = field.type((strfind(field.type,'@')+1):end);
+                field.store = strtrim(field.type((strfind(field.type,'@')+1):end));
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;
                 foreignKeySql = [foreignKeySql, sprintf( ...
                     ['FOREIGN KEY (`%s`) REFERENCES `{database}`.`%s_%s` (`hash`) ON ' ...

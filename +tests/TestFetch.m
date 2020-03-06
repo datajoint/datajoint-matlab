@@ -1,7 +1,7 @@
 classdef TestFetch < tests.Prep
     % TestFetch tests typical insert/fetch scenarios.
     methods (Test)
-        function testVariousDatatypes(testCase)
+        function TestFetch_testVariousDatatypes(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'University';
@@ -31,7 +31,7 @@ classdef TestFetch < tests.Prep
             testCase.verifyEqual(res(1).number,  3.213);
             testCase.verifyEqual(res(1).blob,  [1, 2; 3, 4]);
         end
-        function testDescribe(testCase)
+        function TestFetch_testDescribe(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             q = University.All;

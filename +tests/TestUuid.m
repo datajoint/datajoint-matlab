@@ -1,7 +1,7 @@
 classdef TestUuid < tests.Prep
     % TestUuid tests uuid scenarios.
     methods (Test)
-        function testInsertFetch(testCase)
+        function TestUuid_testInsertFetch(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'University';
@@ -32,7 +32,7 @@ classdef TestUuid < tests.Prep
 
             testCase.verifyEqual(value_check,  test_val2);
         end
-        function testQuery(testCase)
+        function TestUuid_testQuery(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'University';
@@ -51,7 +51,7 @@ classdef TestUuid < tests.Prep
 
             testCase.verifyEqual(value_check,  test_val1);
         end
-        function testReverseEngineering(testCase)
+        function TestUuid_testReverseEngineering(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             q = University.Message;

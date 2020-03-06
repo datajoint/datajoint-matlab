@@ -169,16 +169,18 @@ classdef ExternalTable < dj.Relvar
         function unused = unused(self)
             % query expression for unused hashes
             ref = self.references;
-            unused = self - cellfun(@(column, table) sprintf(...
+            query = strjoin(cellfun(@(column, table) sprintf(...
                 'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
-                ref.column_name, ref.referencing_table, 'UniformOutput', false);
+                ref.column_name, ref.referencing_table, 'UniformOutput', false), ' OR ');
+            if ~isempty(query)
+                unused = self - query;
+            else
+                unused = self;
+            end
         end
         function used = used(self)
             % query expression for used hashes
-            ref = self.references;
-            used = self & cellfun(@(column, table) sprintf(...
-                'hex(`hash`) in (select hex(`%s`) from %s)', column, table), ...
-                ref.column_name, ref.referencing_table, 'UniformOutput', false);
+            used = self - self.unused.proj();
         end        
         function delete(self, delete_external_files, limit)
             % DELETE(self, delete_external_files, limit)  
@@ -205,8 +207,8 @@ classdef ExternalTable < dj.Relvar
 end
 function folded_array = subfold(name, folds)
     % subfolding for external storage:   e.g.  subfold('aBCdefg', [2, 3])  -->  {'ab','cde'}
-    folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds, 1:length(folds), ...
-        cumsum(folds), 'UniformOutput', false);
+    folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds', 1:length(folds), ...
+        cumsum(folds'), 'UniformOutput', false);
 end
 function config = buildConfig(config, validation_config, store_name)
     % builds out store config with defaults set
