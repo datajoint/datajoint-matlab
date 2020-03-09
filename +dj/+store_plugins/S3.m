@@ -1,5 +1,5 @@
-% dj.store_plugins.File - an external storage class for local file stores.
-classdef File
+% dj.store_plugins.S3 - an external storage class for S3 stores.
+classdef S3
     properties (Hidden, Constant)
         % mode = -1(reject), 0(optional), 1(require)
         validation_config = struct( ...
