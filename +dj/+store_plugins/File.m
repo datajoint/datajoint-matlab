@@ -69,8 +69,8 @@ classdef File
             % initialize store
             self.protocol = config.protocol;
             self.location = strrep(config.location, '\', '/');
-            self.type_config = struct();
             
+            self.type_config = struct();
             if dj.internal.ExternalTable.BACKWARD_SUPPORT_DJPY012 && ~any(strcmp(...
                     'datajoint_type', fieldnames(config)))
                 self.type_config.subfolding = config.subfolding;

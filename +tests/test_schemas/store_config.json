@@ -40,6 +40,50 @@
             "datajoint_type": "blob",
             "protocol": "file",
             "location": "{{external_file_store_root}}/base"
+        },
+        "remote": {
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret",
+            "secure": false,
+            "subfolding": [
+                3,
+                4
+            ]
+        },
+        "new_remote": {
+            "datajoint_type": "blob",
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret",
+            "secure": false,
+            "subfolding": [
+                3,
+                4
+            ]
+        },
+        "remote_default": {
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret"
+        },
+        "new_remote_default": {
+            "datajoint_type": "blob",
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret"
         }
     }
 }
