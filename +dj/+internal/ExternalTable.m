@@ -7,6 +7,7 @@ classdef ExternalTable < dj.Relvar
     properties
         store
         spec
+        cache_folder
     end
     properties (Hidden)
         connection
@@ -49,6 +50,30 @@ classdef ExternalTable < dj.Relvar
                 end
             end
             self.spec = dj.store_plugins.(storePlugin)(config);
+            try
+                self.cache_folder = strrep(dj.config('blobCache'), '\', '/');
+            catch ME
+                if strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
+                    self.cache_folder = [];
+                else
+                    rethrow(ME);
+                end
+            end
+            if dj.internal.ExternalTable.BACKWARD_SUPPORT_DJPY012 && isempty(self.cache_folder)
+                try
+                    self.cache_folder = strrep(dj.config('cache'), '\', '/');
+                catch ME
+                    if strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
+                        self.cache_folder = [];
+                    else
+                        rethrow(ME);
+                    end
+                end
+            end
+            if ~isempty(self.cache_folder)
+                assert(exist(self.cache_folder, 'dir')==7, 'Cache folder `%s` not found.', ...
+                    self.cache_folder);
+            end
         end
         function create(self)
             % parses the table declration and declares the table
@@ -97,32 +122,12 @@ classdef ExternalTable < dj.Relvar
         end
         function blob = download_buffer(self, uuid)
             % get blob via uuid (with caching support)
-            try
-                cache_folder = strrep(dj.config('blobCache'), '\', '/');
-            catch ME
-                if strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
-                    cache_folder = [];
-                else
-                    rethrow(ME);
-                end
-            end
-            if dj.internal.ExternalTable.BACKWARD_SUPPORT_DJPY012 && isempty(cache_folder)
-                try
-                    cache_folder = strrep(dj.config('cache'), '\', '/');
-                catch ME
-                    if strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
-                        cache_folder = [];
-                    else
-                        rethrow(ME);
-                    end
-                end
-            end
             blob = [];
-            if ~isempty(cache_folder)
-                cache_file = [cache_folder '/' self.schema.dbname '/' strjoin(...
+            if ~isempty(self.cache_folder)
+                cache_path = [self.cache_folder '/' self.schema.dbname '/' strjoin(...
                     subfold(uuid, self.spec.type_config.subfolding), '/') '/' uuid ''];
                 try
-                    fileID = fopen(cache_file, 'r');
+                    fileID = fopen(cache_path, 'r');
                     result = fread(fileID);
                     fclose(fileID);
                     blob = mym('deserialize', uint8(result));
@@ -132,10 +137,10 @@ classdef ExternalTable < dj.Relvar
             if isempty(blob)
                 blob_binary = uint8(self.spec.download_buffer(self.make_uuid_path(uuid, '')));
                 blob = mym('deserialize', blob_binary);
-                if ~isempty(cache_folder)
-                    [~,start_idx,~] = regexp(cache_file, '/', 'match', 'start', 'end');
-                    mkdir(cache_file(1:(start_idx(end)-1)));
-                    fileID = fopen(cache_file, 'w');
+                if ~isempty(self.cache_folder)
+                    [~,start_idx,~] = regexp(cache_path, '/', 'match', 'start', 'end');
+                    mkdir(cache_path(1:(start_idx(end)-1)));
+                    fileID = fopen(cache_path, 'w');
                     fwrite(fileID, blob_binary);
                     fclose(fileID);
                 end

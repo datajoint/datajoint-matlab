@@ -11,6 +11,9 @@ classdef TestExternalFile < tests.Prep
                 ext_root));
             dj.config('stores.main', dj.config(['stores.' store]));
             dj.config(cache, [ext_root '/cache']);
+            % create location/cache directories
+            mkdir(dj.config(cache));
+            mkdir(dj.config('stores.main.location'));
             % create schema
             package = 'External';
             dj.createSchema(package,[test_instance.test_root '/test_schemas'], ...
@@ -90,6 +93,8 @@ classdef TestExternalFile < tests.Prep
                 [status,cmdout] = system(['rm -R ' ...
                     test_instance.external_file_store_root]);
             end
+            % Remove previous mapping
+            schema.external.tables = struct();
             % drop database
             schema.conn.query(['DROP DATABASE `' test_instance.PREFIX '_external`']);
             dj.config.restore;
