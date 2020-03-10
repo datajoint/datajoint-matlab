@@ -16,7 +16,11 @@ classdef TestExternalFile < tests.Prep
             if strcmp(dj.config('stores.main.protocol'), 'file')
                 mkdir(dj.config('stores.main.location'));
             elseif strcmp(dj.config('stores.main.protocol'), 's3')
-                dj.config('stores.main.endpoint', test_instance.S3_CONN_INFO.endpoint);
+                if any(strcmp('secure', fieldnames(dj.config('stores.main')))) && dj.config('stores.main.secure')
+                    dj.config('stores.main.endpoint', strrep(test_instance.S3_CONN_INFO.endpoint, ':9000', ':443'));
+                else
+                    dj.config('stores.main.endpoint', test_instance.S3_CONN_INFO.endpoint);
+                end
                 dj.config('stores.main.access_key', test_instance.S3_CONN_INFO.access_key);
                 dj.config('stores.main.secret_key', test_instance.S3_CONN_INFO.secret_key);
                 dj.config('stores.main.bucket', test_instance.S3_CONN_INFO.bucket);

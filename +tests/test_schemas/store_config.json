@@ -62,7 +62,7 @@
             "bucket": "dep1",
             "access_key": "key",
             "secret_key": "secret",
-            "secure": false,
+            "secure": true,
             "subfolding": []
         },
         "remote_default": {
