@@ -115,6 +115,15 @@ classdef Prep < matlab.unittest.TestCase
                     res.(['Database (' testCase.PREFIX '_%)']){i} ';']);
             end
             curr_conn.query('SET FOREIGN_KEY_CHECKS=1;');
+            
+            % remove external storage content
+            if ispc
+                [status,cmdout] = system(['rmdir /Q /s "' ...
+                    testCase.external_file_store_root '"']);
+            else
+                [status,cmdout] = system(['rm -R ' ...
+                    testCase.external_file_store_root]);
+            end
 
             % remove users
             cmd = {...

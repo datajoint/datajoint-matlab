@@ -48,8 +48,15 @@ classdef TestExternalFile < tests.Prep
                 subfold_path = strrep(uuid_path, ['/' dj.config('stores.main.bucket') '/' dj.config('stores.main.location')], '');
             end
             subfold_path = strrep(subfold_path, ['/' schema.dbname '/'], '');
-            subfold_path = strrep(subfold_path, ['/' uuid], '');
-            test_instance.verifyEqual(cellfun(@(x) length(x), split(subfold_path, '/')), ...
+            subfold_cell = split(subfold_path, '/');
+            if length(subfold_cell) > 1
+                subfold_cell = subfold_cell(1:end-1);
+                subfold_path = ['/' strjoin(subfold_cell, '/')];
+            else
+                subfold_cell = {};
+                subfold_path = '';
+            end
+            test_instance.verifyEqual(cellfun(@(x) length(x), subfold_cell), ...
                 schema.external.table('main').spec.type_config.subfolding);
             % delete value to rely on cache
             schema.external.table('main').spec.remove_object(uuid_path);
@@ -77,7 +84,7 @@ classdef TestExternalFile < tests.Prep
             schema.external.table('main').delete(true, '');
             if strcmp(dj.config('stores.main.protocol'), 'file')
                 test_instance.verifyEqual(lastwarn,  ['File ''' ...
-                    dj.config('stores.main.location') '/' schema.dbname '/' subfold_path '/' ...
+                    dj.config('stores.main.location') '/' schema.dbname subfold_path '/' ...
                     uuid ''' not found.']);
             end
             % reverse engineer

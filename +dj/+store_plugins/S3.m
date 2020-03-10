@@ -95,7 +95,12 @@ classdef S3
         function self = S3(config)
             % initialize store
             self.protocol = config.protocol;
-            self.location = strrep(config.location, '\', '/');
+            [~, start, ~] = regexp(config.location, '[a-zA-Z0-9][a-zA-Z0-9]', 'match', 'start', 'end');
+            if ~isempty(start)
+                self.location = ['/' strrep(config.location(start(1):end), '\', '/')];
+            else
+                self.location = '';
+            end
             self.endpoint = config.endpoint;
             self.bucket = config.bucket;
             self.access_key = config.access_key;
@@ -126,7 +131,7 @@ classdef S3
         end
         function external_filepath = make_external_filepath(self, relative_filepath)
             % resolve the complete external path based on the relative path
-            external_filepath = ['/' self.bucket '/' self.location '/' relative_filepath];
+            external_filepath = ['/' self.bucket self.location '/' relative_filepath];
         end
         function upload_buffer(self, buffer, external_filepath)
             % put blob

@@ -63,10 +63,7 @@
             "access_key": "key",
             "secret_key": "secret",
             "secure": false,
-            "subfolding": [
-                3,
-                4
-            ]
+            "subfolding": []
         },
         "remote_default": {
             "protocol": "s3",
