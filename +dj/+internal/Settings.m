@@ -78,11 +78,7 @@ classdef Settings < matlab.mixin.Copyable
             dj.internal.Settings.save(dj.internal.Settings.LOCALFILE);
         end
         function saveGlobal()
-            location = dj.internal.Settings.GLOBALFILE;
-            if ispc
-                location = strrep(location, '~', strrep(getenv('USERPROFILE'), '\', '/'));
-            end
-            dj.internal.Settings.save(location);
+            dj.internal.Settings.save(dj.internal.Settings.GLOBALFILE);
         end
     end
 end

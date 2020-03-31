@@ -4,35 +4,21 @@ x-net: &net
   networks:
     - main
 services:
-  db:
-    <<: *net
-    image: datajoint/mysql:${MYSQL_TAG}
-    environment:
-      - MYSQL_ROOT_PASSWORD=simple
-  fakeservices.datajoint.io:
-    <<: *net
-    image: raphaelguzman/nginx:v0.0.3
-    environment:
-    - ADD_db_TYPE=DATABASE
-    - ADD_db_ENDPOINT=db:3306
-    depends_on:
-      db:
-        condition: service_healthy
   app:
     <<: *net
     environment:
     - DISPLAY
     - MATLAB_LICENSE
     - MATLAB_USER
-    - DJ_HOST=fakeservices.datajoint.io
+    - DJ_HOST=mysql
     - DJ_USER=root
     - DJ_PASS=simple
-    - DJ_TEST_HOST=fakeservices.datajoint.io
+    - DJ_TEST_HOST=mysql
     - DJ_TEST_USER=datajoint
     - DJ_TEST_PASSWORD=datajoint
     image: raphaelguzman/matlab:${MATLAB_VERSION}-MIN
     depends_on:
-      fakeservices.datajoint.io:
+      mysql:
         condition: service_healthy
     user: ${MATLAB_UID}:${MATLAB_GID}
     working_dir: /src
@@ -48,5 +34,10 @@ services:
     volumes:
       - .:/src
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  mysql:
+    <<: *net
+    image: datajoint/mysql:${MYSQL_TAG}
+    environment:
+      - MYSQL_ROOT_PASSWORD=simple
 networks:
   main:
