@@ -1,7 +1,7 @@
 classdef TestProjection < tests.Prep
     % TestProjection tests use of q.proj(...).
     methods (Test)
-        function testDateConversion(testCase)
+        function TestProjection_testDateConversion(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'University';

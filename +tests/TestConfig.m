@@ -1,7 +1,7 @@
 classdef TestConfig < tests.Prep
     % TestConfig tests scenarios related to initializing DJ config.
     methods (Static)
-        function obj = configRemoveEnvVars(obj, type)
+        function obj = TestConfig_configRemoveEnvVars(obj, type)
             switch type
                 case 'file'
                     if isfield(obj, 'database_host')
@@ -31,7 +31,7 @@ classdef TestConfig < tests.Prep
                     end
             end
         end
-        function configSingleFileTest(test_instance, type, fname, base)
+        function TestConfig_configSingleFileTest(test_instance, type, fname, base)
             switch type
                 case 'save-local'
                     dj.config.saveLocal();
@@ -39,6 +39,9 @@ classdef TestConfig < tests.Prep
                 case 'save-global'
                     dj.config.saveGlobal();
                     fname = dj.internal.Settings.GLOBALFILE;
+                    if ispc
+                        fname = strrep(fname, '~', strrep(getenv('USERPROFILE'), '\', '/'));
+                    end
                 case 'save-custom'
                     dj.config.save(fname);
                 case 'load-custom'
@@ -46,7 +49,7 @@ classdef TestConfig < tests.Prep
             end
             % load raw
             read_data = fileread(fname);           
-            obj1 = tests.TestConfig.configRemoveEnvVars(jsondecode(read_data), 'file');
+            obj1 = tests.TestConfig.TestConfig_configRemoveEnvVars(jsondecode(read_data), 'file');
             % optional merge from base
             if strcmpi(type, 'load-custom')
                 tmp = rmfield(base, intersect(fieldnames(base), fieldnames(obj1)));
@@ -57,7 +60,7 @@ classdef TestConfig < tests.Prep
             % stringify
             file = jsonencode(obj1);
             % load config
-            obj2 = tests.TestConfig.configRemoveEnvVars(dj.config(), 'config');
+            obj2 = tests.TestConfig.TestConfig_configRemoveEnvVars(dj.config(), 'config');
             curr = jsonencode(obj2);
             curr = regexprep(curr,'[a-z0-9][A-Z]','${$0(1)}_${lower($0(2))}');
             % checks
@@ -70,7 +73,7 @@ classdef TestConfig < tests.Prep
         end
     end
     methods (Test)
-        function testGetSet(testCase)
+        function TestConfig_testGetSet(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             function verifyConfig(new, previous_value, subref, subref_value, subref_prev)
@@ -134,7 +137,7 @@ classdef TestConfig < tests.Prep
                     'subfolding', [2,2] ...
             )}}), prev, 'stores{2}.protocol', 'http', 's3');
         end
-        function testConfigChecks(testCase)
+        function TestConfig_testConfigChecks(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             testCase.verifyError(@() dj.config(9), ...
@@ -142,33 +145,33 @@ classdef TestConfig < tests.Prep
             d = testCase.verifyError(@() dj.config('none'), ...
                 'DataJoint:Config:InvalidKey');
         end
-        function testRestore(testCase)
+        function TestConfig_testRestore(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             dj.config.restore;
-            obj1 = tests.TestConfig.configRemoveEnvVars(dj.config(), 'config');
-            obj2 = tests.TestConfig.configRemoveEnvVars( ...
+            obj1 = tests.TestConfig.TestConfig_configRemoveEnvVars(dj.config(), 'config');
+            obj2 = tests.TestConfig.TestConfig_configRemoveEnvVars( ...
                 orderfields(dj.internal.Settings.DEFAULTS), 'config');
             testCase.verifyEqual(jsonencode(obj1), jsonencode(obj2));
         end
-        function testSave(testCase)
+        function TestConfig_testSave(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);            
             dj.config.restore;
             
             % local
             dj.config('font', 10);
-            tests.TestConfig.configSingleFileTest(testCase, 'save-local');
+            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'save-local');
             % global
             dj.config('font', 12);
-            tests.TestConfig.configSingleFileTest(testCase, 'save-global');
+            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'save-global');
             % custom
             dj.config('font', 16);
-            tests.TestConfig.configSingleFileTest(testCase, 'save-custom', './config.json');
+            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'save-custom', './config.json');
             
             dj.config.restore;
         end
-        function testLoad(testCase)
+        function TestConfig_testLoad(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             pkg = what('tests');
@@ -176,22 +179,22 @@ classdef TestConfig < tests.Prep
             default_file = [pkg.path '/test_schemas/default.json'];
             dj.config.restore;
             dj.config.save(default_file);
-            defaults = tests.TestConfig.configRemoveEnvVars( ...
+            defaults = tests.TestConfig.TestConfig_configRemoveEnvVars( ...
                 jsondecode(fileread(default_file)), 'file');
             delete(default_file);
             % load test config
-            tests.TestConfig.configSingleFileTest(testCase, 'load-custom', ...
+            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
                 [pkg.path '/test_schemas/config.json'], defaults);
             % load new config on top of existing
-            base = tests.TestConfig.configRemoveEnvVars(dj.config, 'config');
+            base = tests.TestConfig.TestConfig_configRemoveEnvVars(dj.config, 'config');
             base = jsonencode(base);
             base = regexprep(base,'[a-z0-9][A-Z]','${$0(1)}_${lower($0(2))}');
-            tests.TestConfig.configSingleFileTest(testCase, 'load-custom', ...
+            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
                 [pkg.path '/test_schemas/config_lite.json'], jsondecode(base));
             % cleanup
             dj.config.restore;
         end
-        function testEnv(testCase)
+        function TestConfig_testEnv(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             function validateEnvVarConfig(type, values)
