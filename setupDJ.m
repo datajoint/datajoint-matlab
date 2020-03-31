@@ -37,7 +37,7 @@ function setupDJ(skipPathAddition, force)
         end
         % rename extracted mym-master directory to mym
         % movefile(fullfile(base, 'mym-master'), mymdir)
-        movefile(fullfile(base, 'mym-ext-serialize'), mymdir)
+        movefile(fullfile(base, 'mym-external-storage'), mymdir)
         delete(target)
     end
     
