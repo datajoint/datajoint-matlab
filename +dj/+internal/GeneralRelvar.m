@@ -210,7 +210,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret = self.conn.query(sprintf('SELECT %s FROM %s%s', ...
                 hdr.sql, sql_, limit));
             ret = dj.struct.fromFields(ret);
-            ret = get(self.conn, self.header.attributes, ret);
+            ret = get(self.header.attributes, ret);
             
             if nargout>1
                 % return primary key structure array
@@ -433,6 +433,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function ret = minus(self, arg)
             % MINUS -- relational antijoin
+            if iscell(arg)
+                throwAsCaller(MException('DataJoint:invalidOperator',...
+                    'Antijoin only accepts single restrictions'))
+            end
             ret = self.copy;
             ret.restrict('not', arg)
         end
@@ -920,7 +924,7 @@ function str = escapeString(str)
     str = strrep(str, '\', '\\');
 end
 
-function data = get(connection, attr, data)
+function data = get(attr, data)
     % data = GET(attr, data)
     %   Process in place fetched data.
     %   data:   <struct_array> Fetched records.
@@ -928,24 +932,13 @@ function data = get(connection, attr, data)
     for i = 1:length(attr)
         if attr(i).isUuid
             for j = 1:length(data)
-                if ~isempty(data(j).(attr(i).name))
-                    new_value = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
-                    new_value = [new_value(1:8) '-' ...
-                                new_value(9:12) '-' ...
-                                new_value(13:16) '-' ...
-                                new_value(17:20) '-' ...
-                                new_value(21:end)];
-                    data(j).(attr(i).name) = new_value;
-                end
-            end
-        elseif attr(i).isBlob && attr(i).isExternal
-            for j = 1:length(data)
-                if ~isempty(data(j).(attr(i).name))
-                    uuid = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
-                    data(j).(attr(i).name) = connection.schemas.(...
-                        attr(i).database).external.tables.(...
-                        attr(i).store).download_buffer(uuid);
-                end
+                new_value = reshape(lower(dec2hex(data(j).(attr(i).name))).',1,[]);
+                new_value = [new_value(1:8) '-' ...
+                            new_value(9:12) '-' ...
+                            new_value(13:16) '-' ...
+                            new_value(17:20) '-' ...
+                            new_value(21:end)];
+                data(j).(attr(i).name) = new_value;
             end
         end
     end

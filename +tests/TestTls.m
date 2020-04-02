@@ -1,7 +1,7 @@
 classdef TestTls < tests.Prep
     % TestTls tests TLS connection scenarios.
     methods (Test)
-        function TestTls_testSecureConn(testCase)
+        function testSecureConn(testCase)
             % secure connection test
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -12,7 +12,7 @@ classdef TestTls < tests.Prep
                 '',true,true).query(...
                 'SHOW STATUS LIKE ''Ssl_cipher''').Value{1}) > 0);
         end
-        function TestTls_testInsecureConn(testCase)
+        function testInsecureConn(testCase)
             % insecure connection test
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -24,7 +24,7 @@ classdef TestTls < tests.Prep
                 'SHOW STATUS LIKE ''Ssl_cipher''').Value{1}, ...
                 '');
         end
-        function TestTls_testPreferredConn(testCase)
+        function testPreferredConn(testCase)
             % preferred connection test
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -35,7 +35,7 @@ classdef TestTls < tests.Prep
                 '',true).query(...
                 'SHOW STATUS LIKE ''Ssl_cipher''').Value{1}) > 0);
         end
-        function TestTls_testRejectException(testCase)
+        function testRejectException(testCase)
             % test exception on require TLS
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -54,7 +54,7 @@ classdef TestTls < tests.Prep
                     ["requires secure connection","Access denied"])); %MySQL8,MySQL5
             end
         end
-        function TestTls_testStructException(testCase)
+        function testStructException(testCase)
             % test exception on TLS struct
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -63,7 +63,7 @@ classdef TestTls < tests.Prep
                 testCase.CONN_INFO.user, ...
                 testCase.CONN_INFO.password, ...
                 '',true,struct('ca','fake/path/some/where')), ...
-                'mYm:TLS:InvalidStruct');
+                'DataJoint:TLS:InvalidStruct');
         end
     end
 end

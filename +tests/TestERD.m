@@ -1,7 +1,7 @@
 classdef TestERD < tests.Prep
     % TestERD tests unusual ERD scenarios.
     methods (Test)
-        function TestERD_testDraw(testCase)
+        function testDraw(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'University';

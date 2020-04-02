@@ -20,10 +20,10 @@ classdef Table < handle
     
     properties(SetAccess = protected)
         className    % the name of the corresponding base dj.Relvar class
-        schema          % handle to a schema object
     end
     
     properties(SetAccess = private)
+        schema          % handle to a schema object
         plainTableName  % just the table name
         tableHeader     % attribute information
     end
@@ -54,10 +54,6 @@ classdef Table < handle
                 name = class(self);
                 if any(strcmp(name,{'dj.Table','dj.Relvar'}))
                     name = '';
-                elseif isa(self,'dj.internal.ExternalTable')
-                    store = self.store;
-                    store(1) = upper(store(1));
-                    name = [self.schema.package '.External' store];
                 end
             end
         end
@@ -248,8 +244,7 @@ classdef Table < handle
             % get foreign keys
             fk = self.schema.conn.foreignKeys;
             if ~isempty(fk)
-                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName) && ...
-                    ~contains(s.ref, '~external'), fk));
+                fk = fk(arrayfun(@(s) strcmp(s.from, self.fullTableName), fk));
             end
             
             attributes_thus_far = {};
@@ -336,9 +331,9 @@ classdef Table < handle
                 after = [' ' after];
             end
             
-            [sql, ~, ~] = dj.internal.Declare.compileAttribute(...
-                dj.internal.Declare.parseAttrDef(definition), []);
-            self.alter(sprintf('ADD COLUMN %s%s', sql, after));
+            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+                definition));
+            self.alter(sprintf('ADD COLUMN %s%s', sql(1:end-2), after));
         end
         
         function dropAttribute(self, attrName)
@@ -351,9 +346,9 @@ classdef Table < handle
             % dj.Table/alterAttribute - Modify the definition of attribute
             % attrName using its new line from the table definition
             % "newDefinition"
-            [sql, ~, ~] = dj.internal.Declare.compileAttribute(...
-                dj.internal.Declare.parseAttrDef(newDefinition), []);
-            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql));
+            sql = dj.internal.Declare.compileAttribute(dj.internal.Declare.parseAttrDef( ...
+                newDefinition));
+            self.alter(sprintf('CHANGE COLUMN `%s` %s', attrName, sql(1:end-2)));
         end
         
         function addForeignKey(self, target)
@@ -369,9 +364,9 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            [attr_sql, fk_sql, ~] = dj.internal.Declare.makeFK('', target, self.primaryKey, ...
+            sql = dj.internal.Declare.makeFK('', target, self.primaryKey, ...
                 true, dj.internal.shorthash(self.fullTableName));
-            self.alter(sprintf('ADD %s%s', attr_sql, fk_sql))
+            self.alter(sprintf('ADD %s', sql))
         end
         
         function dropForeignKey(self, target)
@@ -478,8 +473,7 @@ classdef Table < handle
                 fprintf('File %s.m is not found\n', self.className);
             else
                 if dj.config('safemode') ...
-                        && ~strcmpi('yes', dj.internal.ask(sprintf(...
-                        'Update the table definition and class definition in %s?',path)))
+                        && ~strcmpi('yes', dj.internal.ask(sprintf('Update the table definition and class definition in %s?',path)))
                     disp 'No? Table definition left untouched.'
                 else
                     % read old file
@@ -588,6 +582,11 @@ classdef Table < handle
     
     methods(Access=private)
         
+        function yes = isCreated(self)
+            yes = self.schema.tableNames.isKey(self.className);
+        end
+        
+        
         function alter(self, alterStatement)
             % dj.Table/alter
             % alter(self, alterStatement)
@@ -607,10 +606,6 @@ classdef Table < handle
     
     methods
         
-        function yes = isCreated(self)
-            yes = self.schema.tableNames.isKey(self.className);
-        end
-        
         function create(self)
             % parses the table declration and declares the table
 
@@ -623,12 +618,7 @@ classdef Table < handle
             end
             def = dj.internal.Declare.getDefinition(self);
 
-            [sql, external_stores] = dj.internal.Declare.declare(self, def);
-            sql = strrep(sql, '{database}', self.schema.dbname);
-            for k=1:length(external_stores)
-                table = self.schema.external.table(external_stores{k});
-                table.create;
-            end
+            sql = dj.internal.Declare.declare(self, def);
             self.schema.conn.query(sql);
             self.schema.reload
         end

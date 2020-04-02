@@ -13,7 +13,6 @@ classdef Prep < matlab.unittest.TestCase
     end
     properties
         test_root;
-        external_file_store_root;
     end
     methods
         function obj = Prep()
@@ -21,11 +20,6 @@ classdef Prep < matlab.unittest.TestCase
             test_pkg_details = what('tests');
             [test_root, ~, ~] = fileparts(test_pkg_details.path);
             obj.test_root = [test_root '/+tests'];
-            if ispc
-                obj.external_file_store_root = [getenv('TEMP') '\root'];
-            else
-                obj.external_file_store_root = '/tmp/root';
-            end
         end
      end
     methods (TestClassSetup)
@@ -102,7 +96,6 @@ classdef Prep < matlab.unittest.TestCase
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password, '',true);
 
-            % remove databases
             curr_conn.query('SET FOREIGN_KEY_CHECKS=0;');
             res = curr_conn.query(['SHOW DATABASES LIKE "' testCase.PREFIX '_%";']);
             for i = 1:length(res.(['Database (' testCase.PREFIX '_%)']))
@@ -111,7 +104,6 @@ classdef Prep < matlab.unittest.TestCase
             end
             curr_conn.query('SET FOREIGN_KEY_CHECKS=1;');
 
-            % remove users
             cmd = {...
             'DROP USER ''datajoint''@''%%'';'
             'DROP USER ''djview''@''%%'';'
