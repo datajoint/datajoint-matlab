@@ -5,3 +5,7 @@ mym/
 notebook
 *getSchema.m
 docker-compose.yml
+.vscode
+matlab.prf
+win.*
+macos.*

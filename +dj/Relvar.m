@@ -20,11 +20,16 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             id = ret.lid;
         end
         
-        function delQuick(self)
+        function count = delQuick(self, getCount)
             % DELQUICK - remove all tuples of the relation from its table.
             % Unlike del, delQuick does not prompt for user
             % confirmation, nor does it attempt to cascade down to the dependent tables.
             self.schema.conn.query(sprintf('DELETE FROM %s', self.sql))
+            count = [];
+            if nargin > 1 && getCount
+                count = self.schema.conn.query(sprintf('SELECT count(*) as count FROM %s', ...
+                    self.sql)).count;
+            end
         end
         
         
@@ -104,14 +109,15 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 rels = rels(counts>0);
                 
                 % confirm and delete
-                if dj.config('safemode') && ~strcmpi('yes',dj.internal.ask('Proceed to delete?'))
+                if dj.config('safemode') && ~strcmpi('yes', ...
+                        dj.internal.ask('Proceed to delete?'))
                     disp 'delete canceled'
                 else
                     self.schema.conn.startTransaction
                     try
                         for rel = fliplr(rels)
                             fprintf('Deleting from %s\n', rel.className)
-                            rel.delQuick
+                            rel.delQuick;
                         end
                         self.schema.conn.commitTransaction
                         disp committed
@@ -228,7 +234,18 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     decMtx = hex2dec(hexMtx);
                     value = uint8(decMtx);
                 elseif header.attributes(attr_idx).isBlob
-                    placeholder = '"{M}"';
+                    if ~header.attributes(attr_idx).isExternal
+                        placeholder = '"{M}"';
+                    else
+                        placeholder = '"{B}"';
+                        value = self.schema.external.tables.(...
+                            header.attributes(attr_idx).store).upload_buffer(value);
+                        hexstring = value';
+                        reshapedString = reshape(hexstring,2,16);
+                        hexMtx = reshapedString.';
+                        decMtx = hex2dec(hexMtx);
+                        value = uint8(decMtx);
+                    end
                 else
                     assert((isnumeric(value) || islogical(value)) && (isscalar( ...
                         value) || isempty(value)),...

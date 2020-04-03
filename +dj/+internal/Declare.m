@@ -3,19 +3,23 @@ classdef Declare
     % table definitions, and to declare the corresponding mysql tables.
 
     properties(Constant)
+        UUID_DATA_TYPE = 'binary(16)'
         CONSTANT_LITERALS = {'CURRENT_TIMESTAMP'}
+        EXTERNAL_TABLE_ROOT = '~external'
         TYPE_PATTERN = struct( ...
             'NUMERIC', '^((tiny|small|medium|big)?int|decimal|double|float)', ...
             'STRING', '^((var)?char|enum|date|(var)?year|time|timestamp)', ...
-            'INTERNAL_BLOB', '^(tiny|medium|long)?blob', ...
+            'INTERNAL_BLOB', '^(tiny|medium|long)?blob$', ...
+            'EXTERNAL_BLOB', '^blob@(?<store>[a-z]\w*)$', ...
             'UUID', 'uuid$' ...
         )
-        UUID_DATA_TYPE = 'binary(16)'
-        SPECIAL_TYPES = {'UUID'}
+        SPECIAL_TYPES = {'UUID', 'EXTERNAL_BLOB'}
+        EXTERNAL_TYPES = {'EXTERNAL_BLOB'}  % data referenced by a UUID in external tables
+        SERIALIZED_TYPES = {'EXTERNAL_BLOB'}  % requires packing data
     end
     
     methods(Static)
-        function sql = declare(table_instance, def)
+        function [sql, external_stores] = declare(table_instance, def)
             % sql = DECLARE(query, definition)  
             %   Parse table declaration and declares the table.
             %   sql:        <string> Generated SQL to create a table.
@@ -36,12 +40,13 @@ classdef Declare
             switch true
                     
                 case {isa(table_instance, 'dj.internal.UserRelation'), isa(table_instance, ...
-                        'dj.Part'), isa(table_instance, 'dj.Jobs')}
+                        'dj.Part'), isa(table_instance, 'dj.Jobs'), ...
+                        isa(table_instance, 'dj.internal.ExternalTable')}
                     % New-style declaration using special classes for each tier
                     tableInfo = struct;
                     if isa(table_instance, 'dj.Part')
                         tableInfo.tier = 'part';
-                    else
+                    elseif ~isa(table_instance, 'dj.internal.ExternalTable')
                         specialClass = find(cellfun(@(c) isa(table_instance, c), ...
                             dj.Schema.tierClasses));
                         assert(length(specialClass)==1, ...
@@ -70,11 +75,14 @@ classdef Declare
                             dj.internal.fromCamelCase(table_instance.className(length( ...
                             table_instance.master.className)+1:end)))); 
                             %#ok<MCNPN>
-                    else
+                    elseif ~isa(table_instance, 'dj.internal.ExternalTable')
                         tableName = sprintf('%s%s%s', ...
                             table_instance.schema.prefix, dj.Schema.tierPrefixes{ ...
                             strcmp(tableInfo.tier, dj.Schema.allowedTiers)}, ...
                             dj.internal.fromCamelCase(tableInfo.className));
+                    else
+                        tableName = [dj.internal.Declare.EXTERNAL_TABLE_ROOT '_' ...
+                            table_instance.store];
                     end
                     
                 otherwise
@@ -105,12 +113,13 @@ classdef Declare
                         stableInfo.className));
             end
             
-            sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname, ...
-                tableName);
-            
             % fields and foreign keys
             inKey = true;
             primaryFields = {};
+            foreignKeySql = {};
+            indexSql = {};
+            attributeSql = {};
+            external_stores = {};
             fields = {};
             for iLine = 1:length(def)
                 line = def{iLine};
@@ -119,11 +128,12 @@ classdef Declare
                         inKey = false;                        
                         % foreign key
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-                        [sql, newFields] = dj.internal.Declare.makeFK( ...
-                            sql, line, fields, inKey, ...
+                        [fk_attr_sql, fk_sql, newFields] = dj.internal.Declare.makeFK( ...
+                            line, fields, inKey, ...
                             dj.internal.shorthash(sprintf('`%s`.`%s`', ...
                             table_instance.schema.dbname, tableName)));
-                        sql = sprintf('%s,\n', sql);
+                        attributeSql = [attributeSql, fk_attr_sql]; %#ok<AGROW>
+                        foreignKeySql = [foreignKeySql, fk_sql]; %#ok<AGROW>
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
                             primaryFields = [primaryFields, newFields]; %#ok<AGROW>
@@ -131,7 +141,7 @@ classdef Declare
                         
                         % index
                     case regexpi(line, '^(unique\s+)?index[^:]*$')
-                        sql = sprintf('%s%s,\n', sql, line);    %  add checks
+                        indexSql = [indexSql, line]; %#ok<AGROW>
                         
                         % attribute
                     case regexp(line, ['^[a-z][a-z\d_]*\s*' ...       % name
@@ -144,26 +154,37 @@ classdef Declare
                             primaryFields{end+1} = fieldInfo.name; %#ok<AGROW>
                         end
                         fields{end+1} = fieldInfo.name; %#ok<AGROW>
-                        sql = sprintf('%s%s', sql, ...
-                            dj.internal.Declare.compileAttribute(fieldInfo));
-                        
+                        [attr_sql, store, foreignKeySql] = ...
+                            dj.internal.Declare.compileAttribute(fieldInfo, foreignKeySql);
+                        attributeSql = [attributeSql, attr_sql]; %#ok<AGROW>
+                        if ~isempty(store)
+                            external_stores{end+1} = store; %#ok<AGROW>
+                        end
                     otherwise
                         error('Invalid table declaration line "%s"', line)
                 end
             end
             
-            % add primary key declaration
+            % create declaration
+            create_sql = sprintf('CREATE TABLE `%s`.`%s` (\n', table_instance.schema.dbname,...
+                tableName);
+            % add attribute, primary key, foreign key, and index declaration
             assert(~isempty(primaryFields), 'table must have a primary key')
-            sql = sprintf('%sPRIMARY KEY (%s),\n' ,sql, backquotedList(primaryFields));
-            
+            table_sql = {attributeSql', {['PRIMARY KEY (`' strjoin(primaryFields, '`,`') ...
+                '`)']}, foreignKeySql', indexSql'};
+            table_sql = sprintf([strjoin(cat(1, table_sql{:}), ',\n') '\n']);
             % finish the declaration
-            sql = sprintf('%s\n) ENGINE = InnoDB, COMMENT "%s"', sql(1:end-2), ...
-                tableInfo.comment);
+            engine_sql = sprintf(') ENGINE = InnoDB, COMMENT "%s"', tableInfo.comment);
+
+            sql = sprintf('%s%s%s', create_sql, table_sql, engine_sql);
+            
             
             % execute declaration
-            fprintf \n<SQL>\n
-            fprintf(sql)
-            fprintf \n</SQL>\n\n
+            if strcmpi(dj.config('loglevel'), 'DEBUG')
+                fprintf \n<SQL>\n
+                fprintf(sql)
+                fprintf \n</SQL>\n\n
+            end
         end
 
         function fieldInfo = parseAttrDef(line)
@@ -178,7 +199,7 @@ classdef Declare
                 '^(?<name>[a-z][a-z\d_]*)\s*'     % field name
                 ['=\s*(?<default>".*"|''.*''|\w+|[-+]?[0-9]*\.?[0-9]+([eE][-+]?' ...
                     '[0-9]+)?)\s*'] % default value
-                [':\s*(?<type>\w[\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN]' ...
+                [':\s*(?<type>\w[@\w\s]+(\(.*\))?(\s*[aA][uU][tT][oO]_[iI][nN]' ...
                     '[cC][rR][eE][mM][eE][nN][tT])?)\s*']       % datatype
                 '#(?<comment>.*)'           % comment
                 '$'  % end of line
@@ -208,7 +229,7 @@ classdef Declare
             fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
         end
 
-        function [sql, newattrs] = makeFK(sql, line, existingFields, inKey, hash)
+        function [all_attr_sql, fk_sql, newattrs] = makeFK(line, existingFields, inKey, hash)
             % [sql, newattrs] = MAKEFK(sql, line, existingFields, inKey, hash)
             %   Add foreign key to SQL table definition.
             %   sql:            <string> Modified in-place SQL to include foreign keys.
@@ -217,6 +238,8 @@ classdef Declare
             %   existingFields: <struct> Existing field attributes.
             %   inKey:          <logical> Set as primary key.
             %   hash:           <string> Current hash as base.
+            fk_sql = '';
+            all_attr_sql = '';
             pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
                 '\s*->\s*' ...
                 '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
@@ -269,29 +292,38 @@ classdef Declare
                     rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
                 fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
-                sql = sprintf('%s%s', sql, dj.internal.Declare.compileAttribute(fieldInfo));
+                [attr_sql, ~, ~] = dj.internal.Declare.compileAttribute(fieldInfo, []);
+                all_attr_sql = sprintf('%s%s,\n', all_attr_sql, attr_sql);
             end
+            all_attr_sql = all_attr_sql(1:end-2);
             
             fkattrs = rel.primaryKey;
             fkattrs(ismember(fkattrs, attrs))=newattrs;
             hash = dj.internal.shorthash([{hash rel.fullTableName} newattrs]);
-            sql = sprintf(...
+            fk_sql = sprintf(...
                 ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
-                'ON UPDATE CASCADE ON DELETE RESTRICT'], sql, hash, backquotedList(fkattrs), ...
-                rel.fullTableName, backquotedList(rel.primaryKey));
+                'ON UPDATE CASCADE ON DELETE RESTRICT'], fk_sql, hash, ...
+                backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
         end
 
-        function field = substituteSpecialType(field, category)
+        function [field, foreignKeySql] = substituteSpecialType(field, category, foreignKeySql)
             % field = SUBSTITUTESPECIALTYPE(field, category)
             %   Substitute DataJoint type with sql type.
             %   field:      <struct> Modified in-place field attributes.
             %   category:   <string> DataJoint type match based on TYPE_PATTERN.
             if strcmpi(category, 'UUID')
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;
+            elseif any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
+                field.store = strtrim(field.type((strfind(field.type,'@')+1):end));
+                field.type = dj.internal.Declare.UUID_DATA_TYPE;
+                foreignKeySql = [foreignKeySql, sprintf( ...
+                    ['FOREIGN KEY (`%s`) REFERENCES `{database}`.`%s_%s` (`hash`) ON ' ...
+                    'UPDATE RESTRICT ON DELETE RESTRICT'], field.name, ...
+                    dj.internal.Declare.EXTERNAL_TABLE_ROOT, field.store)]; %#ok<AGROW>
             end
         end
 
-        function sql = compileAttribute(field)
+        function [sql, store, foreignKeySql] = compileAttribute(field, foreignKeySql)
             % sql = COMPILEATTRIBUTE(field)
             %   Convert the structure field with header {'name' 'type' 'default' 'comment'}
             %       to the SQL column declaration.
@@ -317,11 +349,16 @@ classdef Declare
                 'illegal characters in attribute comment "%s"', field.comment)
 
             category = dj.internal.Declare.matchType(field.type);
+            store = [];
             if any(strcmpi(category, dj.internal.Declare.SPECIAL_TYPES))
                 field.comment = [':' strip(field.type) ':' field.comment];
-                field = dj.internal.Declare.substituteSpecialType(field, category);
+                [field, foreignKeySql] = dj.internal.Declare.substituteSpecialType(field, ...
+                    category, foreignKeySql);
+                if isfield(field, 'store')
+                    store = field.store;                    
+                end
             end
-            sql = sprintf('`%s` %s %s COMMENT "%s",\n', ...
+            sql = sprintf('`%s` %s %s COMMENT "%s"', ...
                 field.name, strtrim(field.type), default, field.comment);
         end
 
