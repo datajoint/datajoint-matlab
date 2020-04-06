@@ -1,7 +1,6 @@
 branches:
   except:
-  - master-stage
-  - stage
+  - /^stage.*$/
 sudo: required
 services: 
 - docker
