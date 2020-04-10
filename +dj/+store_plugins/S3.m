@@ -121,77 +121,107 @@ classdef S3
                     self.type_config.subfolding = config.subfolding;
                 end
             end
-            try
-                RESTCallAWSSigned(self.web_protocol, self.endpoint, ['/' self.bucket], uint8(''), self.access_key, self.secret_key, 'put');
-            catch ME
-                if ~strcmp(ME.identifier,'MATLAB:webservices:HTTP409StatusCodeError')
-                    rethrow(ME);
-                end
+            if ~self.exists(['/' self.bucket])
+                error('DataJoint:S3Plugin:BucketInaccessible','S3 Bucket `%s` not accessible.', self.bucket);
             end
         end
         function external_filepath = make_external_filepath(self, relative_filepath)
             % resolve the complete external path based on the relative path
             external_filepath = ['/' self.bucket self.location '/' relative_filepath];
         end
+        function result = exists(self, external_filepath)
+            % get blob metadata
+            try
+                dj.store_plugins.S3.RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, uint8(''), self.access_key, self.secret_key, 'head');
+                result = true;
+            catch ME
+                result = false;
+                if ~strcmp(ME.identifier,'DataJoint:RequestError:NotFound')
+                    rethrow(ME);
+                end
+            end
+        end
         function upload_buffer(self, buffer, external_filepath)
             % put blob
-            RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, buffer, self.access_key, self.secret_key, 'put');
+            dj.store_plugins.S3.RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, buffer, self.access_key, self.secret_key, 'put');
         end
         function result = download_buffer(self, external_filepath)
             % get blob
-            result = RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, uint8(''), self.access_key, self.secret_key, 'get');
+            result = dj.store_plugins.S3.RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, uint8(''), self.access_key, self.secret_key, 'get');
         end
         function remove_object(self, external_filepath)
             % delete an object from the store
-            RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, uint8(''), self.access_key, self.secret_key, 'delete');
+            dj.store_plugins.S3.RESTCallAWSSigned(self.web_protocol, self.endpoint, external_filepath, uint8(''), self.access_key, self.secret_key, 'delete');
         end
     end
-end
-function data = RESTCallAWSSigned(protocol, host, canonical_uri, payload_bin, access_key, secret_key, method)
-    % https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html
-    content_type = 'application/octet-stream';
-    
-    utctime = datetime(now,'ConvertFrom','datenum') + minutes(java.util.Date().getTimezoneOffset());
-    amzdate = datestr(utctime,'yyyymmddThhMMSSZ');
-    datestamp = datestr(utctime,'yyyymmdd');
-    
-    payload_hash = dj.lib.DataHash(payload_bin, 'bin', 'hex', 'SHA-256');
-    
-    algorithm = 'AWS4-HMAC-SHA256';
-    region = 'us-east-1';
-    service = 's3';
-    credential_scope = [datestamp '/' region '/' service '/' 'aws4_request'];
-    signed_headers = 'host;x-amz-date';
-    
-    signing_key = getSignatureKey(secret_key, datestamp, region, service);
-    canonical_querystring = '';
-    canonical_headers = ['host:' host newline 'x-amz-date:' amzdate newline];
-    canonical_request = [upper(method) newline canonical_uri newline canonical_querystring newline canonical_headers newline signed_headers newline payload_hash];
-    string_to_sign = [algorithm newline amzdate newline credential_scope newline dj.lib.DataHash(uint8(canonical_request), 'bin', 'hex', 'SHA-256')];
-    signature = lower(dj.lib.HMAC(signing_key, string_to_sign, 'SHA-256'));
-    authorization_header = [algorithm ' ' 'Credential=' access_key '/' credential_scope ', '  'SignedHeaders=' signed_headers ', ' 'Signature=' signature];
-    
-    headers = {...
-        'content_type', content_type; ...
-        'host', host; ...
-        'X-Amz-Date', amzdate; ...
-        'X-Amz-Content-Sha256', payload_hash; ...
-        'Authorization', authorization_header...
-    };
-
-    options = weboptions(...
-        'HeaderFields', headers, ...
-        'RequestMethod', lower(method), ...
-        'Timeout', 60, ...
-        'ContentType', 'binary', ...
-        'MediaType', content_type, ...
-        'CharacterEncoding', 'ISO-8859-1'...
-    );
-    url = [protocol host canonical_uri '?' canonical_querystring];
-    if strcmpi(method, 'get')
-        data = webread(url, options);
-    else
-        data = webwrite(url, char(payload_bin'), options);
+    methods (Static)
+        function data = RESTCallAWSSigned(protocol, host, canonical_uri, payload_bin, access_key, secret_key, method)
+            % https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html
+            content_type = 'application/octet-stream';
+            
+            utctime = datetime(now,'ConvertFrom','datenum') + minutes(java.util.Date().getTimezoneOffset());
+            amzdate = datestr(utctime,'yyyymmddThhMMSSZ');
+            datestamp = datestr(utctime,'yyyymmdd');
+            
+            payload_hash = dj.lib.DataHash(payload_bin, 'bin', 'hex', 'SHA-256');
+            
+            algorithm = 'AWS4-HMAC-SHA256';
+            region = 'us-east-1';
+            service = 's3';
+            credential_scope = [datestamp '/' region '/' service '/' 'aws4_request'];
+            signed_headers = 'host;x-amz-date';
+            
+            signing_key = getSignatureKey(secret_key, datestamp, region, service);
+            canonical_querystring = '';
+            canonical_headers = ['host:' host newline 'x-amz-date:' amzdate newline];
+            canonical_request = [upper(method) newline canonical_uri newline canonical_querystring newline canonical_headers newline signed_headers newline payload_hash];
+            string_to_sign = [algorithm newline amzdate newline credential_scope newline dj.lib.DataHash(uint8(canonical_request), 'bin', 'hex', 'SHA-256')];
+            signature = lower(dj.lib.HMAC(signing_key, string_to_sign, 'SHA-256'));
+            authorization_header = [algorithm ' ' 'Credential=' access_key '/' credential_scope ', '  'SignedHeaders=' signed_headers ', ' 'Signature=' signature];
+            url = [protocol host canonical_uri '?' canonical_querystring];
+            
+            if ~strcmpi(method, 'head')
+                headers = {...
+                    'content_type', content_type; ...
+                    'host', host; ...
+                    'X-Amz-Date', amzdate; ...
+                    'X-Amz-Content-Sha256', payload_hash; ...
+                    'Authorization', authorization_header...
+                };
+            
+                options = weboptions(...
+                    'HeaderFields', headers, ...
+                    'RequestMethod', lower(method), ...
+                    'Timeout', 60, ...
+                    'ContentType', 'binary', ...
+                    'MediaType', content_type, ...
+                    'CharacterEncoding', 'ISO-8859-1'...
+                );
+                
+                if strcmpi(method, 'get')
+                    data = webread(url, options);
+                else
+                    data = webwrite(url, char(payload_bin'), options);
+                end
+            else
+                headers = [...
+                    matlab.net.http.HeaderField('content_type', content_type), ...
+                    matlab.net.http.HeaderField('host', host), ...
+                    matlab.net.http.HeaderField('X-Amz-Date', amzdate), ...
+                    matlab.net.http.HeaderField('X-Amz-Content-Sha256', payload_hash), ...
+                    matlab.net.http.HeaderField('Authorization', authorization_header), ...
+                    matlab.net.http.field.AcceptField([matlab.net.http.MediaType(content_type)]) ...
+                ];
+            
+                request = matlab.net.http.RequestMessage(lower(method), headers, matlab.net.http.MessageBody(payload_bin));
+                response = request.send(url, matlab.net.http.HTTPOptions('ConnectTimeout', 60));
+                if response.StatusCode ~= matlab.net.http.StatusCode.OK && response.StatusCode ~= matlab.net.http.StatusCode.NoContent
+                    error(['DataJoint:RequestError:' char(response.StatusCode)],'Request failed on route `%s` with status `%s`.', canonical_uri, response.StatusLine);
+                else
+                    data = response.Body.Data;
+                end
+            end   
+        end
     end
 end
 function kSigning = getSignatureKey(key, dateStamp, regionName, serviceName)

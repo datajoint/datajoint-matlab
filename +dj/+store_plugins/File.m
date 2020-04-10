@@ -63,6 +63,14 @@ classdef File
             result = fread(fileID);
             fclose(fileID);
         end
+        function result = exists(self, external_filepath)
+            % get blob metadata
+            if exist(external_filepath, 'file') == 2
+                result = true;
+            else
+                result = false;
+            end
+        end
     end
     methods
         function self = File(config)

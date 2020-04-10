@@ -41,7 +41,7 @@ classdef Prep < matlab.unittest.TestCase
 
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
-
+            % create test users
             ver = curr_conn.query('select @@version as version').version;
             if tests.lib.compareVersions(ver,'5.8')
                 cmd = {...
@@ -97,6 +97,8 @@ classdef Prep < matlab.unittest.TestCase
                 };
                 curr_conn.query(sprintf('%s',cmd{:}));
             end
+            % create test bucket
+            dj.store_plugins.S3.RESTCallAWSSigned('http://', testCase.S3_CONN_INFO.endpoint, ['/' testCase.S3_CONN_INFO.bucket], uint8(''), testCase.S3_CONN_INFO.access_key, testCase.S3_CONN_INFO.secret_key, 'put');
         end
     end
     methods (TestClassTeardown)
@@ -124,6 +126,8 @@ classdef Prep < matlab.unittest.TestCase
                 [status,cmdout] = system(['rm -R ' ...
                     testCase.external_file_store_root]);
             end
+            % remove test bucket
+            dj.store_plugins.S3.RESTCallAWSSigned('http://', testCase.S3_CONN_INFO.endpoint, ['/' testCase.S3_CONN_INFO.bucket], uint8(''), testCase.S3_CONN_INFO.access_key, testCase.S3_CONN_INFO.secret_key, 'delete');
 
             % remove users
             cmd = {...
