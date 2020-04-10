@@ -10,6 +10,7 @@ env:
     - COMPOSE_HTTP_TIMEOUT: 120
     - MATLAB_UID: 2000
     - MATLAB_GID: 2000
+    - MINIO_VER: RELEASE.2019-09-26T19-42-35Z
 slim: &slim
   stage: Slim9.9
   os: linux
