@@ -16,8 +16,10 @@ classdef TestExternalFile < tests.Prep
             if strcmp(dj.config('stores.main.protocol'), 'file')
                 mkdir(dj.config('stores.main.location'));
             elseif strcmp(dj.config('stores.main.protocol'), 's3')
-                if any(strcmp('secure', fieldnames(dj.config('stores.main')))) && dj.config('stores.main.secure')
-                    dj.config('stores.main.endpoint', strrep(test_instance.S3_CONN_INFO.endpoint, ':9000', ':443'));
+                if any(strcmp('secure', fieldnames(dj.config('stores.main')))) && ...
+                        dj.config('stores.main.secure')
+                    dj.config('stores.main.endpoint', strrep(...
+                        test_instance.S3_CONN_INFO.endpoint, ':9000', ':443'));
                 else
                     dj.config('stores.main.endpoint', test_instance.S3_CONN_INFO.endpoint);
                 end
@@ -49,7 +51,8 @@ classdef TestExternalFile < tests.Prep
             if strcmp(dj.config('stores.main.protocol'), 'file')
                 subfold_path = strrep(uuid_path, dj.config('stores.main.location'), '');
             elseif strcmp(dj.config('stores.main.protocol'), 's3')
-                subfold_path = strrep(uuid_path, ['/' dj.config('stores.main.bucket') '/' dj.config('stores.main.location')], '');
+                subfold_path = strrep(uuid_path, ['/' dj.config('stores.main.bucket') ...
+                    '/' dj.config('stores.main.location')], '');
             end
             subfold_path = strrep(subfold_path, ['/' schema.dbname '/'], '');
             subfold_cell = split(subfold_path, '/');

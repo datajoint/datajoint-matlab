@@ -4,7 +4,8 @@ classdef TestExternalS3 < tests.Prep
         function TestExternalS3_testRemote(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'new_remote', 'blobCache');
+            tests.TestExternalFile.TestExternalFile_checks(testCase, 'new_remote', ...
+                'blobCache');
         end
         function TestExternalS3_testRemoteDefault(testCase)
             st = dbstack;
@@ -20,7 +21,8 @@ classdef TestExternalS3 < tests.Prep
         function TestExternalS3_testBackwardDefault(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'remote_default', 'cache');
+            tests.TestExternalFile.TestExternalFile_checks(testCase, 'remote_default', ...
+                'cache');
         end
         function TestExternalS3_testLocationFlexibility(testCase)
             st = dbstack;
@@ -49,9 +51,11 @@ classdef TestExternalS3 < tests.Prep
                     'subfolding', [1;1] ...
                 ));
                 if length(v{1}) > 6
-                    testCase.verifyEqual(s3Obj.make_external_filepath(rel_path),  ['/' testCase.S3_CONN_INFO.bucket '/leading/slash/test' '/' rel_path]);
+                    testCase.verifyEqual(s3Obj.make_external_filepath(rel_path),  ...
+                        ['/' testCase.S3_CONN_INFO.bucket '/leading/slash/test' '/' rel_path]);
                 else
-                    testCase.verifyEqual(s3Obj.make_external_filepath(rel_path),  ['/' testCase.S3_CONN_INFO.bucket '/' rel_path]);
+                    testCase.verifyEqual(s3Obj.make_external_filepath(rel_path), ...
+                        ['/' testCase.S3_CONN_INFO.bucket '/' rel_path]);
                 end
             end
         end
