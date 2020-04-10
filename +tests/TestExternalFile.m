@@ -13,7 +13,20 @@ classdef TestExternalFile < tests.Prep
             dj.config(cache, [ext_root '/cache']);
             % create location/cache directories
             mkdir(dj.config(cache));
-            mkdir(dj.config('stores.main.location'));
+            if strcmp(dj.config('stores.main.protocol'), 'file')
+                mkdir(dj.config('stores.main.location'));
+            elseif strcmp(dj.config('stores.main.protocol'), 's3')
+                if any(strcmp('secure', fieldnames(dj.config('stores.main')))) && ...
+                        dj.config('stores.main.secure')
+                    dj.config('stores.main.endpoint', strrep(...
+                        test_instance.S3_CONN_INFO.endpoint, ':9000', ':443'));
+                else
+                    dj.config('stores.main.endpoint', test_instance.S3_CONN_INFO.endpoint);
+                end
+                dj.config('stores.main.access_key', test_instance.S3_CONN_INFO.access_key);
+                dj.config('stores.main.secret_key', test_instance.S3_CONN_INFO.secret_key);
+                dj.config('stores.main.bucket', test_instance.S3_CONN_INFO.bucket);
+            end
             % create schema
             package = 'External';
             dj.createSchema(package,[test_instance.test_root '/test_schemas'], ...
@@ -35,19 +48,25 @@ classdef TestExternalFile < tests.Prep
             packed_cell = mym('serialize {M}', test_val1);
             uuid = dj.lib.DataHash(packed_cell{1}, 'bin', 'hex', 'MD5');
             uuid_path = schema.external.table('main').make_uuid_path(uuid, '');
-            subfold_path = strrep(uuid_path, dj.config('stores.main.location'), '');
+            if strcmp(dj.config('stores.main.protocol'), 'file')
+                subfold_path = strrep(uuid_path, dj.config('stores.main.location'), '');
+            elseif strcmp(dj.config('stores.main.protocol'), 's3')
+                subfold_path = strrep(uuid_path, ['/' dj.config('stores.main.bucket') ...
+                    '/' dj.config('stores.main.location')], '');
+            end
             subfold_path = strrep(subfold_path, ['/' schema.dbname '/'], '');
-            subfold_path = strrep(subfold_path, ['/' uuid], '');
-            test_instance.verifyEqual(cellfun(@(x) length(x), split(subfold_path, '/')), ...
+            subfold_cell = split(subfold_path, '/');
+            if length(subfold_cell) > 1
+                subfold_cell = subfold_cell(1:end-1);
+                subfold_path = ['/' strjoin(subfold_cell, '/')];
+            else
+                subfold_cell = {};
+                subfold_path = '';
+            end
+            test_instance.verifyEqual(cellfun(@(x) length(x), subfold_cell), ...
                 schema.external.table('main').spec.type_config.subfolding);
             % delete value to rely on cache
-            if ispc
-                [status,cmdout] = system(['rmdir /Q /s "' ...
-                    test_instance.external_file_store_root '\base"']);
-            else
-                [status,cmdout] = system(['rm -R ' ...
-                    test_instance.external_file_store_root '/base']);
-            end
+            schema.external.table('main').spec.remove_object(uuid_path);
             res = q.fetch('dimension');
             value_check = res(1).dimension;
             test_instance.verifyEqual(value_check,  test_val1);
@@ -70,9 +89,11 @@ classdef TestExternalFile < tests.Prep
             test_instance.verifyTrue(schema.external.table('main').unused.count==2);
             % check delete from external
             schema.external.table('main').delete(true, '');
-            test_instance.verifyEqual(lastwarn,  ['File ''' ...
-                dj.config('stores.main.location') '/' schema.dbname '/' subfold_path '/' ...
-                uuid ''' not found.']);
+            if strcmp(dj.config('stores.main.protocol'), 'file')
+                test_instance.verifyEqual(lastwarn,  ['File ''' ...
+                    dj.config('stores.main.location') '/' schema.dbname subfold_path '/' ...
+                    uuid ''' not found.']);
+            end
             % reverse engineer
             q = External.Dimension;
             raw_def = dj.internal.Declare.getDefinition(q);

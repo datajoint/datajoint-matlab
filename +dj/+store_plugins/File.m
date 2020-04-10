@@ -1,4 +1,4 @@
-% dj.internal.File - an external storage class for local file stores.
+% dj.store_plugins.File - an external storage class for local file stores.
 classdef File
     properties (Hidden, Constant)
         % mode = -1(reject), 0(optional), 1(require)
@@ -63,14 +63,22 @@ classdef File
             result = fread(fileID);
             fclose(fileID);
         end
+        function result = exists(self, external_filepath)
+            % get blob metadata
+            if exist(external_filepath, 'file') == 2
+                result = true;
+            else
+                result = false;
+            end
+        end
     end
     methods
         function self = File(config)
             % initialize store
             self.protocol = config.protocol;
             self.location = strrep(config.location, '\', '/');
-            self.type_config = struct();
             
+            self.type_config = struct();
             if dj.internal.ExternalTable.BACKWARD_SUPPORT_DJPY012 && ~any(strcmp(...
                     'datajoint_type', fieldnames(config)))
                 self.type_config.subfolding = config.subfolding;

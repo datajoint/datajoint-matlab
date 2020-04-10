@@ -104,8 +104,8 @@ classdef ExternalTable < dj.Relvar
         function uuid_path = make_uuid_path(self, uuid, suffix)
             % create external path based on the uuid hash
             uuid = strrep(uuid, '-', '');
-            uuid_path = self.spec.make_external_filepath([self.schema.dbname '/' strjoin(...
-                subfold(uuid, self.spec.type_config.subfolding), '/') '/' uuid suffix]);
+            uuid_path = self.spec.make_external_filepath([self.schema.dbname subfold(...
+                uuid, self.spec.type_config.subfolding) '/' uuid suffix]);
         end
         % -- BLOBS --
         function uuid = upload_buffer(self, blob)
@@ -124,8 +124,8 @@ classdef ExternalTable < dj.Relvar
             % get blob via uuid (with caching support)
             blob = [];
             if ~isempty(self.cache_folder)
-                cache_path = [self.cache_folder '/' self.schema.dbname '/' strjoin(...
-                    subfold(uuid, self.spec.type_config.subfolding), '/') '/' uuid ''];
+                cache_path = [self.cache_folder '/' self.schema.dbname subfold(...
+                    uuid, self.spec.type_config.subfolding) '/' uuid ''];
                 try
                     fileID = fopen(cache_path, 'r');
                     result = fread(fileID);
@@ -210,10 +210,15 @@ classdef ExternalTable < dj.Relvar
         end
     end
 end
-function folded_array = subfold(name, folds)
+function folded_path = subfold(name, folds)
     % subfolding for external storage:   e.g.  subfold('aBCdefg', [2, 3])  -->  {'ab','cde'}
-    folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds', 1:length(folds), ...
-        cumsum(folds'), 'UniformOutput', false);
+    if ~isempty(folds)
+        folded_array = arrayfun(@(len,idx,s) name(s-len+1:s), folds', 1:length(folds), ...
+            cumsum(folds'), 'UniformOutput', false);
+        folded_path = ['/' strjoin(folded_array, '/')];
+    else
+        folded_path = '';
+    end
 end
 function config = buildConfig(config, validation_config, store_name)
     % builds out store config with defaults set
