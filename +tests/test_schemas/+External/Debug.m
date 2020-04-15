@@ -9,7 +9,8 @@ fov: int
 num_chunks: int
 cross_chunks_x_shifts: blob
 cross_chunks_y_shifts: blob
-cross_chunks_reference_image: blob@mesoimaging
+test: varchar(20)
+#cross_chunks_reference_image: blob@mesoimaging
 %}
 classdef Debug < dj.Manual
 end
