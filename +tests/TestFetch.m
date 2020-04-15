@@ -22,7 +22,7 @@ classdef TestFetch < tests.Prep
                 'blob', [1, 2; 3, 4] ...
             ));
 
-            q = University.All;
+            q = University.All & 'id=2';
             res = q.fetch('*');
 
             testCase.verifyEqual(res(1).id,  2);
@@ -31,12 +31,11 @@ classdef TestFetch < tests.Prep
             testCase.verifyEqual(res(1).number,  3.213);
             testCase.verifyEqual(res(1).blob,  [1, 2; 3, 4]);
         end
-        function TestFetch_testShan(testCase)
+        function TestFetch_testBlobScalar(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            package = 'External';
-
-            % dj.config('stores.mesoimaging', struct('location', '~/meso_imaging', 'protocol', 'file'))
+            % https://github.com/datajoint/datajoint-matlab/issues/217
+            package = 'University';
 
             c1 = dj.conn(...
                 testCase.CONN_INFO.host,... 
@@ -44,31 +43,20 @@ classdef TestFetch < tests.Prep
                 testCase.CONN_INFO.password,'',true);
 
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
-                [testCase.PREFIX '_ext']);
+                [testCase.PREFIX '_university']);
 
-            new_value = struct();
-            new_value.segmentation_method = 'cnmf';
-            new_value.seg_parameter_set_id = 1;
-            new_value.subject_fullname = 'lpinto_SP6';
-            new_value.session_date = '2019-10-16';
-            new_value.session_number = 0;
-            new_value.fov = 1;
-            new_value.num_chunks = 1;
-            new_value.cross_chunks_x_shifts = 0;
-            new_value.cross_chunks_y_shifts = 0;
-            % new_value.cross_chunks_x_shifts = [1,2];
-            % new_value.cross_chunks_y_shifts = [1,2];
-            new_value.test = 'hello';
-            % new_value.cross_chunks_reference_image = single([2,3]);
+            insert(University.All, struct( ...
+                'id', 3, ...
+                'string', 'nothing', ...
+                'date', '2020-03-17 20:38', ...
+                'number', 9.7, ...
+                'blob', 1 ...
+            ));
 
-            insert(External.Debug, new_value);
-
-            q = External.Debug;
+            q = University.All & 'id=3';
             res = q.fetch('*');
 
-            testCase.verifyEqual(res(1).test,  'hello');
-
-            % dj.config.restore;
+            testCase.verifyEqual(res(1).string,  'nothing');
         end
         function TestFetch_testDescribe(testCase)
             st = dbstack;
