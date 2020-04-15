@@ -1,7 +1,7 @@
-classdef TestTls < matlab.unittest.TestCase
+classdef TestTls < tests.Prep
     % TestTls tests TLS connection scenarios.
     methods (Test)
-        function testSecureConn(testCase)
+        function TestTls_testSecureConn(testCase)
             % secure connection test
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -12,7 +12,7 @@ classdef TestTls < matlab.unittest.TestCase
                 '',true,true).query(...
                 'SHOW STATUS LIKE ''Ssl_cipher''').Value{1}) > 0);
         end
-        function testInsecureConn(testCase)
+        function TestTls_testInsecureConn(testCase)
             % insecure connection test
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -24,7 +24,7 @@ classdef TestTls < matlab.unittest.TestCase
                 'SHOW STATUS LIKE ''Ssl_cipher''').Value{1}, ...
                 '');
         end
-        function testPreferredConn(testCase)
+        function TestTls_testPreferredConn(testCase)
             % preferred connection test
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -35,7 +35,7 @@ classdef TestTls < matlab.unittest.TestCase
                 '',true).query(...
                 'SHOW STATUS LIKE ''Ssl_cipher''').Value{1}) > 0);
         end
-        function testRejectException(testCase)
+        function TestTls_testRejectException(testCase)
             % test exception on require TLS
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -54,7 +54,7 @@ classdef TestTls < matlab.unittest.TestCase
                     ["requires secure connection","Access denied"])); %MySQL8,MySQL5
             end
         end
-        function testStructException(testCase)
+        function TestTls_testStructException(testCase)
             % test exception on TLS struct
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
@@ -63,7 +63,7 @@ classdef TestTls < matlab.unittest.TestCase
                 testCase.CONN_INFO.user, ...
                 testCase.CONN_INFO.password, ...
                 '',true,struct('ca','fake/path/some/where')), ...
-                'DataJoint:TLS:InvalidStruct');
+                'mYm:TLS:InvalidStruct');
         end
     end
 end
