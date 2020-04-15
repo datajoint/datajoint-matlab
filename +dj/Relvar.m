@@ -317,8 +317,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 valueStr = '';
                 for i = find(ix)
                     [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
-                    if ~isempty(v) && ( ...
-                            (~isnumeric(v) && ~islogical(v)) || (~isscalar(v) && ~isempty(v)))
+                    if header.attributes(i).isBlob || header.attributes(i).isString && ...
+                            ~isempty(v)
                         blobs{end+1} = v;   %#ok<AGROW>
                     end
                     valueStr = sprintf(['%s' placeholder ','],valueStr);
