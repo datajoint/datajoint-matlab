@@ -352,14 +352,25 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             
             switch true
                 case isNull
+                    assert(header.attributes(ix).isnullable, ...
+                            'attribute `%s` is not nullable.', attrname)
                     valueStr = 'NULL';
                     value = {};
                 case header.attributes(ix).isString
                     assert(dj.lib.isString(value), 'Value must be a string')
-                    valueStr = '"{S}"';
-                    value = {char(value)};
+                    if isempty(value)
+                        assert(header.attributes(ix).isnullable, ...
+                            'attribute `%s` is not nullable.', attrname)
+                        valueStr = 'NULL';
+                        value = {};
+                    else
+                        valueStr = '"{S}"';
+                        value = {char(value)};
+                    end
                 case header.attributes(ix).isBlob
                     if isempty(value) && header.attributes(ix).isnullable
+                        assert(header.attributes(ix).isnullable, ...
+                            'attribute `%s` is not nullable.', attrname)
                         valueStr = 'NULL';
                         value = {};
                     else
