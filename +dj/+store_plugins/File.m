@@ -65,11 +65,7 @@ classdef File
         end
         function result = exists(self, external_filepath)
             % get blob metadata
-            if exist(external_filepath, 'file') == 2
-                result = true;
-            else
-                result = false;
-            end
+            result = exist(external_filepath, 'file') == 2;
         end
     end
     methods

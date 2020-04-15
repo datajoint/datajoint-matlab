@@ -38,6 +38,9 @@ function hash = HMAC(key,message,method)
         Blocksize = 128;
     elseif strcmp(method,'SHA-512') == 1
         Blocksize = 128;
+    else
+        error('HMAC:Algorithm:Unavailable', ...
+            'Algorithm `%s` not available.', method);
     end
     % if key length > Blocksize calculate Hash and format as binary
     if length(key) > Blocksize
