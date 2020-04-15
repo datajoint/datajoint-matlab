@@ -15,22 +15,24 @@ classdef TestUuid < tests.Prep
                 [testCase.PREFIX '_university']);
 
             test_val1 = '1d751e2e-1e74-faf8-4ab4-85fde8ef72be';
+            test_val2 = '03aaa83d-289d-4f7e-96a7-bf91c2d8f5a4';
             insert(University.Message, struct( ...
                 'msg_id', test_val1, ...
-                'body', 'Great campus!' ...
+                'body', 'Great campus!', ...
+                'dep_id', test_val2 ...
             ));
 
-            test_val2 = '12321346-1312-4123-1234-312739283795';
+            test_val1 = '12321346-1312-4123-1234-312739283795';
+            test_val2 = 'e7dd9506d2e848f59bdf6c31aa586b92';
             insert(University.Message, struct( ...
-                'msg_id', test_val2, ...
+                'msg_id', test_val1, ...
                 'body', 'Where can I find the gym?' ...
             ));
 
             q = University.Message;
-            res = q.fetch('msg_id');
-            value_check = res(1).msg_id;
-
-            testCase.verifyEqual(value_check,  test_val2);
+            res = q.fetch('*');
+            testCase.verifyEqual(res(1).msg_id,  test_val1);
+            testCase.verifyEqual(res(1).dep_id,  uint8.empty(1, 0));
         end
         function TestUuid_testQuery(testCase)
             st = dbstack;
