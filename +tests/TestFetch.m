@@ -112,5 +112,79 @@ classdef TestFetch < tests.Prep
             assembled_sql = dj.internal.Declare.declare(q, assembled_def);
             testCase.verifyEqual(raw_sql,  assembled_sql);
         end
+        function TestFetch_testInteger(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            package = 'University';
+
+            c1 = dj.conn(...
+                testCase.CONN_INFO.host,... 
+                testCase.CONN_INFO.user,...
+                testCase.CONN_INFO.password,'',true);
+
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_university']);
+
+            id = 1;
+            correct_value = 5;
+            null_value = NaN;
+            wrong_value = 'wrong';
+            
+            table = University.Integer;
+            num_attr = length(table.header.notBlobs);
+            
+            base_value = cell2struct(num2cell(repmat(correct_value,1,num_attr)), table.header.notBlobs, 2);
+            base_value.id = id;
+            insert(University.Integer, base_value);
+            first = (table & struct('id', id));
+            first = first.fetch('*');
+            
+            for i = 2:num_attr
+                attr = table.header.attributes(i);
+                
+                % check original value
+                testCase.verifyEqual(first(1).(attr.name),  correct_value);
+                
+                % wrong value
+                id = id + 1;
+                curr_value = base_value;
+                curr_value.id = id;
+                curr_value.(attr.name) = wrong_value;
+                try
+                    insert(University.Integer, curr_value);
+                catch ME
+                    if ~strcmp(ME.identifier,'DataJoint:DataType:Mismatch')
+                        rethrow(ME);
+                    end
+                end
+                
+                % default value
+                id = id + 1;
+                curr_value = base_value;
+                curr_value.id = id;
+                curr_value = rmfield(curr_value, attr.name);
+                try
+                    insert(University.Integer, curr_value);
+                catch ME
+                    if ~strcmp(ME.identifier,'')
+                        rethrow(ME);
+                    end
+                end
+            end
+            
+            
+%             strings = cell(1, num_attr);
+%             strings(:) = {wrong_value};
+%             value = cell2struct(strings, table.header.notBlobs, 2);
+%             value.id = id + 1;
+%             insert(University.Integer, value);
+            
+%             strings = cell(1, num_attr);
+%             strings(:) = {wrong_value};
+%             value = cell2struct(strings, table.header.notBlobs, 2);
+%             value.id = id + 1;
+%             insert(University.Integer, value);
+            
+        end
     end
 end
