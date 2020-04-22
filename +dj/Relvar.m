@@ -343,12 +343,14 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             %   update(v2p.Mice & key, 'mouse_dob',   '2011-01-01')
             %   update(v2p.Scan & key, 'lens')   % set the value to NULL
             
-            assert(count(self)==1, 'Update is only allowed on one tuple at a time')
-            isNull = nargin<3;
+            assert(count(self)==1, 'Update is only allowed on one tuple at a time');
             header = self.header;
             ix = find(strcmp(attrname,header.names));
-            assert(numel(ix)==1, 'invalid attribute name')
-            assert(~header.attributes(ix).iskey, 'cannot update a key value. Use insert(..,''REPLACE'') instead')
+            assert(numel(ix)==1, 'invalid attribute name');
+            assert(~header.attributes(ix).iskey, ...
+                'cannot update a key value. Use insert(..,''REPLACE'') instead');
+            isNull = nargin<3 || (header.attributes(ix).isNumeric && isnan(value)) || ...
+                (~header.attributes(ix).isNumeric && ~ischar(value) && isempty(value));
             
             switch true
                 case isNull
@@ -358,36 +360,15 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     value = {};
                 case header.attributes(ix).isString
                     assert(dj.lib.isString(value), 'Value must be a string')
-                    if isempty(value)
-                        assert(header.attributes(ix).isnullable, ...
-                            'attribute `%s` is not nullable.', attrname)
-                        valueStr = 'NULL';
-                        value = {};
-                    else
                         valueStr = '"{S}"';
                         value = {char(value)};
-                    end
                 case header.attributes(ix).isBlob
-                    if isempty(value) && header.attributes(ix).isnullable
-                        assert(header.attributes(ix).isnullable, ...
-                            'attribute `%s` is not nullable.', attrname)
-                        valueStr = 'NULL';
-                        value = {};
-                    else
-                        valueStr = '"{M}"';
-                        value = {value};
-                    end
+                    valueStr = '"{M}"';
+                    value = {value};
                 case header.attributes(ix).isNumeric
                     assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
-                    if isnan(value)
-                        assert(header.attributes(ix).isnullable, ...
-                            'attribute `%s` is not nullable. NaNs not allowed', attrname)
-                        valueStr = 'NULL';
-                        value = {};
-                    else
-                        valueStr = sprintf('%1.16g',value);
-                        value = {};
-                    end
+                    valueStr = sprintf('%1.16g',value);
+                    value = {};
                 otherwise
                     error 'invalid update command'
             end
