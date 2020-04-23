@@ -215,7 +215,8 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 %   value:      <var> Processed, in-place value ready for insert.
                 %   placeholder:<string> Placeholder for argument substitution.
                 %   attr_idx:   <num> Attribute order index.
-                if isempty(value) || (header.attributes(attr_idx).isNumeric && all(isnan(value)))
+                if (header.attributes(attr_idx).isNumeric && length(value) == 1 && isnan(value)) || ...
+                    (~header.attributes(attr_idx).isNumeric && ~ischar(value) && isempty(value))
                     assert(header.attributes(attr_idx).isnullable, ...
                         'DataJoint:DataType:NotNullable', ...
                         'attribute `%s` is not nullable.', ...
@@ -319,9 +320,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 valueStr = '';
                 for i = find(ix)
                     [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
-                    if (header.attributes(i).isUuid || header.attributes(i).isBlob || ...
-                            header.attributes(i).isString) && ~isempty(v) && ...
-                            (~header.attributes(i).isNumeric || ~isnan(v))
+                    if ~header.attributes(i).isNumeric && (ischar(v) || ~isempty(v))
                         blobs{end+1} = v;   %#ok<AGROW>
                     end
                     valueStr = sprintf(['%s' placeholder ','],valueStr);
