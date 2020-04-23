@@ -223,6 +223,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         'attribute `%s` is not nullable.', ...
                         header.attributes(attr_idx).name)
                     placeholder = 'NULL';
+                    value = [];
                 elseif header.attributes(attr_idx).isString
                     assert(dj.lib.isString(value), ...
                         'DataJoint:DataType:Mismatch', ...
@@ -269,6 +270,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         else
                             placeholder = sprintf('%1.16g', value);
                         end
+                        value = [];
                     end
                 end
             end
@@ -321,7 +323,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 valueStr = '';
                 for i = find(ix)
                     [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
-                    if ischar(placeholder) && ~isempty(regexp(placeholder, '"{\w+}"', 'once'))
+                    if ~isempty(v) || ischar(v)
                         blobs{end+1} = v;   %#ok<AGROW>
                     end
                     valueStr = sprintf(['%s' placeholder ','],valueStr);
