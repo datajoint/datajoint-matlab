@@ -215,46 +215,51 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 %   value:      <var> Processed, in-place value ready for insert.
                 %   placeholder:<string> Placeholder for argument substitution.
                 %   attr_idx:   <num> Attribute order index.
-                if header.attributes(attr_idx).isString
+                if (header.attributes(attr_idx).isNumeric && length(value) == 1 && ...
+                        isnan(value)) || (~header.attributes(attr_idx).isNumeric && ...
+                        ~ischar(value) && isempty(value))
+                    assert(header.attributes(attr_idx).isnullable, ...
+                        'DataJoint:DataType:NotNullable', ...
+                        'attribute `%s` is not nullable.', ...
+                        header.attributes(attr_idx).name)
+                    placeholder = 'NULL';
+                    value = [];
+                elseif header.attributes(attr_idx).isString
                     assert(dj.lib.isString(value), ...
+                        'DataJoint:DataType:Mismatch', ...
                         'The field %s must be a character string', ...
                         header.attributes(attr_idx).name)
-                    if isempty(value)
-                        placeholder = '""';
-                    else
-                        placeholder = '"{S}"';
-                        value = char(value);
-                    end
+                    placeholder = '"{S}"';
+                    value = char(value);
                 elseif header.attributes(attr_idx).isUuid
-                    placeholder = '"{B}"';
                     value = strrep(value, '-', '');
                     hexstring = value';
                     reshapedString = reshape(hexstring,2,16);
                     hexMtx = reshapedString.';
                     decMtx = hex2dec(hexMtx);
+                    placeholder = '"{B}"';
                     value = uint8(decMtx);
                 elseif header.attributes(attr_idx).isBlob
                     if ~header.attributes(attr_idx).isExternal
                         placeholder = '"{M}"';
                     else
-                        placeholder = '"{B}"';
                         value = self.schema.external.tables.(...
                             header.attributes(attr_idx).store).upload_buffer(value);
                         hexstring = value';
                         reshapedString = reshape(hexstring,2,16);
                         hexMtx = reshapedString.';
                         decMtx = hex2dec(hexMtx);
+                        placeholder = '"{B}"';
                         value = uint8(decMtx);
                     end
                 else
                     assert((isnumeric(value) || islogical(value)) && (isscalar( ...
                         value) || isempty(value)),...
+                        'DataJoint:DataType:Mismatch', ...
                         'The field %s must be a numeric scalar value', ...
                         header.attributes(attr_idx).name)
                     % empty numeric values and nans are passed as nulls
-                    if isempty(value) || isnan(value)
-                        placeholder = 'NULL';
-                    elseif isinf(value)
+                    if isinf(value)
                         error 'Infinite values are not allowed in numeric fields'
                     else  % numeric values
                         type = header.attributes(i).type;
@@ -265,6 +270,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         else
                             placeholder = sprintf('%1.16g', value);
                         end
+                        value = [];
                     end
                 end
             end
@@ -317,8 +323,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 valueStr = '';
                 for i = find(ix)
                     [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
-                    if ~isempty(v) && ( ...
-                            (~isnumeric(v) && ~islogical(v)) || (~isscalar(v) && ~isempty(v)))
+                    if ~isempty(v) || ischar(v)
                         blobs{end+1} = v;   %#ok<AGROW>
                     end
                     valueStr = sprintf(['%s' placeholder ','],valueStr);
