@@ -1,7 +1,8 @@
 classdef TestFetch < tests.Prep
     % TestFetch tests typical insert/fetch scenarios.
     methods (Static)
-        function TestFetch_Generic(testCase, id, correct_value, null_value, wrong_value, incr, table)
+        function TestFetch_Generic(testCase, id, correct_value, null_value, wrong_value, ...
+                incr, table)
             % related https://github.com/datajoint/datajoint-matlab/issues/217
             value_incr = correct_value;
             num_attr = length(table.header.notBlobs);
@@ -33,7 +34,8 @@ classdef TestFetch < tests.Prep
                     v(:) = {value_incr};
                     curr_value = cell2struct(v, table.header.notBlobs, 2);
                 else
-                    curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), table.header.notBlobs, 2);
+                    curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), ...
+                        table.header.notBlobs, 2);
                 end
                 curr_value.id = id;
                 curr_value.(attr.name) = wrong_value;
@@ -53,7 +55,8 @@ classdef TestFetch < tests.Prep
                     v(:) = {value_incr};
                     curr_value = cell2struct(v, table.header.notBlobs, 2);
                 else
-                    curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), table.header.notBlobs, 2);
+                    curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), ...
+                        table.header.notBlobs, 2);
                 end
                 curr_value.id = id;
                 curr_value.(attr.name) = null_value;
@@ -62,10 +65,12 @@ classdef TestFetch < tests.Prep
 %                     q = table & ['id=' num2str(id)];
 %                     testCase.verifyEqual(q.fetch(attr.name).(attr.name), null_value);
                     res = mym(['select ' attr.name ' from `' testCase.PREFIX ...
-                        '_university`.`' table.plainTableName '` where id=' num2str(id) ' and ' attr.name ' is ' 'NULL' ';']);
+                        '_university`.`' table.plainTableName '` where id=' num2str(id) ...
+                        ' and ' attr.name ' is ' 'NULL' ';']);
                     testCase.verifyEqual(length(res.(attr.name)), 1);
                 catch ME
-                    if attr.isnullable || ~strcmp(ME.identifier,'DataJoint:DataType:NotNullable')
+                    if attr.isnullable || ~strcmp(ME.identifier, ...
+                            'DataJoint:DataType:NotNullable')
                         rethrow(ME);
                     end
                 end
@@ -78,7 +83,8 @@ classdef TestFetch < tests.Prep
                     v(:) = {value_incr};
                     curr_value = cell2struct(v, table.header.notBlobs, 2);
                 else
-                    curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), table.header.notBlobs, 2);
+                    curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), ...
+                        table.header.notBlobs, 2);
                 end
                 curr_value.id = id;
                 curr_value = rmfield(curr_value, attr.name);
@@ -86,17 +92,21 @@ classdef TestFetch < tests.Prep
                     insert(table, curr_value);
                     if ischar(attr.default) && isempty(attr.default)
                         res = mym(['select ' attr.name ' from `' testCase.PREFIX ...
-                            '_university`.`' table.plainTableName '` where id=' num2str(id) ' and ' attr.name ' is ' 'null' ';']);
+                            '_university`.`' table.plainTableName '` where id=' num2str(id) ...
+                            ' and ' attr.name ' is ' 'null' ';']);
                     elseif attr.isString
                         res = mym(['select ' attr.name ' from `' testCase.PREFIX ...
-                            '_university`.`' table.plainTableName '` where id=' num2str(id) ' and ' attr.name ' like ' ['''' attr.default ''''] ';']);
+                            '_university`.`' table.plainTableName '` where id=' num2str(id) ...
+                            ' and ' attr.name ' like ' ['''' attr.default ''''] ';']);
                     else
                         res = mym(['select ' attr.name ' from `' testCase.PREFIX ...
-                            '_university`.`' table.plainTableName '` where id=' num2str(id) ' and ' attr.name ' like ' attr.default ';']);
+                            '_university`.`' table.plainTableName '` where id=' num2str(id) ...
+                            ' and ' attr.name ' like ' attr.default ';']);
                     end
                     testCase.verifyEqual(length(res.(attr.name)), 1);
                 catch ME
-                    if ~isempty(attr.default) || ~contains(ME.message,'doesn''t have a default value')
+                    if ~isempty(attr.default) || ~contains(ME.message, ...
+                            'doesn''t have a default value')
                         rethrow(ME);
                     end
                 end
@@ -109,17 +119,20 @@ classdef TestFetch < tests.Prep
 %                     v(:) = {value_incr};
 %                     curr_value = cell2struct(v, table.header.notBlobs, 2);
 %                 else
-%                     curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), table.header.notBlobs, 2);
+%                     curr_value = cell2struct(num2cell(repmat(value_incr,1,num_attr)), ...
+%                         table.header.notBlobs, 2);
 %                 end
 %                 curr_value.id = id;
 %                 curr_value.(attr.name) = correct_value;
 %                 try
 %                     insert(table, curr_value);
 %                     res = mym(['select ' attr.name ' from `' testCase.PREFIX ...
-%                         '_university`.`' table.plainTableName '` where id=' num2str(id) ' and ' attr.name '=' ['''' correct_value ''''] ';']);
+%                         '_university`.`' table.plainTableName '` where id=' num2str(id) ...
+%                         ' and ' attr.name '=' ['''' correct_value ''''] ';']);
 %                     testCase.verifyEqual(length(res.(attr.name)), 1);
 %                 catch ME
-%                     if contains(attr.name, 'nounq') || ~contains(ME.message,'Duplicate entry')
+%                     if contains(attr.name, 'nounq') || ~contains(ME.message, ...
+%                             'Duplicate entry')
 %                         rethrow(ME);
 %                     end
 %                 end
@@ -251,7 +264,8 @@ classdef TestFetch < tests.Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_university']);
             
-            tests.TestFetch.TestFetch_Generic(testCase, 1, 'n', [], 5, @(x) strcat(x, 'o'), University.String);
+            tests.TestFetch.TestFetch_Generic(testCase, 1, 'n', [], 5, ...
+                @(x) strcat(x, 'o'), University.String);
         end
         function TestFetch_testDate(testCase)
             st = dbstack;
@@ -266,7 +280,8 @@ classdef TestFetch < tests.Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_university']);
             
-            tests.TestFetch.TestFetch_Generic(testCase, 1, '2020-01-01', [], 5, @(x) datestr(addtodate(datenum(x), 1, 'day'), 'yyyy-mm-dd'), University.Date);
+            tests.TestFetch.TestFetch_Generic(testCase, 1, '2020-01-01', [], 5, ...
+                @(x) datestr(addtodate(datenum(x), 1, 'day'), 'yyyy-mm-dd'), University.Date);
         end
         function TestFetch_testInteger(testCase)
             st = dbstack;
@@ -281,7 +296,8 @@ classdef TestFetch < tests.Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_university']);
             
-            tests.TestFetch.TestFetch_Generic(testCase, 1, 2, NaN, 'wrong', @(x) x + 1, University.Integer);        
+            tests.TestFetch.TestFetch_Generic(testCase, 1, 2, NaN, 'wrong', ...
+                @(x) x + 1, University.Integer);        
         end
         function TestFetch_testFloat(testCase)
             st = dbstack;
@@ -296,7 +312,8 @@ classdef TestFetch < tests.Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_university']);
             
-            tests.TestFetch.TestFetch_Generic(testCase, 1, 1.01, NaN, 'wrong', @(x) x + 0.01, University.Float);        
+            tests.TestFetch.TestFetch_Generic(testCase, 1, 1.01, NaN, 'wrong', ...
+                @(x) x + 0.01, University.Float);        
         end
     end
 end
