@@ -31,15 +31,21 @@ classdef TestExternalFile < tests.Prep
             package = 'External';
             dj.createSchema(package,[test_instance.test_root '/test_schemas'], ...
                 [test_instance.PREFIX '_external']);
-            schema = External.getSchema;
             % test value
             rng(5);
             test_val1 = floor(rand(1,3)*100);
-            % insert and fetch
+            % insert
             insert(External.Dimension, struct( ...
                 'dimension_id', 4, ...
                 'dimension', test_val1 ...
             ));
+            % check that external tables are loaded on new schema objs if they already exists
+            delete([test_instance.test_root '/test_schemas' '/+' package '/getSchema.m']);
+            dj.createSchema(package,[test_instance.test_root '/test_schemas'], ...
+                [test_instance.PREFIX '_external']);
+            schema = External.getSchema;
+            % fetch
+            schema.tableNames.remove('External.Dimension');
             q = External.Dimension & 'dimension_id=4';
             res = q.fetch('dimension');
             value_check = res(1).dimension;
