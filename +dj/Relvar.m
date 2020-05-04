@@ -243,7 +243,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     if ~header.attributes(attr_idx).isExternal
                         placeholder = '"{M}"';
                     else
-                        value = self.schema.external.tables.(...
+                        value = self.schema.external.table(...
                             header.attributes(attr_idx).store).upload_buffer(value);
                         hexstring = value';
                         reshapedString = reshape(hexstring,2,16);
