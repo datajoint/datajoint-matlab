@@ -1,4 +1,4 @@
-classdef TestConfig < tests.Prep
+classdef TestConfig < Prep
     % TestConfig tests scenarios related to initializing DJ config.
     methods (Static)
         function obj = TestConfig_configRemoveEnvVars(obj, type)
@@ -49,7 +49,7 @@ classdef TestConfig < tests.Prep
             end
             % load raw
             read_data = fileread(fname);           
-            obj1 = tests.TestConfig.TestConfig_configRemoveEnvVars(jsondecode(read_data), 'file');
+            obj1 = TestConfig.TestConfig_configRemoveEnvVars(jsondecode(read_data), 'file');
             % optional merge from base
             if strcmpi(type, 'load-custom')
                 tmp = rmfield(base, intersect(fieldnames(base), fieldnames(obj1)));
@@ -60,7 +60,7 @@ classdef TestConfig < tests.Prep
             % stringify
             file = jsonencode(obj1);
             % load config
-            obj2 = tests.TestConfig.TestConfig_configRemoveEnvVars(dj.config(), 'config');
+            obj2 = TestConfig.TestConfig_configRemoveEnvVars(dj.config(), 'config');
             curr = jsonencode(obj2);
             curr = regexprep(curr,'[a-z0-9][A-Z]','${$0(1)}_${lower($0(2))}');
             % checks
@@ -142,15 +142,20 @@ classdef TestConfig < tests.Prep
             disp(['---------------' st(1).name '---------------']);
             testCase.verifyError(@() dj.config(9), ...
                 'DataJoint:Config:InvalidType');
-            d = testCase.verifyError(@() dj.config('none'), ...
-                'DataJoint:Config:InvalidKey');
+            try
+                d = dj.config('none');
+            catch ME
+                if ~strcmp(ME.identifier,'DataJoint:Config:InvalidKey')
+                    rethrow(ME);
+                end
+            end
         end
         function TestConfig_testRestore(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             dj.config.restore;
-            obj1 = tests.TestConfig.TestConfig_configRemoveEnvVars(dj.config(), 'config');
-            obj2 = tests.TestConfig.TestConfig_configRemoveEnvVars( ...
+            obj1 = TestConfig.TestConfig_configRemoveEnvVars(dj.config(), 'config');
+            obj2 = TestConfig.TestConfig_configRemoveEnvVars( ...
                 orderfields(dj.internal.Settings.DEFAULTS), 'config');
             testCase.verifyEqual(jsonencode(obj1), jsonencode(obj2));
         end
@@ -161,36 +166,36 @@ classdef TestConfig < tests.Prep
             
             % local
             dj.config('font', 10);
-            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'save-local');
+            TestConfig.TestConfig_configSingleFileTest(testCase, 'save-local');
             % global
             dj.config('font', 12);
-            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'save-global');
+            TestConfig.TestConfig_configSingleFileTest(testCase, 'save-global');
             % custom
             dj.config('font', 16);
-            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'save-custom', './config.json');
+            TestConfig.TestConfig_configSingleFileTest(testCase, 'save-custom', './config.json');
             
             dj.config.restore;
         end
         function TestConfig_testLoad(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            pkg = what('tests');
+            pkg_path = testCase.test_root;
             % generate default base
-            default_file = [pkg.path '/test_schemas/default.json'];
+            default_file = [pkg_path '/test_schemas/default.json'];
             dj.config.restore;
             dj.config.save(default_file);
-            defaults = tests.TestConfig.TestConfig_configRemoveEnvVars( ...
+            defaults = TestConfig.TestConfig_configRemoveEnvVars( ...
                 jsondecode(fileread(default_file)), 'file');
             delete(default_file);
             % load test config
-            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
-                [pkg.path '/test_schemas/config.json'], defaults);
+            TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
+                [pkg_path '/test_schemas/config.json'], defaults);
             % load new config on top of existing
-            base = tests.TestConfig.TestConfig_configRemoveEnvVars(dj.config, 'config');
+            base = TestConfig.TestConfig_configRemoveEnvVars(dj.config, 'config');
             base = jsonencode(base);
             base = regexprep(base,'[a-z0-9][A-Z]','${$0(1)}_${lower($0(2))}');
-            tests.TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
-                [pkg.path '/test_schemas/config_lite.json'], jsondecode(base));
+            TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
+                [pkg_path '/test_schemas/config_lite.json'], jsondecode(base));
             % cleanup
             dj.config.restore;
         end
@@ -210,14 +215,14 @@ classdef TestConfig < tests.Prep
                 testCase.verifyEqual(dj.config('databasePassword'), values{3});
                 testCase.verifyEqual(dj.config('connectionInit_function'), values{4});
             end
-            pkg = what('tests');
+            pkg_path = testCase.test_root;
             setenv('DJ_INIT', 'select @@version;');
             dj.config.restore;
             % check pulling from env vars
             env = {getenv('DJ_HOST'), getenv('DJ_USER'), getenv('DJ_PASS'), getenv('DJ_INIT')};
             validateEnvVarConfig('env', env);
             % check after load if env vars take precedence
-            dj.config.load([pkg.path '/test_schemas/config.json']);
+            dj.config.load([pkg_path '/test_schemas/config.json']);
             validateEnvVarConfig('env', env);
             % check if overriding env vars is persisted
             validateEnvVarConfig('set', ...

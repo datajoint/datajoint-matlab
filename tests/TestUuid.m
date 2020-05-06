@@ -1,4 +1,4 @@
-classdef TestUuid < tests.Prep
+classdef TestUuid < Prep
     % TestUuid tests uuid scenarios.
     methods (Test)
         function TestUuid_testInsertFetch(testCase)
