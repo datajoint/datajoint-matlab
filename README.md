@@ -20,14 +20,15 @@ MYSQL_TAG=5.7
 * `cp local-docker-compose.yml docker-compose.yml`
 * `docker-compose up` (Note configured `JUPYTER_PASSWORD`)
 * Select a means of running MATLAB e.g. Jupyter Notebook, GUI, or Terminal (see bottom)
+* Add `tests` directory to path e.g. in MATLAB, `addpath('tests')`
 * Run desired tests. Some examples are as follows:
 
 | Use Case                     | MATLAB Code                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------------ |
-| Run all tests                | `run(tests.Main)`                                                              |
-| Run one class of tests       | `run(tests.TestTls)`                                                           |
-| Run one specific test        | `runtests('tests.TestTls/testInsecureConn')`                                   |
-| Run tests based on test name | `import matlab.unittest.TestSuite;`<br>`import matlab.unittest.selectors.HasName;`<br>`import matlab.unittest.constraints.ContainsSubstring;`<br>`suite = TestSuite.fromClass(?tests.Main, ... `<br><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>`HasName(ContainsSubstring('Conn')));`<br>`run(suite)`|
+| Run all tests                | `run(Main)`                                                              |
+| Run one class of tests       | `run(TestTls)`                                                           |
+| Run one specific test        | `runtests('TestTls/testInsecureConn')`                                   |
+| Run tests based on test name | `import matlab.unittest.TestSuite;`<br>`import matlab.unittest.selectors.HasName;`<br>`import matlab.unittest.constraints.ContainsSubstring;`<br>`suite = TestSuite.fromClass(?Main, ... `<br><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>`HasName(ContainsSubstring('Conn')));`<br>`run(suite)`|
 
 
 Launch Jupyter Notebook
