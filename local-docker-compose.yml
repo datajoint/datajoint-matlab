@@ -82,6 +82,7 @@ services:
         ## Set dj path
         matlab -nodisplay -r \"\
             addpath('/src');\
+            addpath('/src/tests');\
             savepath;\
           \";
         ## Interactive Jupyter Notebook environment
