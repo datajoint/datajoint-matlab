@@ -172,7 +172,8 @@ classdef TestConfig < Prep
             TestConfig.TestConfig_configSingleFileTest(testCase, 'save-global');
             % custom
             dj.config('font', 16);
-            TestConfig.TestConfig_configSingleFileTest(testCase, 'save-custom', './config.json');
+            TestConfig.TestConfig_configSingleFileTest(...
+                testCase, 'save-custom', './config.json');
             
             dj.config.restore;
         end
