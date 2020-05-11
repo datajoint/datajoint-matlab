@@ -1,11 +1,11 @@
-classdef TestExternalFile < tests.Prep
+classdef TestExternalFile < Prep
     % TestExternalFile tests scenarios related to external file store.
     methods (Static)
         function TestExternalFile_checks(test_instance, store, cache)
             % load config
-            pkg = what('tests');
+            pkg_path = test_instance.test_root;
             ext_root = strrep(test_instance.external_file_store_root, '\', '/');
-            dj.config.load([strrep(pkg.path, '\', '/') '/test_schemas/store_config.json']);
+            dj.config.load([strrep(pkg_path, '\', '/') '/test_schemas/store_config.json']);
             dj.config(['stores.' store '.location'], strrep(dj.config(...
                 ['stores.' store '.location']), '{{external_file_store_root}}', ...
                 ext_root));
@@ -61,7 +61,7 @@ classdef TestExternalFile < tests.Prep
                     '/' dj.config('stores.main.location')], '');
             end
             subfold_path = strrep(subfold_path, ['/' schema.dbname '/'], '');
-            subfold_cell = split(subfold_path, '/');
+            subfold_cell = strsplit(subfold_path, '/');
             if length(subfold_cell) > 1
                 subfold_cell = subfold_cell(1:end-1);
                 subfold_path = ['/' strjoin(subfold_cell, '/')];
@@ -69,7 +69,7 @@ classdef TestExternalFile < tests.Prep
                 subfold_cell = {};
                 subfold_path = '';
             end
-            test_instance.verifyEqual(cellfun(@(x) length(x), subfold_cell), ...
+            test_instance.verifyEqual(cellfun(@(x) length(x), subfold_cell)', ...
                 schema.external.table('main').spec.type_config.subfolding);
             % delete value to rely on cache
             schema.external.table('main').spec.remove_object(uuid_path);
@@ -131,23 +131,23 @@ classdef TestExternalFile < tests.Prep
         function TestExternalFile_testLocal(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'new_local', 'blobCache');
+            TestExternalFile.TestExternalFile_checks(testCase, 'new_local', 'blobCache');
         end
         function TestExternalFile_testLocalDefault(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'new_local_default', ...
+            TestExternalFile.TestExternalFile_checks(testCase, 'new_local_default', ...
                 'blobCache');
         end
         function TestExternalFile_testBackward(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'local', 'cache');
+            TestExternalFile.TestExternalFile_checks(testCase, 'local', 'cache');
         end
         function TestExternalFile_testBackwardDefault(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
-            tests.TestExternalFile.TestExternalFile_checks(testCase, 'local_default', 'cache');
+            TestExternalFile.TestExternalFile_checks(testCase, 'local_default', 'cache');
         end
         function TestExternalFile_testMD5Hash(testCase)
             st = dbstack;

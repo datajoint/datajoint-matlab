@@ -1,4 +1,4 @@
-classdef TestERD < tests.Prep
+classdef TestERD < Prep
     % TestERD tests unusual ERD scenarios.
     methods (Test)
         function TestERD_testDraw(testCase)

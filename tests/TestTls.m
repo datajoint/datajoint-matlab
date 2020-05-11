@@ -1,4 +1,4 @@
-classdef TestTls < tests.Prep
+classdef TestTls < Prep
     % TestTls tests TLS connection scenarios.
     methods (Test)
         function TestTls_testSecureConn(testCase)
@@ -51,7 +51,7 @@ classdef TestTls < tests.Prep
                 e = lasterror;
                 testCase.verifyEqual(e.identifier, 'MySQL:Error');
                 testCase.verifyTrue(contains(e.message,...
-                    ["requires secure connection","Access denied"])); %MySQL8,MySQL5
+                    {'requires secure connection','Access denied'})); %MySQL8,MySQL5
             end
         end
         function TestTls_testStructException(testCase)
