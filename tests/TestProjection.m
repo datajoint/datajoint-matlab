@@ -1,4 +1,4 @@
-classdef TestProjection < tests.Prep
+classdef TestProjection < Prep
     % TestProjection tests use of q.proj(...).
     methods (Test)
         function TestProjection_testDateConversion(testCase)
