@@ -249,6 +249,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                             blobs{end+1} = char(v);  %#ok<AGROW>
                         end
                     elseif header.attributes(i).isBlob
+                        assert(~issparse(v), 'Sparse blobs not currently supported');
                         valueStr = sprintf('%s"{M}",', valueStr);
                         blobs{end+1} = v;    %#ok<AGROW>
                     else
@@ -363,6 +364,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                     valueStr = '"{S}"';
                     value = {char(value)};
                 case header.attributes(ix).isBlob
+                    assert(~issparse(value), 'Sparse blobs not currently supported');
                     valueStr = '"{M}"';
                     value = {value};
                 case header.attributes(ix).isNumeric
