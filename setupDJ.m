@@ -10,6 +10,10 @@ function setupDJ(skipPathAddition, force)
         return
     end
 
+    if verLessThan('matlab', '8.6')
+        error 'MATLAB version 8.6 (R2015b) or greater is required'
+    end
+
     base = fileparts(mfilename('fullpath'));
 
     if nargin < 1
@@ -42,6 +46,13 @@ function setupDJ(skipPathAddition, force)
     % run mymSetup.m
     fprintf('Setting up mym...\n')
     run(fullfile(mymdir, 'mymSetup.m'))
-    
+
+    try
+        mymVersion = mym('version');
+        assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
+    catch
+        error 'Outdated version of mYm.  Please upgrade to version 2.6 or later'
+    end
+
     INVOKED = 1;
 end

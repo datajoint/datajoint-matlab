@@ -28,15 +28,6 @@ classdef Connection < handle
             % initQuery is the SQL query to be executed at the start
             % of each new session.
             setupDJ(true);
-            try
-                mymVersion = mym('version');
-                assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
-            catch
-                error 'Outdated version of mYm.  Please upgrade to version 2.6 or later'
-            end
-            if verLessThan('matlab', '8.6')
-                error 'MATLAB version 8.6 (R2015b) or greater is required'
-            end
             self.host = host;
             self.user = username;
             self.password = password;
