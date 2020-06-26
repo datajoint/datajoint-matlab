@@ -7,34 +7,60 @@
 %   of the attributes of information_schema.processlist: ID, USER, HOST,
 %   DB, COMMAND, TIME, STATE, INFO.
 %
+%   dj.kill(restriction, connection) allows specifying the target connection.
+%   will use default connection (dj.conn) if not specified.
+%
+%   dj.kill(restriction, connection, order_by) allows providing an order_by
+%   argument. By default, output is lited by ID in ascending order.
+%
 %   Examples:
 %       dj.kill('HOST LIKE "%at-compute%"') lists only connections from
 %       at-compute.
 %
 %       dj.kill('TIME > 600') lists only connections older than 10 minutes.
+%
+%       dj.kill('', dj.conn, 'time') will display no restrictions for the 
+%         default connection ordered by TIME.
+%
 
-function kill(restriction)
+
+function kill(restriction, connection, order_by)
+
+if nargin < 3
+    order_by = false;
+end
+
+if nargin < 2
+    connection = dj.conn;
+end
 
 qstr = 'SELECT * FROM information_schema.processlist WHERE id <> CONNECTION_ID()';
+
 if nargin && ~isempty(restriction)
     qstr = sprintf('%s AND (%s)', qstr, restriction);
 end
-    
+
+if order_by
+    qstr = sprintf('%s ORDER BY %s', qstr, order_by);
+else
+    qstr = sprintf('%s ORDER BY id', qstr);
+end
+
 while true
-    query(dj.conn, qstr)
+    query(connection, qstr)
     id = input('process to kill (''q''-quit, ''a''-all) > ', 's');
     if ischar(id) && strncmpi(id, 'q', 1)
         break
     elseif ischar(id) && strncmpi(id, 'a', 1)
-        res = query(dj.conn, qstr);
+        res = query(connection, qstr);
         id = double(res.ID)';
         for i = id
-            query(dj.conn, 'kill {Si}', i)
+            query(connection, 'kill {Si}', i)
         end
         break
     end
     id = sscanf(id,'%d');
     if ~isempty(id) 
-        query(dj.conn, 'kill {Si}', id(1))
+        query(connection, 'kill {Si}', id(1))
     end
 end
