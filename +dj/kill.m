@@ -27,7 +27,7 @@
 function kill(restriction, connection, order_by)
 
 if nargin < 3
-    order_by = false;
+    order_by = {};
 end
 
 if nargin < 2
@@ -40,8 +40,16 @@ if nargin && ~isempty(restriction)
     qstr = sprintf('%s AND (%s)', qstr, restriction);
 end
 
-if order_by
-    qstr = sprintf('%s ORDER BY %s', qstr, order_by);
+if ~isempty(order_by)
+    if iscell(order_by)
+        l_order_by = '';
+        for t = order_by
+            l_order_by = strcat(l_order_by, t{:}, ',');
+        end
+        qstr = sprintf('%s ORDER BY %s', qstr, l_order_by(1:end-1));
+    else
+        qstr = sprintf('%s ORDER BY %s', qstr, order_by);
+    end
 else
     qstr = sprintf('%s ORDER BY id', qstr);
 end
