@@ -21,8 +21,9 @@ function setupMYM(version, force)
             fprintf('force install.. removing %s\n', mymdir);
             rmdir(mymdir, 's');
         else
-            fprintf('Warning: mym directory exists. not re-installing.\n');
-            fprintf('  to override, pass force=true\n');
+            warning('DataJoint:System:setupMyMwarning', ...
+                    ['Warning: mym directory exists. not re-installing.\n', ...
+                     '  to override, pass force=true\n']);
         end
     end
 
@@ -52,15 +53,15 @@ function setupMYM(version, force)
         end
 
         % rename extracted mym-master directory to mym
-        fprintf('renaming %s to %s\n', extdir, mymdir)
+        fprintf('renaming %s to %s\n', extdir, mymdir);
         movefile(extdir, mymdir);
 
         delete(target);
     end
 
     % run mymSetup.m
-    fprintf('Setting up mym...\n')
-    run(fullfile(mymdir, 'mymSetup.m'))
+    fprintf('Setting up mym...\n');
+    run(fullfile(mymdir, 'mymSetup.m'));
 
     INVOKED = 1;
 
