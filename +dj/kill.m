@@ -40,18 +40,14 @@ if nargin && ~isempty(restriction)
     qstr = sprintf('%s AND (%s)', qstr, restriction);
 end
 
-if ~isempty(order_by)
+if isempty(order_by)
+    qstr = sprintf('%s ORDER BY id', qstr);
+else
     if iscell(order_by)
-        l_order_by = '';
-        for t = order_by
-            l_order_by = strcat(l_order_by, t{:}, ',');
-        end
-        qstr = sprintf('%s ORDER BY %s', qstr, l_order_by(1:end-1));
+        qstr = sprintf('%s ORDER BY %s', qstr, strjoin(order_by, ',');
     else
         qstr = sprintf('%s ORDER BY %s', qstr, order_by);
     end
-else
-    qstr = sprintf('%s ORDER BY id', qstr);
 end
 
 while true
