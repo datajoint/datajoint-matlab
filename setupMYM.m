@@ -1,7 +1,9 @@
 function setupMYM(version, force)
 
+    default_version = 'master';
+
     if nargin < 1
-        version = 'master';
+        version = default_version;
     elseif nargin < 2
         force = false;
     end
@@ -20,7 +22,7 @@ function setupMYM(version, force)
         if force
             fprintf('force install.. removing %s\n', mymdir);
             rmdir(mymdir, 's');
-        else
+        elseif(~strcmp(version, default_version))
             warning('DataJoint:System:setupMyMwarning', ...
                     ['Warning: mym directory exists. not re-installing.\n', ...
                      '  to override, pass force=true\n']);
