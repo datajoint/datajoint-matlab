@@ -2,8 +2,15 @@
 Creating a virtual class
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-A ``TableAccessor`` object is created as a property of a schema during each schema's creation.
-This property is named ``schema.v``, for *virtual class generator*.
-The ``TableAccessor`` ``v`` itself has properties that refer to the tables of the schema.
-For example, one can access the ``Session`` table using ``schema.v.Session`` with no need for any ``Session`` class to exist in MATLAB.
-Tab completion of table names is possible because the table names are added as dynamic properties of ``TableAccessor``.
+To facilitate working with existing pipelines, DataJoint MATLAB creates a ``TableAccessor`` property in each schema object.
+The ``TableAccessor`` property, a *virtual class generator*, is available as ``schema.v``, and allows listing and querying of the tables defined on the server without needing to create the MATLAB table definitions locally.
+For example, creating a scratch ``experiment`` schema package and querying an existing ``my_experiment.Session`` table on the server can be done as follows::
+
+  >> dj.createSchema('experiment', '/scratch', 'my_experiment')
+  >> addpath('/scratch')
+  >> experiment_schema = experiment.getSchema();
+  >> experiment_schema.v.Session() & 'session_id=1234';
+
+.. note::
+
+   You can view the available tables in a schema by using tab completion on the ``schema.v`` property.
