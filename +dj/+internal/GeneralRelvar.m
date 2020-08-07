@@ -78,7 +78,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             
             attrList = cell(size(hdr.attributes));
             for i = 1:length(hdr.attributes)
-                if hdr.attributes(i).isBlob
+                if hdr.attributes(i).isBlob || hdr.attributes(i).isAttachment || ...
+                        hdr.attributes(i).isFilepath
                     attrList{i} = sprintf('("=BLOB=") -> %s', hdr.names{i});
                 else
                     attrList{i} = hdr.names{i};
@@ -938,6 +939,10 @@ function data = get(connection, attr, data)
                     data(j).(attr(i).name) = new_value;
                 end
             end
+        elseif attr(i).isAttachment || attr(i).isFilepath
+            error('DataJoint:DataType:NotYetSupported', ...
+                'The field `%s` with datatype `%s` is not yet supported.', ...
+                attr(i).name, attr(i).type)
         elseif attr(i).isBlob && attr(i).isExternal
             for j = 1:length(data)
                 if ~isempty(data(j).(attr(i).name))

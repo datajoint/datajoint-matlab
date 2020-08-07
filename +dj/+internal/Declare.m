@@ -11,11 +11,18 @@ classdef Declare
             'STRING', '^((var)?char|enum|date|(var)?year|time|timestamp)', ...
             'INTERNAL_BLOB', '^(tiny|medium|long)?blob$', ...
             'EXTERNAL_BLOB', '^blob@(?<store>[a-z]\w*)$', ...
+            'INTERNAL_ATTACH', 'attach$', ...
+            'EXTERNAL_ATTACH', 'attach@(?P<store>[a-z]\w*)$', ...
+            'FILEPATH', 'filepath@(?P<store>[a-z]\w*)$', ...
             'UUID', 'uuid$' ...
         )
-        SPECIAL_TYPES = {'UUID', 'EXTERNAL_BLOB'}
-        EXTERNAL_TYPES = {'EXTERNAL_BLOB'}  % data referenced by a UUID in external tables
-        SERIALIZED_TYPES = {'EXTERNAL_BLOB'}  % requires packing data
+        SPECIAL_TYPES = {'UUID', 'INTERNAL_ATTACH', 'EXTERNAL_ATTACH', 'EXTERNAL_BLOB', ...
+            'FILEPATH', 'ADAPTED'}
+        % data referenced by a UUID in external tables
+        EXTERNAL_TYPES = {'EXTERNAL_ATTACH', 'EXTERNAL_BLOB', 'FILEPATH'}
+        % requires packing data
+        SERIALIZED_TYPES = {'EXTERNAL_ATTACH', 'INTERNAL_ATTACH', 'EXTERNAL_BLOB', ...
+            'INTERNAL_BLOB'}
     end
     
     methods(Static)
@@ -313,6 +320,8 @@ classdef Declare
             %   category:   <string> DataJoint type match based on TYPE_PATTERN.
             if strcmpi(category, 'UUID')
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;
+            elseif strcmpi(category, 'INTERNAL_ATTACH')
+                field.type = 'LONGBLOB';
             elseif any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
                 field.store = strtrim(field.type((strfind(field.type,'@')+1):end));
                 field.type = dj.internal.Declare.UUID_DATA_TYPE;

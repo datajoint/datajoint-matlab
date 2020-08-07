@@ -78,6 +78,8 @@ classdef Header < matlab.mixin.Copyable
             attrs.isautoincrement = false(length(attrs.isnullable), 1);
             attrs.isNumeric = false(length(attrs.isnullable), 1);
             attrs.isString = false(length(attrs.isnullable), 1);
+            attrs.isAttachment = false(length(attrs.isnullable), 1);
+            attrs.isFilepath = false(length(attrs.isnullable), 1);
             attrs.isUuid = false(length(attrs.isnullable), 1);
             attrs.isBlob = false(length(attrs.isnullable), 1);
             attrs.isExternal = false(length(attrs.isnullable), 1);
@@ -107,6 +109,9 @@ classdef Header < matlab.mixin.Copyable
                 attrs.isString(i) = strcmpi(category, 'STRING');
                 attrs.isUuid(i) = strcmpi(category, 'UUID');
                 attrs.isBlob(i) = any(strcmpi(category, {'INTERNAL_BLOB', 'EXTERNAL_BLOB'}));
+                attrs.isAttachment(i) = any(strcmpi(category, {'INTERNAL_ATTACH', ...
+                    'EXTERNAL_ATTACH'}));
+                attrs.isFilepath(i) = strcmpi(category, 'FILEPATH');
                 if any(strcmpi(category, dj.internal.Declare.EXTERNAL_TYPES))
                     attrs.isExternal(i) = true;
                     attrs.store{i} = attrs.type{i}(regexp(attrs.type{i}, '@', 'once')+1:end);
@@ -118,7 +123,7 @@ classdef Header < matlab.mixin.Copyable
             end
 
             validFields = [attrs.isNumeric] | [attrs.isString] | [attrs.isBlob] | ...
-                [attrs.isUuid];
+                [attrs.isUuid] | [attrs.isAttachment] | [attrs.isFilepath];
             if ~all(validFields)
                 ix = find(~validFields, 1, 'first');
                 error('unsupported field type "%s" in `%s`.`%s`', ...
@@ -178,6 +183,8 @@ classdef Header < matlab.mixin.Copyable
                                 'isString', false, ...
                                 'isBlob', false, ...
                                 'isUuid', false, ...
+                                'isAttachment', false, ...
+                                'isFilepath', false, ...
                                 'isExternal', false, ...
                                 'store', [], ...
                                 'database', [], ...
