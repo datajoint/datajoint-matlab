@@ -44,7 +44,7 @@ if isempty(order_by)
     qstr = sprintf('%s ORDER BY id', qstr);
 else
     if iscell(order_by)
-        qstr = sprintf('%s ORDER BY %s', qstr, strjoin(order_by, ',');
+        qstr = sprintf('%s ORDER BY %s', qstr, strjoin(order_by, ','));
     else
         qstr = sprintf('%s ORDER BY %s', qstr, order_by);
     end
