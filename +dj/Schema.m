@@ -66,8 +66,8 @@ classdef Schema < handle
             self.conn.addPackage(dbname, package)
             self.headers    = containers.Map('KeyType','char','ValueType','any');
             self.tableNames = containers.Map('KeyType','char','ValueType','char');
-            self.external = dj.internal.ExternalMapping(self);
             self.v = dj.internal.TableAccessor(self);
+            self.external = dj.internal.ExternalMapping(self);
             conn.register(self);
         end
         
