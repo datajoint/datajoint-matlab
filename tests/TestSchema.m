@@ -38,7 +38,7 @@ classdef TestSchema < Prep
             schema = External.getSchema;
             q = schema.v.Document & ['document_id=' num2str(id)];
             % display
-            queryPreview = evalc("q");
+            queryPreview = evalc('q');
             queryPreview = splitlines(queryPreview);
             recordPreview = queryPreview(end-4);
             recordPreview = strsplit(recordPreview{1});
@@ -53,9 +53,9 @@ classdef TestSchema < Prep
             % fetch good
             testCase.verifyEqual(q.fetch1('document_id'),  id);
             % fetch bad
-            for c = ["document_data1", "document_data2", "document_data3"]
+            for c = {'document_data1', 'document_data2', 'document_data3'}
                 try
-                    res = q.fetch(char(c));
+                    res = q.fetch(char(c{1}));
                 catch ME
                     if ~strcmp(ME.identifier,'DataJoint:DataType:NotYetSupported')
                         rethrow(ME);
@@ -81,9 +81,9 @@ classdef TestSchema < Prep
             update(q, 'document_name', new_name);
             testCase.verifyEqual(q.fetch1('document_name'),  new_name);
             % update bad
-            for c = ["document_data1", "document_data2", "document_data3"]
+            for c = {'document_data1', 'document_data2', 'document_data3'}
                 try
-                    update(q, char(c), 'this');
+                    update(q, char(c{1}), 'this');
                 catch ME
                     if ~strcmp(ME.identifier,'DataJoint:DataType:NotYetSupported')
                         rethrow(ME);
