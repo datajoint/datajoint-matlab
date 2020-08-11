@@ -71,18 +71,9 @@ services:
       /bin/bash -c "
         matlab -nodisplay -r \"\
             addpath('/src/tests');\
-            try\
-              res=run(Main);\
-            catch ME\
-              rethrow(ME);\
-              exit(1);\
-            end\
+            try res=run(Main), catch ME, disp(ME.identifier),disp(ME.message),exit(1),end;\
             disp(res);\
-            if all([res.Passed])\
-              exit;\
-            else\
-              exit(1);\
-            end\
+            if all([res.Passed])  exit, else exit(1), end;\
           \";
       "
     mac_address: $MATLAB_HOSTID
