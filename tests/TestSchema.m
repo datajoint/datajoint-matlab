@@ -2,12 +2,11 @@ classdef TestSchema < Prep
     % TestSchema tests related to schemas.
     methods (Test)
         % https://github.com/datajoint/datajoint-matlab/issues/254
-        % external table included in schema.tableNames
-        % external table included in schema.classNames
         function TestSchema_testUnsupportedDJTypes(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             % setup
+            dj.config.restore;
             package = 'External';
             c1 = dj.conn(...
                 testCase.CONN_INFO.host,... 
@@ -18,6 +17,7 @@ classdef TestSchema < Prep
             store_dir = '/tmp/fake';
             store_name = 'main';
             mkdir(store_dir);
+            dj.config('safemode', false);
             dj.config('stores',struct(store_name, struct('protocol', 'file', 'location', ...
                 store_dir)));
             id = 2;
@@ -91,8 +91,8 @@ classdef TestSchema < Prep
                 end
             end
             % clean up
-            rmdir(store_dir);
-            dj.config.restore;
+            schema.dropQuick;
+            rmdir(store_dir, 's');
         end
     end
 end
