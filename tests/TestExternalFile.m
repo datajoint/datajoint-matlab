@@ -73,14 +73,14 @@ classdef TestExternalFile < Prep
                 schema.external.table('main').spec.type_config.subfolding);
             % delete value to rely on cache
             schema.external.table('main').spec.remove_object(uuid_path);
-            res = q.fetch('dimension');
-            value_check = res(1).dimension;
+            res = q.fetchn('dimension');
+            value_check = res{1};
             test_instance.verifyEqual(value_check,  test_val1);
             % populate
             populate(External.Image);
             q = External.Image & 'dimension_id=4';
-            res = q.fetch('img');
-            value_check = res(1).img;
+            res = q.fetch1('img');
+            value_check = res;
             test_instance.verifyEqual(size(value_check),  test_val1);
             % check used and unused
             test_instance.verifyTrue(schema.external.table('main').used.count==2);

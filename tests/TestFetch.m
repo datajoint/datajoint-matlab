@@ -232,14 +232,15 @@ classdef TestFetch < Prep
                 'blob', [] ...
             ));
 
-            q = University.All & 'id=5';
-            res = q.fetch('*');
+            q = University.All & 'id<6';
+            [id, string_fetch, date_fetch, number, blob] = q.fetchn('id', 'string', ...
+                'date', 'number', 'blob', 'ORDER BY id DESC');
 
-            testCase.verifyEqual(res(1).id,  5);
-            testCase.verifyEqual(res(1).string,  '');
-            testCase.verifyEqual(res(1).date,  '');
-            testCase.verifyEqual(res(1).number,  NaN);
-            testCase.verifyEqual(res(1).blob,  '');
+            testCase.verifyEqual(id(1),  5);
+            testCase.verifyEqual(string_fetch{1},  '');
+            testCase.verifyEqual(date_fetch{1},  '');
+            testCase.verifyEqual(number(1),  NaN);
+            testCase.verifyEqual(blob{1},  '');
         end
         function TestFetch_testDescribe(testCase)
             st = dbstack;
