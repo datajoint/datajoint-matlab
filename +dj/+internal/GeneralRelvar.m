@@ -174,7 +174,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         end
         
         function [ret,keys] = fetch(self, varargin)
-            % FETCHN retrieve data from a relation as a struct array
+            % FETCH retrieve data from a relation as a struct array
             % SYNTAX:
             %    s = self.fetch       % retrieve primary key attributes only
             %    s = self.fetch('*')  % retrieve all attributes
@@ -269,7 +269,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             %
             % See also FETCH1, FETCH, PROJ
             
-            [limit, args] = makeLimitClause(varargin{:});
+            [~, args] = makeLimitClause(varargin{:});
             specs = args(cellfun(@ischar, args)); % attribute specifiers
             returnKey = nargout==length(specs)+1;
             assert(returnKey || (nargout==length(specs) || (nargout==0 && length( ...
@@ -279,17 +279,18 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             assert(~any(strcmp(specs,'*')), '"*" is not allowed in fetchn()')
             
             % submit query
-            self = self.proj(args{:});  % this copies the object, so now it's a different self
-            [hdr, sql_] = self.compile;
-            ret = self.conn.query(sprintf('SELECT %s FROM %s%s%s',...
-                hdr.sql, sql_, limit));
+            s = self.fetch(varargin{:});
             
             % copy into output arguments
             varargout = cell(length(specs));
             for iArg=1:length(specs)
                 % if renamed, use the renamed attribute
                 name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
-                varargout{iArg} = ret.(name{1}{1});
+                if isnumeric(s(1).(name{1}{1})) && length(s(1).(name{1}{1})) == 1
+                    varargout{iArg} = [s.(name{1}{1})]';
+                else
+                    varargout{iArg} = {s.(name{1}{1})}';
+                end
             end
             
             if returnKey
