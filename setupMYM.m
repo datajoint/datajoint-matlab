@@ -1,6 +1,6 @@
 function setupMYM(version, force)
 
-    default_version = 'master';
+    default_version = 'master'; % else git tag string e.g. '2.7.2'
 
     if nargin < 1
         version = default_version;
