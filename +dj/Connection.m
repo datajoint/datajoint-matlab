@@ -6,7 +6,8 @@ classdef Connection < handle
         initQuery    % initializing function or query executed for each new session
         use_tls
         inTransaction = false
-        connId       % connection handle
+        connId       % MyM connection handle
+        serverId     % server connection ID
         packages     % maps database names to package names
         
         % dependency lookups by table name
@@ -168,6 +169,9 @@ classdef Connection < handle
                 if ~isempty(self.initQuery)
                     self.query(self.initQuery);
                 end
+
+                self.serverId = self.query('SELECT CONNECTION_ID() as id').id;
+
             end
             v = varargin;
             if dj.set('bigint_to_double')
