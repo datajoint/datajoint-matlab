@@ -98,7 +98,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     fprintf '          ...\n\n'
                 end
             end
-            fprintf('%d tuples (%.3g s)\n\n', self.count, toc)            
+            if dj.config('displayCount')
+                fprintf('%d tuples (%.3g s)\n\n', self.count, toc)
+            end
         end
         
         function view(self, varargin)
