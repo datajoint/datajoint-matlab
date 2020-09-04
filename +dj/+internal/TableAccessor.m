@@ -27,7 +27,7 @@ classdef TableAccessor < dynamicprops
                 name = splitName{2};
                 addprop(self, name);
                 tableName = schema.tableNames(className{1});
-                tierClass = dj.Schema.tierClasses{2}; % default to Manual table
+                tierClass = 'dj.Manual';
                 for k=1:numel(dj.Schema.tierPrefixes)
                     tierCharLen = length(dj.Schema.tierPrefixes{k});
                     if tierCharLen > 0 && ~isempty(regexp(dj.Schema.tierPrefixes{k}, ...
