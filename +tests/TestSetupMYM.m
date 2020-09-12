@@ -14,7 +14,9 @@ classdef TestSetupMYM < tests.Prep
                 rmdir(tmym, 's');
             end
             
-            ms = setupMYM(); % TODO: how properly verify?
+            ms = setupMYM();
+            testCase.verifyTrue(strcmp(ms, 'master'));
+            testCase.verifyTrue(isdir(tmym));
 
         end
         function TestSetupMYM_testVersionInstallFresh(testCase)
@@ -28,8 +30,8 @@ classdef TestSetupMYM < tests.Prep
             end
 
             % TODO: how manage version string?
-            ms = setupMYM('2.7.2'); % TODO: how properly verify?
-
+            ms = setupMYM('2.7.2');
+            testCase.verifyTrue(strcmp(ms, '2.7.2'));
             testCase.verifyTrue(isdir(tmym));
 
         end
@@ -45,7 +47,8 @@ classdef TestSetupMYM < tests.Prep
             end
 
             % TODO: how manage version string?
-            ms = setupMYM('2.7.2'); % TODO: how verify fail?
+            ms = setupMYM('2.7.2'); % TODO: how properly verify?
+                                    % also: .. persistent & test state ...
 
         end
         function TestSetupMYM_testVersionInstallStaleForce(testCase)
@@ -60,8 +63,8 @@ classdef TestSetupMYM < tests.Prep
             end
 
             % TODO: how manage version string?
-            ms = setupMYM('2.7.2', true); % TODO: how properly verify?
-
+            ms = setupMYM('2.7.2', true);
+            testCase.verifyTrue(strcmp(ms, '2.7.2'));
             testCase.verifyTrue(isdir(tmym));
 
         end
@@ -75,8 +78,8 @@ classdef TestSetupMYM < tests.Prep
                 rmdir(tmym, 's');
             end
 
-            ms = setupMYM('master'); % TODO: how properly verify
-
+            ms = setupMYM('master');
+            testCase.verifyTrue(strcmp(ms, 'master'));
             testCase.verifyTrue(isdir(tmym));
 
         end
@@ -92,7 +95,7 @@ classdef TestSetupMYM < tests.Prep
             end
 
             ms = setupMYM('master'); % TODO: how verify fail?
-
+                                     % also: .. persistent & test state ...
         end
         function TestSetupMYM_testMasterInstallStaleForce(testCase)
             [dir, nam, ext] = fileparts(mfilename('fullpath'));
@@ -105,8 +108,8 @@ classdef TestSetupMYM < tests.Prep
                 testCase.verifyTrue(isdir(tmym));
             end
 
-            ms = setupMYM('master'); % TODO: how properly verify
-
+            ms = setupMYM('master');
+            testCase.verifyTrue(strcmp(ms, 'master'));
             testCase.verifyTrue(isdir(tmym));
 
         end
