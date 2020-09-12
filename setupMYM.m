@@ -12,6 +12,9 @@ function mymVersion = setupMYM(version, force)
     persistent INSTALLED_VERSION;
     
     if ~isempty(INSTALLED_VERSION) && ~force
+        % note: for 'master', is currently 'master' not mym('version')
+        %   using mym('version') needs a master:version mapping,
+        %   and how to handle this is a wider dev issue (releses, tests, etc)
         mymVersion = INSTALLED_VERSION;
         return;
     end
