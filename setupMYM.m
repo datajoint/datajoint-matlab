@@ -1,17 +1,22 @@
-function setupMYM(version, force)
+function mymVersion = setupMYM(version, force)
 
     default_version = 'master'; % else git tag string e.g. '2.7.2'
 
     if nargin < 1
         version = default_version;
-    elseif nargin < 2
+    end
+    if nargin < 2
         force = false;
     end
+
+    persistent INSTALLED_VERSION;
     
-    persistent INVOKED;
-    
-    if ~isempty(INVOKED) && ~force
-        return
+    if ~isempty(INSTALLED_VERSION) && ~force
+        % note: for 'master', is currently 'master' not mym('version')
+        %   using mym('version') needs a master:version mapping,
+        %   and how to handle this is a wider dev issue (releses, tests, etc)
+        mymVersion = INSTALLED_VERSION;
+        return;
     end
 
     base = fileparts(mfilename('fullpath'));
@@ -65,6 +70,7 @@ function setupMYM(version, force)
     fprintf('Setting up mym...\n');
     run(fullfile(mymdir, 'mymSetup.m'));
 
-    INVOKED = 1;
+    mymVersion = version;
+    INSTALLED_VERSION = mymVersion;
 
 end 
