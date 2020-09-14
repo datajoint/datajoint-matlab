@@ -24,7 +24,7 @@ jobs:
     - <<: *slim
       env:
       - MATLAB_VERSION: R2019a
-      - MYSQL_TAG: 8.0
+      - MYSQL_TAG: 8.0.18 # Temporarily version lock MySQL8 until address mYm issue #55
     - <<: *slim
       env:
       - MATLAB_VERSION: R2019a
