@@ -71,7 +71,7 @@ services:
       /bin/bash -c "
         matlab -nodisplay -r \"\
             addpath('/src/tests');\
-            res=run(Main);\
+            try res=run(Main), catch ME, disp(ME.identifier),disp(ME.message),exit(1),end;\
             disp(res);\
             if all([res.Passed])  exit, else exit(1), end;\
           \";
