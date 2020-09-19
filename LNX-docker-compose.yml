@@ -21,7 +21,6 @@ services:
   app:
     <<: *net
     environment:
-    - DISPLAY
     - MATLAB_LICENSE
     - MATLAB_USER
     - DJ_HOST=fakeservices.datajoint.io
@@ -35,17 +34,29 @@ services:
       fakeservices.datajoint.io:
         condition: service_healthy
     user: ${MATLAB_UID}:${MATLAB_GID}
-    working_dir: /src
-    command: > 
-      /bin/bash -c "
-        matlab -nodisplay -r \"\
-            res=run(tests.Main);\
-            disp(res);\
-            if all([res.Passed])  exit, else exit(1), end;\
-          \";
-      "
+    working_dir: /main
+    command:
+      - /bin/bash
+      - -c
+      - |
+        matlab -nodisplay -r "
+          websave([tempdir 'GHToolbox.mltbx'],\
+                  ['https://github.com/datajoint/GHToolbox' \
+                   '/releases/download/' subsref(webread(['https://api.github.com/repos' \
+                                                          '/datajoint/GHToolbox' \
+                                                          '/releases/latest']),\
+                                                 substruct('.', 'tag_name')) \
+                   '/GHToolbox.mltbx']);\
+          matlab.addons.toolbox.installToolbox([tempdir 'GHToolbox.mltbx']);\
+          ghtb.install('DataJoint.mltbx');\
+          addpath('tests');\
+          res=run(Main);\
+          disp(res);\
+          if all([res.Passed])  exit, else exit(1), end;\
+        "
     mac_address: $MATLAB_HOSTID
     volumes:
-      - .:/src
+      - ./tests:/main/tests
+      - ./DataJoint.mltbx:/main/DataJoint.mltbx
 networks:
   main:

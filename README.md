@@ -24,10 +24,10 @@ MYSQL_TAG=5.7
 
 | Use Case                     | MATLAB Code                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------------ |
-| Run all tests                | `run(tests.Main)`                                                              |
-| Run one class of tests       | `run(tests.TestTls)`                                                           |
-| Run one specific test        | `runtests('tests.TestTls/testInsecureConn')`                                   |
-| Run tests based on test name | `import matlab.unittest.TestSuite;`<br>`import matlab.unittest.selectors.HasName;`<br>`import matlab.unittest.constraints.ContainsSubstring;`<br>`suite = TestSuite.fromClass(?tests.Main, ... `<br><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>`HasName(ContainsSubstring('Conn')));`<br>`run(suite)`|
+| Run all tests                | `run(Main)`                                                              |
+| Run one class of tests       | `run(TestTls)`                                                           |
+| Run one specific test        | `runtests('TestTls/testInsecureConn')`                                   |
+| Run tests based on test name | `import matlab.unittest.TestSuite;`<br>`import matlab.unittest.selectors.HasName;`<br>`import matlab.unittest.constraints.ContainsSubstring;`<br>`suite = TestSuite.fromClass(?Main, ... `<br><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>`HasName(ContainsSubstring('Conn')));`<br>`run(suite)`|
 
 
 Launch Jupyter Notebook

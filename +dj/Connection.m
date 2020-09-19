@@ -27,7 +27,10 @@ classdef Connection < handle
             % specify the connection to the database.
             % initQuery is the SQL query to be executed at the start
             % of each new session.
-            setupDJ(true);
+            if ~any(arrayfun(@(x) strcmp(x.Name, 'mym'), ...
+                             matlab.addons.toolbox.installedToolboxes, 'uni', true))
+                ghtb.install('guzman-raphael/mym');
+            end
             try
                 mymVersion = mym('version');
                 assert(mymVersion.major > 2 || mymVersion.major==2 && mymVersion.minor>=6)
