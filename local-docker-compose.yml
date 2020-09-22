@@ -79,8 +79,6 @@ services:
                                             'uni', false),\
                                    '.'),\
                        {'+dj'});\
-          ghtb.install('DataJoint.mltbx');\
-          dj.version;\
         "
         # Copy preferences
         cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf

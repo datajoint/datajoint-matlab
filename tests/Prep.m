@@ -35,7 +35,7 @@ classdef Prep < matlab.unittest.TestCase
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
             % create test users
             ver = curr_conn.query('select @@version as version').version;
-            if lib.compareVersions(ver,'5.8')
+            if compareVersions(ver,'5.8')
                 cmd = {...
                 'CREATE USER IF NOT EXISTS ''datajoint''@''%%'' '
                 'IDENTIFIED BY ''datajoint'';'
