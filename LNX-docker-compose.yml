@@ -40,7 +40,15 @@ services:
       - -c
       - |
         matlab -nodisplay -r "
-          matlab.addons.toolbox.installToolbox('DataJoint.mltbx');\
+          websave([tempdir 'GHToolbox.mltbx'],\
+                  ['https://github.com/datajoint/GHToolbox' \
+                   '/releases/download/' subsref(webread(['https://api.github.com/repos' \
+                                                          '/datajoint/GHToolbox' \
+                                                          '/releases/latest']),\
+                                                 substruct('.', 'tag_name')) \
+                   '/GHToolbox.mltbx']);\
+          matlab.addons.toolbox.installToolbox([tempdir 'GHToolbox.mltbx']);\
+          ghtb.install('DataJoint.mltbx');\
           addpath('tests');\
           res=run(Main);\
           disp(res);\

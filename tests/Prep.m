@@ -30,6 +30,7 @@ classdef Prep < matlab.unittest.TestCase
             disp('---------------INIT---------------');
             clear functions;
             addpath([testCase.test_root '/test_schemas']);
+            dj.set('suppressPrompt', true);
 
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
