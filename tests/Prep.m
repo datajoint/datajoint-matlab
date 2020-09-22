@@ -22,9 +22,7 @@ classdef Prep < matlab.unittest.TestCase
     methods
         function obj = Prep()
             % Initialize test_root
-            test_pkg_details = what('tests');
-            [test_root, ~, ~] = fileparts(test_pkg_details.path);
-            obj.test_root = [test_root '/+tests'];
+            obj.test_root = [pwd '/tests'];
         end
      end
     methods (TestClassSetup)
@@ -32,12 +30,13 @@ classdef Prep < matlab.unittest.TestCase
             disp('---------------INIT---------------');
             clear functions;
             addpath([testCase.test_root '/test_schemas']);
+            dj.set('suppressPrompt', true);
 
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
             % create test users
             ver = curr_conn.query('select @@version as version').version;
-            if tests.lib.compareVersions(ver,'5.8')
+            if compareVersions(ver,'5.8')
                 cmd = {...
                 'CREATE USER IF NOT EXISTS ''datajoint''@''%%'' '
                 'IDENTIFIED BY ''datajoint'';'
