@@ -4,11 +4,16 @@ DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias
 
 ## Installation
 
-### Greater than R2016b (Recommended)
+### (Recommended) Greater than R2016b
 
 1. Utilize MATLAB built-in GUI i.e. *Top Ribbon -> Add-Ons -> Get Add-Ons*
 2. Search and Select `DataJoint`
 3. Select *Add from GitHub*
+
+### Using GHToolbox (FileExchange Community Toolbox)
+
+1. Install *GHToolbox* using using an appropriate method in https://github.com/datajoint/GHToolbox
+2. run: `ghtb.install('datajoint/datajoint-matlab')`
 
 ### Less than R2016b
 
@@ -26,7 +31,6 @@ DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias
 2. Navigate in MATLAB tree browser to saved toolbox file
 3. Right-Click and Select *Install*
 4. Select *Install*
-
 
 ## Running Tests Locally
 
