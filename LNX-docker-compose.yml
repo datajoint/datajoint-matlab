@@ -39,6 +39,7 @@ services:
       - /bin/bash
       - -c
       - |
+        mkdir ~/Documents
         matlab -nodisplay -r "
           websave([tempdir 'GHToolbox.mltbx'],\
                   ['https://github.com/datajoint/GHToolbox' \
