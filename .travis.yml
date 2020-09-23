@@ -24,7 +24,7 @@ jobs:
     - <<: *slim
       env:
       - MATLAB_VERSION: R2019a
-      - MYSQL_TAG: 8.0
+      - MYSQL_TAG: 8.0.18
     - <<: *slim
       env:
       - MATLAB_VERSION: R2019a
