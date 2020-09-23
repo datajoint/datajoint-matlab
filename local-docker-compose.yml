@@ -52,6 +52,7 @@ services:
       - -c
       - |
         ORIG_DIR=$$(pwd)
+        mkdir ~/Documents
         cd /src
         # package into toolbox, and install
         matlab -nodisplay -r "

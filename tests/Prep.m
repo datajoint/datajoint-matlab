@@ -96,7 +96,7 @@ classdef Prep < matlab.unittest.TestCase
         function dispose(testCase)
             disp('---------------DISP---------------');
             warning('off','MATLAB:RMDIR:RemovedFromPath');
-
+            dj.set('suppressPrompt', true);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password, '',true);
 
