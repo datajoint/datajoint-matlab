@@ -31,7 +31,7 @@ classdef Prep < matlab.unittest.TestCase
             clear functions;
             addpath([testCase.test_root '/test_schemas']);
             dj.set('suppressPrompt', true);
-
+            disp(dj.version);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
             % create test users
