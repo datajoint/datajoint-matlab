@@ -29,11 +29,40 @@ function setup(varargin)
     try
         ghtb.require(requiredToolboxes, 'prompt', prompt);
     catch ME
-        if strcmp(ME.identifier, 'MATLAB:undefinedVarOrClass')
+        installPromptMsg = {
+            'Toolbox ''%s'' did not meet the minimum requirements.'
+            'Would you like to proceed with an upgrade?'
+        };
+        if strcmp(ME.identifier, 'MATLAB:undefinedVarOrClass') && (~prompt || strcmpi('yes',...
+                dj.internal.ask(sprintf(sprintf('%s\n', installPromptMsg{:}), 'GHToolbox'))))
+            % fetch
+            tmp_toolbox = [tempname '.mltbx'];
+            websave(tmp_toolbox, ['https://github.com/' requiredToolboxes{1}.ResolveTarget ...
+                                  '/releases/download/' ...
+                                  subsref(webread(['https://api.github.com/repos/' ...
+                                                   requiredToolboxes{1}.ResolveTarget ...
+                                                   '/releases/latest'], ...
+                                                  weboptions('Timeout', 60)), ...
+                                          substruct('.', 'tag_name')) ...
+                                  '/GHToolbox.mltbx'], weboptions('Timeout', 60));
+            % install
+            try
+                matlab.addons.install(tmp_toolbox, 'overwrite');
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:undefinedVarOrClass')
+                    matlab.addons.toolbox.installToolbox(tmp_toolbox);
+                else
+                    rethrow(ME);
+                end
+            end
+            % remove temp toolbox file
+            delete(tmp_toolbox);
+            % retrigger dependency validation
+            ghtb.require(requiredToolboxes, 'prompt', prompt);
+        elseif strcmp(ME.identifier, 'MATLAB:undefinedVarOrClass')
             GHToolboxMsg = {
-                'Toolbox ''GHToolbox'' did not meet the minimum minimum requirements.'
-                'Please install it via instructions in '
-                '''https://github.com/datajoint/GHToolbox'''.'
+                'Toolbox ''GHToolbox'' did not meet the minimum requirements.'
+                'Please proceed to install it.'
             };
             error('DataJoint:verifyGHToolbox:Failed', ...
                   sprintf('%s\n', GHToolboxMsg{:}));
