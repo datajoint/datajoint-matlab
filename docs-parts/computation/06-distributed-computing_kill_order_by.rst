@@ -1,10 +1,10 @@
 
 For example, to sort the output by hostname in descending order:
 
-.. code-block:: text
+.. code-block:: matlab
 
 
-    >> dj.kill('', dj.conn, 'host desc');
+    dj.kill('', dj.conn, 'host desc');
     
       ID   USER   HOST        DB   COMMAND   TIME   STATE   INFO   TIME_MS   ROWS_SENT   ROWS_EXAMINED 
      +--+ +----+ +---------+ +--+ +-------+ +----+ +-----+ +----+ +-------+ +---------+ +-------------+
