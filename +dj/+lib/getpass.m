@@ -35,10 +35,15 @@ set(hfig,'KeyPressFcn',{@keypress_cb, hpass}, 'CloseRequestFcn','uiresume')
 % wait for password entry
 uiwait
 pass = get(hpass,'userdata');
+if isempty(pass)
+    pass = '';
+end
+
 % remove the figure to prevent passwork leakage
 delete(hfig)
-
   
+end
+
 function keypress_cb(hObj, data, hpass)
 % Callback function to handle actual key strokes
 
@@ -56,3 +61,4 @@ function keypress_cb(hObj, data, hpass)
     end
     set(hpass, 'userdata', pass)
     set(hpass, 'String', char('*' * sign(pass)))
+end
