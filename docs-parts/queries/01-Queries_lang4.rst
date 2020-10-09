@@ -1,5 +1,5 @@
 
-The ``exist`` method applied to a query object evaluates to ``true`` if the query returns any entities and to ``false`` if the query result is empty.
+The ``exists`` method applied to a query object evaluates to ``true`` if the query returns any entities and to ``false`` if the query result is empty.
 
 The ``count`` method applied to a query object determines the number of entities returned by the query.
 

@@ -27,7 +27,7 @@ end
 
 % get password prompt option
 if nargin < 7 || isempty(nogui)
-    nogui = false;
+    nogui = ~usejava('desktop');
 end
 
 
@@ -119,3 +119,6 @@ end
 if nargout==0
     query(connObj, 'SELECT connection_id()')
 end
+
+end
+
