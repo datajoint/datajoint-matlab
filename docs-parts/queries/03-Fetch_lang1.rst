@@ -2,7 +2,7 @@
 DataJoint for MATLAB provides three distinct fetch methods: ``fetch``, ``fetch1``, and ``fetchn``.
 The three methods differ by the type and number of their returned variables.
 
-``query.fetch`` returns the result in the form of an *n* ⨉ 1  `struct array <https://www.mathworks.com/help/matlab/ref/struct.html>`_ where *n*.
+``query.fetch`` returns the result in the form of an *n* ⨉ 1  `struct array <https://www.mathworks.com/help/matlab/ref/struct.html>`_ where *n* is the number of records matching the query expression.
 
 ``query.fetch1`` and ``query.fetchn`` split the result into separate output arguments, one for each attribute of the query.
 

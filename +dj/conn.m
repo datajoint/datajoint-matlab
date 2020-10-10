@@ -27,7 +27,7 @@ end
 
 % get password prompt option
 if nargin < 7 || isempty(nogui)
-    nogui = false;
+    nogui = ~usejava('desktop');
 end
 
 
