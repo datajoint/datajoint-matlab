@@ -8,4 +8,4 @@ docker-compose.yml
 matlab.prf
 win.*
 macos.*
-package.prj
+*.prj
