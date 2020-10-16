@@ -1,4 +1,4 @@
-classdef TestConnection < tests.Prep
+classdef TestConnection < Prep
     % TestConnection tests typical connection scenarios.
     methods (Test)
         function TestConnection_testConnection(testCase)
