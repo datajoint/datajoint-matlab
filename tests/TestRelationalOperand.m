@@ -1,4 +1,4 @@
-classdef TestRelationalOperand < tests.Prep
+classdef TestRelationalOperand < Prep
     % TestRelationalOperand tests relational operations.
     methods (Test)
         function TestRelationalOperand_testUpdateDate(testCase)

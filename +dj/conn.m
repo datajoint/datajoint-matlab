@@ -45,7 +45,6 @@ if isa(CONN, 'dj.Connection') && ~reset
         end
     end
 else
-    % invoke setupDJ
     % optional environment variables specifying the connection.
     env  = struct(...
         'host', 'DJ_HOST', ...
