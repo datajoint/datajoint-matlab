@@ -149,8 +149,10 @@ classdef AutoPopulate < dj.internal.UserRelation
             %   key=null          : blob                  # structure containing the key
             %   error_message=""  : varchar(1023)         # error message returned if failed
             %   error_stack=null  : blob                  # error stack if failed
+            %   user=""           : varchar(255)          # database user                
             %   host=""           : varchar(255)          # system hostname
             %   pid=0             : int unsigned          # system process id
+            %   connection_id=0   : bigint unsigned       # connecton_id()
             %   timestamp=CURRENT_TIMESTAMP : timestamp    # automatic timestamp
             %
             % A job is considered to be available when <package>.Jobs contains
@@ -390,8 +392,10 @@ classdef AutoPopulate < dj.internal.UserRelation
                     catch
                         [~,host] = system('hostname');
                     end
+                    jobKey.user = self.schema.conn.user
                     jobKey.host = strtrim(host);
                     jobKey.pid = feature('getpid');
+                    jobKey.connection_id = self.schema.conn.serverId;
                 end
                 if ismember('error_key', self.jobs.header.names)
                     % for backward compatibility with versions prior to 2.6.3
@@ -420,8 +424,10 @@ classdef AutoPopulate < dj.internal.UserRelation
             fprintf(f, 'key=null           : blob                     # structure containing the key\n');
             fprintf(f, 'error_message=""   : varchar(1023)            # error message returned if failed\n');
             fprintf(f, 'error_stack=null   : blob                     # error stack if failed\n');
+            fprintf(f, 'user=""            : varchar(255)             # database user\n');
             fprintf(f, 'host=""            : varchar(255)             # system hostname\n');
             fprintf(f, 'pid=0              : int unsigned             # system process id\n');
+            fprintf(f, 'connection_id=0    : int unsigned             # connection_id()\n');
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp       # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
             fprintf(f, 'classdef Jobs < dj.Jobs\n');

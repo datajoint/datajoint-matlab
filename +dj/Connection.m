@@ -6,7 +6,8 @@ classdef Connection < handle
         initQuery    % initializing function or query executed for each new session
         use_tls
         inTransaction = false
-        connId       % connection handle
+        connId       % MyM connection handle
+        serverId     % server connection ID
         packages     % maps database names to package names
         schemas      % registered schema objects
         
@@ -167,6 +168,11 @@ classdef Connection < handle
                 if ~isempty(self.initQuery)
                     self.query(self.initQuery);
                 end
+                
+                res = self.query('SELECT CONNECTION_ID() as id');
+                res = cell2struct(struct2cell(res), lower(fieldnames(res)));
+                self.serverId = res.id;
+                
             end
             v = varargin;
             if dj.config('queryBigint_to_double')
