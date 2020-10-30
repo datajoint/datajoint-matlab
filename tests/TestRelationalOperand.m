@@ -52,7 +52,8 @@ classdef TestRelationalOperand < Prep
                     rethrow(ME);
                 end
             end
-            % verify reverse engineering (TBD)
+            % verify reverse engineering
+            % (pending https://github.com/datajoint/datajoint-matlab/issues/305 solution)
             q = Lab.ActiveSession;
             raw_def = dj.internal.Declare.getDefinition(q);
             assembled_def = describe(q);
