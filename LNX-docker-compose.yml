@@ -62,13 +62,13 @@ services:
                         'relational database.'],\
                        docs,\
                        {'.vscode', '.git', '*.env', '.gitignore', '.travis.yml', 'tests',\
-                        'docs-parts', 'mym', 'erd.m', '*docker-compose.yml', 'LICENSE.txt',\
+                        'docs-parts', 'mym', '*docker-compose.yml', 'LICENSE.txt',\
                         'matlab.prf', 'package.m', 'README.md'},\
                        @() strjoin(arrayfun(@(x) num2str(x),\
                                             cell2mat(struct2cell(dj.version)),\
                                             'uni', false),\
                                    '.'),\
-                       {'+dj'});\
+                       {'+dj', 'erd.m'});\
           matlab.addons.toolbox.installToolbox('DataJoint.mltbx');\
           cd(getenv('ORIG_DIR'));\
           addpath('tests');\
