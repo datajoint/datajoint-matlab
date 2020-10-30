@@ -25,11 +25,16 @@ function nkill = kill_quick(restriction, connection)
         qstr = sprintf('%s AND (%s)', qstr, restriction);
     end
 
-    sprintf('%s', qstr)
-
     res = query(connection, qstr);
+
+    if isfield(res, 'ID')  % MySQL >8.x variation
+        id_field = 'ID';
+    else
+        id_field = 'id';
+    end
+
     nkill = 0;
-    for id = double(res.ID)'
+    for id = double(res.(id_field))'
         query(connection, 'kill {Si}', id);
         nkill = nkill + 1;
     end
