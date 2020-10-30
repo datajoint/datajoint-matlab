@@ -7,6 +7,7 @@ classdef Connection < handle
         use_tls
         inTransaction = false
         connId       % connection handle
+        serverId     % server connection ID
         packages     % maps database names to package names
         schemas      % registered schema objects
         
@@ -174,9 +175,14 @@ classdef Connection < handle
             if ~self.isConnected
                 self.connId=mym(-1, 'open', self.host, self.user, self.password, self.use_tls);
                 if ~isempty(self.initQuery)
-                    self.query(self.initQuery);
+                    mym(self.connId, self.initQuery);
                 end
+
+                tmp = mym(self.connId, 'SELECT CONNECTION_ID() as id');
+                self.serverId = tmp.id;
+
             end
+            
             v = varargin;
             if dj.config('queryBigint_to_double')
                 v{end+1} = 'bigint_to_double';
