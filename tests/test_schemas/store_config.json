@@ -1,0 +1,86 @@
+{
+    "database.host": "env",
+    "database.password": "var",
+    "database.user": "override",
+    "database.port": 3306,
+    "database.reconnect": true,
+    "connection.init_function": null,
+    "connection.charset": "",
+    "loglevel": "DEBUG",
+    "safemode": false,
+    "fetch_format": "array",
+    "display.limit": 12,
+    "display.width": 14,
+    "display.show_tuple_count": true,
+    "database.use_tls": null,
+    "enable_python_native_blobs": false,
+    "stores": {
+        "local": {
+            "protocol": "file",
+            "location": "{{external_file_store_root}}/base",
+            "subfolding": [
+                3,
+                4
+            ]
+        },
+        "new_local": {
+            "datajoint_type": "blob",
+            "protocol": "file",
+            "location": "{{external_file_store_root}}/base",
+            "subfolding": [
+                3,
+                4
+            ]
+        },
+        "local_default": {
+            "protocol": "file",
+            "location": "{{external_file_store_root}}/base"
+        },
+        "new_local_default": {
+            "datajoint_type": "blob",
+            "protocol": "file",
+            "location": "{{external_file_store_root}}/base"
+        },
+        "remote": {
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret",
+            "secure": false,
+            "subfolding": [
+                3,
+                4
+            ]
+        },
+        "new_remote": {
+            "datajoint_type": "blob",
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret",
+            "secure": true,
+            "subfolding": []
+        },
+        "remote_default": {
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret"
+        },
+        "new_remote_default": {
+            "datajoint_type": "blob",
+            "protocol": "s3",
+            "location": "lab1/base",
+            "endpoint": "example:1234",
+            "bucket": "dep1",
+            "access_key": "key",
+            "secret_key": "secret"
+        }
+    }
+}

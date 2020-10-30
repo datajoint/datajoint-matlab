@@ -1,5 +1,6 @@
 *.m~
 mym/
+*.mltbx
 *.env
 notebook
 *getSchema.m
@@ -8,5 +9,3 @@ docker-compose.yml
 matlab.prf
 win.*
 macos.*
-*.prj
-*.mltbx

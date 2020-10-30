@@ -8,9 +8,10 @@ classdef Connection < handle
         inTransaction = false
         connId       % connection handle
         packages     % maps database names to package names
+        schemas      % registered schema objects
         
         % dependency lookups by table name
-        foreignKeys   % maps table names to their referenced table names     (primary foreign key)
+        foreignKeys   % maps table names to their referenced table names  (primary foreign key)
     end
     
     properties(Access = private)
@@ -39,9 +40,14 @@ classdef Connection < handle
             end
             self.foreignKeys  = struct([]);
             self.packages = containers.Map;
+            self.schemas = struct();
         end
         
         
+        function register(self, schema)
+            self.schemas.(schema.dbname) = schema;
+        end
+
         function addPackage(self, dbname, package)
             self.packages(dbname) = package;
         end
@@ -55,7 +61,8 @@ classdef Connection < handle
                 '\((?<ref_attrs>[`\w, ]+)\)');
             
             for tabName = schema.headers.keys
-                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
+                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, ...
+                    tabName{1}));
                 fk = strtrim(regexp(fk.('Create Table'){1},'\n','split')');
                 fk = regexp(fk, pat, 'names');
                 fk = [fk{:}];
@@ -121,7 +128,8 @@ classdef Connection < handle
             s = regexp(fullTableName, '^`(?<dbname>.+)`.`(?<tablename>[#~\w\d]+)`$','names');
             className = fullTableName;
             if ~isempty(s) && self.packages.isKey(s.dbname)
-                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(s.tablename));
+                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(...
+                    s.tablename));
             elseif strict
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
             end
@@ -141,7 +149,7 @@ classdef Connection < handle
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             if ~ret && self.inTransaction
-                if dj.set('reconnectTimedoutTransaction')
+                if dj.config('databaseReconnect_transaction')
                     warning 'Reconnected after server disconnected during a transaction'
                 else
                     error 'Server disconnected during a transaction'
@@ -161,7 +169,7 @@ classdef Connection < handle
                 end
             end
             v = varargin;
-            if dj.set('bigint_to_double')
+            if dj.config('queryBigint_to_double')
                 v{end+1} = 'bigint_to_double';
             end
             if nargout>0
