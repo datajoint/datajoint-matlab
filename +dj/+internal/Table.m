@@ -269,10 +269,8 @@ classdef Table < handle
                             self.schema.conn.tableToClass(fk(i).ref));
                     else
                         ref_attr = setdiff(fk(i).attrs, fk(i).ref_attrs);
-                        assert(length(ref_attr)==1, ...
-                            'only single-attributes aliases are supported for now')
-                        str = sprintf('%s\n (%s) -> %s', str, ref_attr{1}, ...
-                            self.schema.conn.tableToClass(fk(i).ref));
+                        str = sprintf('%s\n (%s) -> %s', str, strjoin(ref_attr, ', '), ...
+                                      self.schema.conn.tableToClass(fk(i).ref));
                     end
                 end
                 fk(resolved) = [];
@@ -369,8 +367,8 @@ classdef Table < handle
             if isa(target, 'dj.Table')
                 target = sprintf('->%s', target.className);
             end
-            [attr_sql, fk_sql, ~] = dj.internal.Declare.makeFK('', target, self.primaryKey, ...
-                true, dj.internal.shorthash(self.fullTableName));
+            [attr_sql, fk_sql, ~, ~] = dj.internal.Declare.makeFK('', target, ...
+                self.primaryKey, true, dj.internal.shorthash(self.fullTableName));
             self.alter(sprintf('ADD %s%s', attr_sql, fk_sql))
         end
         
