@@ -58,13 +58,9 @@ function kill(restriction, connection, order_by)
         elseif ischar(id) && strncmpi(id, 'a', 1)
             res = query(connection, qstr);
 
-            if isfield(res, 'ID')  % MySQL >8.x variation
-                id_field = 'ID';
-            else
-                id_field = 'id';
-            end
+            res = cell2struct(struct2cell(res), lower(fieldnames(res)));
 
-            id = double(res.(id_field))';
+            id = double(res.id)';
             for i = id
                 query(connection, 'kill {Si}', i)
             end

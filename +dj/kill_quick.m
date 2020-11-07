@@ -27,14 +27,10 @@ function nkill = kill_quick(restriction, connection)
 
     res = query(connection, qstr);
 
-    if isfield(res, 'ID')  % MySQL >8.x variation
-        id_field = 'ID';
-    else
-        id_field = 'id';
-    end
+    res = cell2struct(struct2cell(res), lower(fieldnames(res)));
 
     nkill = 0;
-    for id = double(res.(id_field))'
+    for id = double(res.id)'
         query(connection, 'kill {Si}', id);
         nkill = nkill + 1;
     end
