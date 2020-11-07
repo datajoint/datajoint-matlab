@@ -174,12 +174,13 @@ classdef Connection < handle
             % The same connection is re-used by all DataJoint objects.
             if ~self.isConnected
                 self.connId=mym(-1, 'open', self.host, self.user, self.password, self.use_tls);
+
                 if ~isempty(self.initQuery)
                     mym(self.connId, self.initQuery);
                 end
 
                 tmp = mym(self.connId, 'SELECT CONNECTION_ID() as id');
-                self.serverId = tmp.id;
+                self.serverId = uint64(tmp.id);
 
             end
             
