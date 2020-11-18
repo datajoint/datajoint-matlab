@@ -331,9 +331,42 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             for tuple=tuples(:)'
                 valueStr = '';
                 for i = find(ix)
-                    [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
-                    if ~isempty(v) || ischar(v)
-                        blobs{end+1} = v;   %#ok<AGROW>
+                    v = tuple.(header.attributes(i).name);
+                    if header.attributes(i).isString
+                        assert(dj.lib.isString(v), ...
+                            'The field %s must be a character string', ...
+                            header.attributes(i).name)
+                        if isempty(v)
+                            valueStr = sprintf('%s"",',valueStr);
+                        else
+                            valueStr = sprintf('%s"{S}",', valueStr);
+                            blobs{end+1} = char(v);  %#ok<AGROW>
+                        end
+                    elseif header.attributes(i).isBlob
+                        assert(~issparse(v), ...
+                            'DataJoint:DataType:Mismatch', ...
+                            'Sparse matrix in blob field `%s` is currently not supported', ...
+                            header.attributes(i).name);
+                        valueStr = sprintf('%s"{M}",', valueStr);
+                        blobs{end+1} = v;    %#ok<AGROW>
+                    else
+                        assert((isnumeric(v) || islogical(v)) && (isscalar(v) || isempty(v)),...
+                            'The field %s must be a numeric scalar value', ...
+                            header.attributes(i).name)
+                        if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
+                            valueStr = sprintf('%sNULL,', valueStr);
+                        elseif isinf(v)
+                            error 'Infinite values are not allowed in numeric fields'
+                        else  % numeric values
+                            type = header.attributes(i).type;
+                            if length(type)>=3 && strcmpi(type(end-2:end),'int')
+                                valueStr = sprintf('%s%d,', valueStr, v);
+                            elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
+                                valueStr = sprintf('%s%u,', valueStr, v);
+                            else
+                                valueStr = sprintf('%s%1.16g,',valueStr, v);
+                            end
+                        end
                     end
                     valueStr = sprintf(['%s' placeholder ','],valueStr);
                 end
@@ -409,20 +442,23 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             %   update(v2p.Mice & key, 'mouse_dob',   '2011-01-01')
             %   update(v2p.Scan & key, 'lens')   % set the value to NULL
             
-            assert(count(self)==1, 'Update is only allowed on one tuple at a time')
-            isNull = nargin<3;
+            assert(count(self)==1, 'Update is only allowed on one tuple at a time');
             header = self.header;
             ix = find(strcmp(attrname,header.names));
-            assert(numel(ix)==1, 'invalid attribute name')
+            assert(numel(ix)==1, 'invalid attribute name');
             assert(~header.attributes(ix).iskey, ...
-                'cannot update a key value. Use insert(..,''REPLACE'') instead')
+                'cannot update a key value. Use insert(..,''REPLACE'') instead');
+            isNull = nargin<3 || (header.attributes(ix).isNumeric && isnan(value)) || ...
+                (~header.attributes(ix).isNumeric && ~ischar(value) && isempty(value));
             
             switch true
                 case isNull
+                    assert(header.attributes(ix).isnullable, ...
+                        'attribute `%s` is not nullable.', attrname);
                     valueStr = 'NULL';
                     value = {};
                 case header.attributes(ix).isString
-                    assert(dj.lib.isString(value), 'Value must be a string')
+                    assert(dj.lib.isString(value), 'Value must be a string');
                     valueStr = '"{S}"';
                     value = {char(value)};
                 case header.attributes(ix).isAttachment || header.attributes(ix).isFilepath
@@ -434,24 +470,12 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         'DataJoint:DataType:Mismatch', ...
                         'Sparse matrix in blob field `%s` is currently not supported', ...
                         attrname);
-                    if isempty(value) && header.attributes(ix).isnullable
-                        valueStr = 'NULL';
-                        value = {};
-                    else
-                        valueStr = '"{M}"';
-                        value = {value};
-                    end
+                    valueStr = '"{M}"';
+                    value = {value};
                 case header.attributes(ix).isNumeric
                     assert(isscalar(value) && isnumeric(value), 'Numeric value must be scalar')
-                    if isnan(value)
-                        assert(header.attributes(ix).isnullable, ...
-                            'attribute `%s` is not nullable. NaNs not allowed', attrname)
-                        valueStr = 'NULL';
-                        value = {};
-                    else
-                        valueStr = sprintf('%1.16g',value);
-                        value = {};
-                    end
+                    valueStr = sprintf('%1.16g',value);
+                    value = {};
                 otherwise
                     error 'invalid update command'
             end

@@ -79,19 +79,49 @@ services:
       - "8888:8888"
     user: ${MATLAB_UID}:${MATLAB_GID}
     working_dir: /home/muser/notebooks
-    command: > 
-      /bin/bash -c "
-        ## Remove mym
-        rm -R /src/mym;
-        ## Set dj path
-        matlab -nodisplay -r \"\
-            addpath('/src');\
-            addpath('/src/tests');\
-            savepath;\
-          \";
-        ## Interactive Jupyter Notebook environment
-        jupyter notebook;
-      "
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ORIG_DIR=$$(pwd)
+        mkdir ~/Documents
+        cd /src
+        # package into toolbox, and install
+        matlab -nodisplay -r "
+          websave([tempdir 'GHToolbox.mltbx'],\
+                  ['https://github.com/datajoint/GHToolbox' \
+                   '/releases/download/' subsref(webread(['https://api.github.com/repos' \
+                                                          '/datajoint/GHToolbox' \
+                                                          '/releases/latest']),\
+                                                 substruct('.', 'tag_name')) \
+                   '/GHToolbox.mltbx']);\
+          matlab.addons.toolbox.installToolbox([tempdir 'GHToolbox.mltbx']);\
+          fid = fopen('README.md', 'r');\
+          docs = fread(fid, '*char')';\
+          fclose(fid);\
+          ghtb.package('DataJoint',\
+                       'Raphael Guzman',\
+                       'raphael.h.guzman@gmail.com',\
+                       ['Scientific workflow management framework built on top of a ' \
+                        'relational database.'],\
+                       docs,\
+                       {'.vscode', '.git', '*.env', '.gitignore', '.travis.yml', 'tests',\
+                        'docs-parts', 'mym', '*docker-compose.yml', 'LICENSE.txt',\
+                        'matlab.prf', 'package.m', 'README.md'},\
+                       @() strjoin(arrayfun(@(x) num2str(x),\
+                                            cell2mat(struct2cell(dj.version)),\
+                                            'uni', false),\
+                                   '.'),\
+                       {'+dj', 'erd.m'});\
+          matlab.addons.toolbox.installToolbox('DataJoint.mltbx');\
+          cd(tempdir);\
+          disp(dj.version);\
+        "
+        cd "$${ORIG_DIR}"
+        # Copy preferences
+        cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
+        # Interactive Jupyter Notebook environment
+        jupyter notebook
     mac_address: $MATLAB_HOSTID
     volumes:
       ## Dev mounts
@@ -99,5 +129,6 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       ## Additional mounts may go here
       # - ./notebook:/home/muser/notebooks
+      # - ./matlab.prf:/tmp/matlab.prf
 networks:
   main:

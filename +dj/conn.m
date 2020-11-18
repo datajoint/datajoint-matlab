@@ -27,7 +27,7 @@ end
 
 % get password prompt option
 if nargin < 7 || isempty(nogui)
-    nogui = false;
+    nogui = ~usejava('desktop');
 end
 
 if nargin<1 || isempty(host)
@@ -51,7 +51,12 @@ if isa(CONN, 'dj.Connection') && ~reset
         end
     end
 else
-    % invoke setupDJ
+    % optional environment variables specifying the connection.
+    env  = struct(...
+        'host', 'DJ_HOST', ...
+        'user', 'DJ_USER', ...
+        'pass', 'DJ_PASS', ...
+        'init', 'DJ_INIT');
     
     % get host address
     if isempty(host)
@@ -116,3 +121,6 @@ end
 if nargout==0
     query(connObj, 'SELECT connection_id()')
 end
+
+end
+
