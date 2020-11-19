@@ -105,9 +105,8 @@ services:
                        ['Scientific workflow management framework built on top of a ' \
                         'relational database.'],\
                        docs,\
-                       {'.vscode', '.git', '*.env', '.gitignore', '.travis.yml', 'tests',\
-                        'docs-parts', 'mym', '*docker-compose.yml', 'LICENSE.txt',\
-                        'matlab.prf', 'package.m', 'README.md'},\
+                       {'.vscode', '.git', '*.env', '.gitignore', '*.yml', 'tests', 'mym'\
+                        'docs-parts', '*.txt', '*.prf', '*.md'},\
                        @() strjoin(arrayfun(@(x) num2str(x),\
                                             cell2mat(struct2cell(dj.version)),\
                                             'uni', false),\

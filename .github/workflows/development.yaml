@@ -1,0 +1,39 @@
+name: Development
+on:
+  push:
+    branches:
+      - '**' # every branch
+      - '!stage*' # exclude branches beginning with stage
+  pull_request:
+    branches:
+      - '**' # every branch
+      - '!stage*' # exclude branches beginning with stage
+jobs:
+  test:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        matlab_version: ["R2019a"]
+        mysql_version: ["8.0.18", "5.7", "5.6"]
+        include:
+          - matlab_version: "R2018b"
+            mysql_version: "5.7"
+          - matlab_version: "R2016b"
+            mysql_version: "5.7"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run primary tests
+        env:
+          MATLAB_UID: "1001"
+          MATLAB_GID: "116"
+          MATLAB_USER: ${{ secrets.matlab_user }}
+          MATLAB_HOSTID: ${{ secrets.matlab_hostid }}
+          MATLAB_VERSION: ${{ matrix.matlab_version }}
+          MYSQL_TAG: ${{ matrix.mysql_version }}
+          MINIO_VER: RELEASE.2019-09-26T19-42-35Z
+          MATLAB_LICENSE: ${{ secrets[format('matlab_license_{0}', matrix.matlab_version)] }}
+          DOCKER_CLIENT_TIMEOUT: "120"
+          COMPOSE_HTTP_TIMEOUT: "120"
+        run: |
+          docker-compose -f LNX-docker-compose.yml up --build --exit-code-from app
