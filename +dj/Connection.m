@@ -28,7 +28,7 @@ classdef Connection < handle
             % specify the connection to the database.
             % initQuery is the SQL query to be executed at the start
             % of each new session.
-            dj.setup('prompt', ~dj.set('suppressPrompt'));
+            dj.setup('prompt', dj.config('safemode'));
             self.host = host;
             self.user = username;
             self.password = password;

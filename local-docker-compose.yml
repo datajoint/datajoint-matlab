@@ -113,6 +113,8 @@ services:
                                    '.'),\
                        {'+dj', 'erd.m'});\
           matlab.addons.toolbox.installToolbox('DataJoint.mltbx');\
+          addpath('tests');\
+          savepath;\
           cd(tempdir);\
           disp(dj.version);\
         "
@@ -128,6 +130,6 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       ## Additional mounts may go here
       # - ./notebook:/home/muser/notebooks
-      # - ./matlab.prf:/tmp/matlab.prf
+      - ./matlab.prf:/tmp/matlab.prf
 networks:
   main:

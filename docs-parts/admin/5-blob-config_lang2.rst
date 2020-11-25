@@ -1,1 +1,1 @@
-Use ``dj.set`` for configuration.
+Use ``dj.config`` for configuration.

@@ -22,7 +22,8 @@ classdef Prep < matlab.unittest.TestCase
     methods
         function obj = Prep()
             % Initialize test_root
-            obj.test_root = [pwd '/tests'];
+            % obj.test_root = [pwd '/tests'];
+            obj.test_root = fileparts(which('Main'));
         end
      end
     methods (TestClassSetup)
@@ -30,7 +31,7 @@ classdef Prep < matlab.unittest.TestCase
             disp('---------------INIT---------------');
             clear functions;
             addpath([testCase.test_root '/test_schemas']);
-            dj.set('suppressPrompt', true);
+            dj.config('safemode', false);
             disp(dj.version);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
@@ -95,8 +96,7 @@ classdef Prep < matlab.unittest.TestCase
     methods (TestClassTeardown)
         function dispose(testCase)
             disp('---------------DISP---------------');
-            warning('off','MATLAB:RMDIR:RemovedFromPath');
-            dj.set('suppressPrompt', true);
+            dj.config('safemode', false);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password, '',true);
 
@@ -127,6 +127,7 @@ classdef Prep < matlab.unittest.TestCase
                     '/getSchema.m']);
                 % delete(['test_schemas/+University/getSchema.m'])
             end
+            warning('off','MATLAB:RMDIR:RemovedFromPath');
             rmpath([testCase.test_root '/test_schemas']);
             warning('on','MATLAB:RMDIR:RemovedFromPath');
         end
