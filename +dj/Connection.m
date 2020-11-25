@@ -7,7 +7,7 @@ classdef Connection < handle
         use_tls
         inTransaction = false
         connId       % connection handle
-        serverId     % server connection ID
+        serverId     % database connection id
         packages     % maps database names to package names
         schemas      % registered schema objects
         

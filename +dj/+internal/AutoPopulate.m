@@ -152,7 +152,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             %   user=""           : varchar(255)          # database user
             %   host=""           : varchar(255)          # system hostname
             %   pid=0             : int unsigned          # system process id
-            %   connection_id=0   : bigint unsigned       # system process id                
+            %   connection_id=0   : bigint unsigned       # database connection id
             %   timestamp=CURRENT_TIMESTAMP : timestamp    # automatic timestamp
             %
             % A job is considered to be available when <package>.Jobs contains
@@ -427,7 +427,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             fprintf(f, 'user=""            : varchar(255)             # database user\n');            
             fprintf(f, 'host=""            : varchar(255)             # system hostname\n');
             fprintf(f, 'pid=0              : int unsigned             # system process id\n');
-            fprintf(f, 'connection_id=0    : bigint unsigned          # connection_id()\n');
+            fprintf(f, 'connection_id=0    : bigint unsigned          # database connection id\n');
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp       # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
             fprintf(f, 'classdef Jobs < dj.Jobs\n');
