@@ -114,5 +114,7 @@ if ~connObj.isConnected
 end
 
 if nargout==0
-    query(connObj, 'SELECT connection_id()')
+    fprintf('database connection id: %d\n', connObj.serverId);    
+end
+
 end

@@ -135,12 +135,14 @@ classdef Declare
                         inKey = false;                        
                         % foreign key
                     case regexp(line, '^(\s*\([^)]+\)\s*)?->.+$')
-                        [fk_attr_sql, fk_sql, newFields] = dj.internal.Declare.makeFK( ...
-                            line, fields, inKey, ...
-                            dj.internal.shorthash(sprintf('`%s`.`%s`', ...
-                            table_instance.schema.dbname, tableName)));
+                        [fk_attr_sql, fk_sql, newFields, idx_sql] = ...
+                            dj.internal.Declare.makeFK( ...
+                                line, fields, inKey, ...
+                                dj.internal.shorthash(sprintf('`%s`.`%s`', ...
+                                table_instance.schema.dbname, tableName)));
                         attributeSql = [attributeSql, fk_attr_sql]; %#ok<AGROW>
                         foreignKeySql = [foreignKeySql, fk_sql]; %#ok<AGROW>
+                        indexSql = [indexSql, idx_sql]; %#ok<AGROW>
                         fields = [fields, newFields]; %#ok<AGROW>
                         if inKey
                             primaryFields = [primaryFields, newFields]; %#ok<AGROW>
@@ -236,7 +238,8 @@ classdef Declare
             fieldInfo.isnullable = strcmpi(fieldInfo.default,'null');
         end
 
-        function [all_attr_sql, fk_sql, newattrs] = makeFK(line, existingFields, inKey, hash)
+        function [all_attr_sql, fk_sql, newattrs, idx_sql] = makeFK(line, existingFields, ...
+                                                                    inKey, hash)
             % [sql, newattrs] = MAKEFK(sql, line, existingFields, inKey, hash)
             %   Add foreign key to SQL table definition.
             %   sql:            <string> Modified in-place SQL to include foreign keys.
@@ -247,8 +250,11 @@ classdef Declare
             %   hash:           <string> Current hash as base.
             fk_sql = '';
             all_attr_sql = '';
+            idx_sql = '';
             pat = ['^(?<newattrs>\([\s\w,]*\))?' ...
                 '\s*->\s*' ...
+                '(?<options>\[[\s\w,]*\])?' ...
+                '\s*' ...
                 '(?<cname>\w+\.[A-Z][A-Za-z0-9]*)' ...
                 '\w*' ...
                 '(?<attrs>\([\s\w,]*\))?' ...
@@ -263,12 +269,17 @@ classdef Declare
             
             % parse and validate the attribute lists
             attrs = strsplit(fk.attrs, {' ',',','(',')'});
+            options = strsplit(fk.options, {' ',',','[',']'});
             newattrs = strsplit(fk.newattrs, {' ',',','(',')'});
             attrs(cellfun(@isempty, attrs))=[];
+            options(cellfun(@isempty, options))=[];
             newattrs(cellfun(@isempty, newattrs))=[];
             assert(all(cellfun(@(a) ismember(a, rel.primaryKey), attrs)), ...
                 'All attributes in (%s) must be in the primary key of %s', ...
                 strjoin(attrs, ','), rel.className)
+            assert(~inKey || ~any(strcmpi('NULLABLE', options)), ...
+                                  sprintf(['Primary dependencies cannot be ' ...
+                                           'nullable in line "%s"'], line));
             if length(newattrs)==1 
                 % unambiguous single attribute
                 if length(rel.primaryKey)==1
@@ -298,7 +309,7 @@ classdef Declare
                 fieldInfo = rel.tableHeader.attributes(strcmp(attrs{i}, ...
                     rel.tableHeader.names));
                 fieldInfo.name = newattrs{i};
-                fieldInfo.nullabe = ~inKey;   % nonprimary references are nullable
+                fieldInfo.isnullable = logical(~inKey*any(strcmpi('NULLABLE', options)));
                 [attr_sql, ~, ~] = dj.internal.Declare.compileAttribute(fieldInfo, []);
                 all_attr_sql = sprintf('%s%s,\n', all_attr_sql, attr_sql);
             end
@@ -311,6 +322,9 @@ classdef Declare
                 ['%sCONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s) ' ...
                 'ON UPDATE CASCADE ON DELETE RESTRICT'], fk_sql, hash, ...
                 backquotedList(fkattrs), rel.fullTableName, backquotedList(rel.primaryKey));
+            if any(strcmpi('UNIQUE', options))
+                idx_sql = sprintf('UNIQUE INDEX (%s)', ['`' strjoin(newattrs, '`,`') '`']);
+            end
         end
 
         function [field, foreignKeySql] = substituteSpecialType(field, category, foreignKeySql)
