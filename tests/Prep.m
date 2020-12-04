@@ -18,12 +18,18 @@ classdef Prep < matlab.unittest.TestCase
     end
     properties
         test_root;
+        external_file_store_root;
     end
     methods
         function obj = Prep()
             % Initialize test_root
             % obj.test_root = [pwd '/tests'];
             obj.test_root = fileparts(which('Main'));
+            if ispc
+                obj.external_file_store_root = [getenv('TEMP') '\root'];
+            else
+                obj.external_file_store_root = '/tmp/root';
+            end
         end
      end
     methods (TestClassSetup)
@@ -91,6 +97,11 @@ classdef Prep < matlab.unittest.TestCase
                 };
                 curr_conn.query(sprintf('%s',cmd{:}));
             end
+            % create test bucket
+            dj.store_plugins.S3.RESTCallAWSSigned('http://', ...
+                testCase.S3_CONN_INFO.endpoint, ['/' testCase.S3_CONN_INFO.bucket], ...
+                uint8(''), testCase.S3_CONN_INFO.access_key, ...
+                testCase.S3_CONN_INFO.secret_key, 'put');
         end
     end
     methods (TestClassTeardown)
@@ -108,6 +119,20 @@ classdef Prep < matlab.unittest.TestCase
                     res.(['Database (' testCase.PREFIX '_%)']){i} ';']);
             end
             curr_conn.query('SET FOREIGN_KEY_CHECKS=1;');
+
+            % remove external storage content
+            if ispc
+                [status,cmdout] = system(['rmdir /Q /s "' ...
+                    testCase.external_file_store_root '"']);
+            else
+                [status,cmdout] = system(['rm -R ' ...
+                    testCase.external_file_store_root]);
+            end
+            % remove test bucket
+            dj.store_plugins.S3.RESTCallAWSSigned('http://', ...
+                testCase.S3_CONN_INFO.endpoint, ['/' testCase.S3_CONN_INFO.bucket], ...
+                uint8(''), testCase.S3_CONN_INFO.access_key, ...
+                testCase.S3_CONN_INFO.secret_key, 'delete');
 
             % remove users
             cmd = {...

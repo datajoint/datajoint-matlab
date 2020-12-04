@@ -29,7 +29,7 @@ services:
       interval: 1s
   fakeservices.datajoint.io:
     <<: *net
-    image: raphaelguzman/nginx:v0.0.10
+    image: raphaelguzman/nginx:v0.0.11
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
@@ -65,7 +65,7 @@ services:
       fakeservices.datajoint.io:
         condition: service_healthy
     user: ${MATLAB_UID}:${MATLAB_GID}
-    working_dir: /main
+    working_dir: /tmp
     command:
       - /bin/bash
       - -c
@@ -116,7 +116,7 @@ services:
         "
     mac_address: $MATLAB_HOSTID
     volumes:
-      - ./tests:/main/tests
+      - ./tests:/tmp/tests
       - .:/src
 networks:
   main:
