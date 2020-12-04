@@ -331,42 +331,9 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             for tuple=tuples(:)'
                 valueStr = '';
                 for i = find(ix)
-                    v = tuple.(header.attributes(i).name);
-                    if header.attributes(i).isString
-                        assert(dj.lib.isString(v), ...
-                            'The field %s must be a character string', ...
-                            header.attributes(i).name)
-                        if isempty(v)
-                            valueStr = sprintf('%s"",',valueStr);
-                        else
-                            valueStr = sprintf('%s"{S}",', valueStr);
-                            blobs{end+1} = char(v);  %#ok<AGROW>
-                        end
-                    elseif header.attributes(i).isBlob
-                        assert(~issparse(v), ...
-                            'DataJoint:DataType:Mismatch', ...
-                            'Sparse matrix in blob field `%s` is currently not supported', ...
-                            header.attributes(i).name);
-                        valueStr = sprintf('%s"{M}",', valueStr);
-                        blobs{end+1} = v;    %#ok<AGROW>
-                    else
-                        assert((isnumeric(v) || islogical(v)) && (isscalar(v) || isempty(v)),...
-                            'The field %s must be a numeric scalar value', ...
-                            header.attributes(i).name)
-                        if isempty(v) || isnan(v) % empty numeric values and nans are passed as nulls
-                            valueStr = sprintf('%sNULL,', valueStr);
-                        elseif isinf(v)
-                            error 'Infinite values are not allowed in numeric fields'
-                        else  % numeric values
-                            type = header.attributes(i).type;
-                            if length(type)>=3 && strcmpi(type(end-2:end),'int')
-                                valueStr = sprintf('%s%d,', valueStr, v);
-                            elseif length(type)>=12 && strcmpi(type(end-11:end),'int unsigned')
-                                valueStr = sprintf('%s%u,', valueStr, v);
-                            else
-                                valueStr = sprintf('%s%1.16g,',valueStr, v);
-                            end
-                        end
+                    [v, placeholder] = makePlaceholder(i, tuple.(header.attributes(i).name));
+                    if ~isempty(v) || ischar(v)
+                        blobs{end+1} = v;   %#ok<AGROW>
                     end
                     valueStr = sprintf(['%s' placeholder ','],valueStr);
                 end
