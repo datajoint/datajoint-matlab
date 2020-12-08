@@ -1,4 +1,4 @@
-# docker-compose -f local-docker-compose.yml --env-file LNX.env up --build
+# docker-compose -f local-docker-compose.yaml --env-file LNX.env up --build
 version: '2.4'
 x-net: &net
   networks:
@@ -105,8 +105,8 @@ services:
                        ['Scientific workflow management framework built on top of a ' \
                         'relational database.'],\
                        docs,\
-                       {'.vscode', '.git', '*.env', '.gitignore', '*.yml', 'tests', 'mym'\
-                        'docs-parts', '*.txt', '*.prf', '*.md'},\
+                       {'.vscode', '.git*', '*.env', '*.yaml', 'tests', 'mym', 'docs-parts',\
+                        '*.txt', '*.prf', '*.md', 'notebook'},\
                        @() strjoin(arrayfun(@(x) num2str(x),\
                                             cell2mat(struct2cell(dj.version)),\
                                             'uni', false),\
@@ -116,6 +116,7 @@ services:
           addpath('tests');\
           savepath;\
           cd(tempdir);\
+          dir(fileparts(which('erd')));\
           disp(dj.version);\
         "
         cd "$${ORIG_DIR}"

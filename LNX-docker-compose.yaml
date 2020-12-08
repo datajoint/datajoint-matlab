@@ -1,4 +1,4 @@
-# docker-compose -f LNX-docker-compose.yml --env-file LNX.env up --build --exit-code-from app
+# docker-compose -f LNX-docker-compose.yaml --env-file LNX.env up --build --exit-code-from app
 version: '2.2'
 x-net: &net
   networks:
@@ -93,17 +93,18 @@ services:
                         'raphael.h.guzman@gmail.com',\
                         ['Scientific workflow management framework built on top of a ' \
                          'relational database.'],\
-                         docs,\
-                         {'.vscode', '.git', '*.env', '.gitignore', '*.yml', 'tests', 'mym'\
-                          'docs-parts', '*.txt', '*.prf', '*.md'},\
-                         @() strjoin(arrayfun(@(x) num2str(x),\
-                                              cell2mat(struct2cell(dj.version)),\
-                                              'uni', false),\
+                        docs,\
+                        {'.vscode', '.git*', '*.env', '*.yaml', 'tests', 'mym', 'docs-parts',\
+                         '*.txt', '*.prf', '*.md', 'notebook'},\
+                        @() strjoin(arrayfun(@(x) num2str(x),\
+                                             cell2mat(struct2cell(dj.version)),\
+                                             'uni', false),\
                                      '.'),\
-                         {'+dj', 'erd.m'});\
+                        {'+dj', 'erd.m'});\
             matlab.addons.toolbox.installToolbox('DataJoint.mltbx');\
             cd(getenv('ORIG_DIR'));\
             addpath('tests');\
+            dir(fileparts(which('erd')));\
             res=run(Main);\
             disp(res);\
             if all([res.Passed])  exit, else exit(1), end;\
