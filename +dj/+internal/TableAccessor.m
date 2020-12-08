@@ -30,8 +30,9 @@ classdef TableAccessor < dynamicprops
                 tierClass = 'dj.Manual';
                 for k=1:numel(dj.Schema.tierPrefixes)
                     tierCharLen = length(dj.Schema.tierPrefixes{k});
-                    if tierCharLen > 0 && ~isempty(regexp(dj.Schema.tierPrefixes{k}, ...
-                            tableName(1:tierCharLen), 'ONCE'))
+                    if tierCharLen > 0 && length(tableName) >= tierCharLen && ...
+                            ~isempty(regexp(dj.Schema.tierPrefixes{k}, ...
+                                            tableName(1:tierCharLen), 'ONCE'))
                         tierClass = dj.Schema.tierClasses{k};
                         break;
                     end

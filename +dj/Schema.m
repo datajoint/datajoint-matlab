@@ -77,7 +77,7 @@ classdef Schema < handle
         end
         
         
-        function makeClass(self, className)
+        function makeClass(self, className, tableTierChoice)
             % create a base relvar class for the new className in schema directory.
             %
             % Example:
@@ -115,17 +115,19 @@ classdef Schema < handle
                 tierClass = tierClassMap.(existingTable.info.tier(1));                
             else
                 existingTable = [];
-                choice = dj.internal.ask(...
-                    ['\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  ' ...
-                    'C=computed\n  P=part\n'],...
-                    {'L','M','I','C','P'});
-                tierClass = tierClassMap.(choice);
+                if nargin < 3
+                    tableTierChoice = dj.internal.ask(...
+                        ['\nChoose table tier:\n  L=lookup\n  M=manual\n  I=imported\n  ' ...
+                        'C=computed\n  P=part\n'],...
+                        {'L','M','I','C','P'});
+                end
+                tierClass = tierClassMap.(lower(tableTierChoice));
                 isAuto = ismember(tierClass, {'dj.Imported', 'dj.Computed'});
             end
-                        
+
             f = fopen(filename,'wt');
             assert(-1 ~= f, 'Could not open %s', filename)
-            
+
             % table declaration
             if numel(existingTable)
                 fprintf(f, '%s', existingTable.describe);
