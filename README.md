@@ -47,7 +47,7 @@ MATLAB_UID=1000
 MATLAB_GID=1000
 MYSQL_TAG=5.7
 ```
-* `cp local-docker-compose.yml docker-compose.yml`
+* `cp local-docker-compose.yaml docker-compose.yaml`
 * `docker-compose up` (Note configured `JUPYTER_PASSWORD`)
 * Select a means of running MATLAB e.g. Jupyter Notebook, GUI, or Terminal (see bottom)
 * Add `tests` directory to path e.g. in MATLAB, `addpath('tests')`

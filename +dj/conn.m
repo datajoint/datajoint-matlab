@@ -51,13 +51,6 @@ if isa(CONN, 'dj.Connection') && ~reset
         end
     end
 else
-    % optional environment variables specifying the connection.
-    env  = struct(...
-        'host', 'DJ_HOST', ...
-        'user', 'DJ_USER', ...
-        'pass', 'DJ_PASS', ...
-        'init', 'DJ_INIT');
-    
     % get host address
     if isempty(host)
         host = input('Enter datajoint host address> ','s');
