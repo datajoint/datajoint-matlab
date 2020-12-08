@@ -9,7 +9,7 @@
 * Minor: Add non-interactive option for dj.new (#69) #317
 * Bugfix: Handle empty password (#250) PR #279, #292
 * Bugfix: Disable GUI password if running headless (#278) PR #280, #292
-* Bugfix: Fix order to dj.kill output (#229) PR #248, #292
+* Bugfix: Add order_by option to dj.kill output (#229) PR #248, #292
 * Bugfix: erd function missing from package (#307) PR #310
 * Bugfix: Error on extremely short table names (#311) PR #317
 * Bugfix: Incorrect return when fetchn of an external field (#269) PR #274
