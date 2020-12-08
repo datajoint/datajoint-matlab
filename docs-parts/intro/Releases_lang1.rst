@@ -16,8 +16,6 @@
 * Bugfix: MATLAB crashes randomly on insert 8-byte string (#255) PR #257
 * Bugfix: Errors thrown when seeing unsupported DataJoint types (#254) PR #265
 * Bugfix: Fix SQL argument growth condition on blobs (#217) PR #220
-* (pending) Docs: Add dj.config documentation (#234) PR #???
-* (pending) Docs: Add documentation for external storage and UUID type (#321) PR #???
 * Tests: Add R2016b tests (#233) PR #235
 * Tests: Convert testing framework from TravisCI to GitHub Actions (#320) PR #317
 * Tests: Increase test coverage
