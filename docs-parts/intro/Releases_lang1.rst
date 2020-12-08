@@ -1,6 +1,6 @@
 3.4.0 -- December 9, 2020
 -------------------------
-* Minor: Add dj.config to be compatible with dj-python and removet dj.set (#186) #188
+* Minor: Add dj.config to be compatible with dj-python and removed dj.set (#186) #188
 * Minor: Add UUID DataJoint datatype (#180) PR #194
 * Minor: Add file external storage (#143) PR #197
 * Minor: Add S3 external storage (#88) PR #207
