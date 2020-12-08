@@ -15,27 +15,27 @@ classdef TestRelationalOperand < Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_university']);
 
-            insert(University.All, struct( ...
+            insert(University.A, struct( ...
                 'id', 20, ...
                 'date', '2019-12-20' ...
             ));
-            q = University.All & 'id=20';
+            q = University.A & 'id=20';
 
             new_value = [];
             q.update('date', new_value);
             res = mym(['select date from `' testCase.PREFIX ...
-                '_university`.`all` where id=20 and date is null;']);
+                '_university`.`a` where id=20 and date is null;']);
             testCase.verifyEqual(length(res.date), 1);
 
             new_value = '2020-04-14';
             q.update('date', new_value);
             res = mym(['select date from `' testCase.PREFIX ...
-                '_university`.`all` where id=20 and date like ''' new_value ''';']);
+                '_university`.`a` where id=20 and date like ''' new_value ''';']);
             testCase.verifyEqual(length(res.date), 1);
 
             q.update('date');
             res = mym(['select date from `' testCase.PREFIX ...
-                '_university`.`all` where id=20 and date is null;']);
+                '_university`.`a` where id=20 and date is null;']);
             testCase.verifyEqual(length(res.date), 1);
         end
         function TestRelationalOperand_testUpdateString(testCase)
@@ -52,39 +52,39 @@ classdef TestRelationalOperand < Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_university']);
 
-            insert(University.All, struct( ...
+            insert(University.A, struct( ...
                 'id', 30, ...
                 'string', 'normal' ...
             ));
-            q = University.All & 'id=30';
+            q = University.A & 'id=30';
 
             new_value = '';
             q.update('string', new_value);
             res = mym(['select string from `' testCase.PREFIX ...
-                '_university`.`all` where id=30 and string like ''' new_value ''';']);
+                '_university`.`a` where id=30 and string like ''' new_value ''';']);
             testCase.verifyEqual(length(res.string), 1);
 
             new_value = ' ';
             q.update('string', new_value);
             res = mym(['select string from `' testCase.PREFIX ...
-                '_university`.`all` where id=30 and string like ''' new_value ''';']);
+                '_university`.`a` where id=30 and string like ''' new_value ''';']);
             testCase.verifyEqual(length(res.string), 1);
 
             new_value = [];
             q.update('string', new_value);
             res = mym(['select string from `' testCase.PREFIX ...
-                '_university`.`all` where id=30 and string is null;']);
+                '_university`.`a` where id=30 and string is null;']);
             testCase.verifyEqual(length(res.string), 1);
 
             new_value = 'diff';
             q.update('string', new_value);
             res = mym(['select string from `' testCase.PREFIX ...
-                '_university`.`all` where id=30 and string like ''' new_value ''';']);
+                '_university`.`a` where id=30 and string like ''' new_value ''';']);
             testCase.verifyEqual(length(res.string), 1);
 
             q.update('string');
             res = mym(['select string from `' testCase.PREFIX ...
-                '_university`.`all` where id=30 and string is null;']);
+                '_university`.`a` where id=30 and string is null;']);
             testCase.verifyEqual(length(res.string), 1);
         end
         function TestRelationalOperand_testFkOptions(testCase)

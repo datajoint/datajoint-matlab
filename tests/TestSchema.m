@@ -94,5 +94,14 @@ classdef TestSchema < Prep
             schema.dropQuick;
             rmdir(store_dir, 's');
         end
+        function TestSchema_testNew(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            % setup
+            dj.config.restore;
+            dj.config('safemode', false);
+            dj.new('new.Student', 'M', pwd , 'djtest_new');
+            rmdir('+new', 's');
+        end
     end
 end

@@ -1,5 +1,5 @@
 %{
-# All
+# A
 id      : int   
 ---
 string=null   : varchar(30)
@@ -8,5 +8,5 @@ date=null     : date
 number=null   : float
 blob=null     : longblob
 %}
-classdef All < dj.Manual
+classdef A < dj.Manual
 end
