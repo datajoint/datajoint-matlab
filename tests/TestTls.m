@@ -47,11 +47,10 @@ classdef TestTls < Prep
                     'djssl', ...
                     '',true,false);
                 testCase.verifyTrue(false);
-            catch
-                e = lasterror;
-                testCase.verifyEqual(e.identifier, 'MySQL:Error');
-                testCase.verifyTrue(contains(e.message,...
-                    {'requires secure connection','Access denied'})); %MySQL8,MySQL5
+            catch ME
+                testCase.verifyEqual(ME.identifier, 'MySQL:Error');
+                testCase.verifyTrue(contains(ME.message,'requires secure connection') || ...
+                                    contains(ME.message,'Access denied')); %MySQL8 or MySQL5
             end
         end
         function TestTls_testStructException(testCase)

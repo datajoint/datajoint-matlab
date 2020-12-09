@@ -27,7 +27,7 @@ end
 
 % get password prompt option
 if nargin < 7 || isempty(nogui)
-    nogui = false;
+    nogui = ~usejava('desktop');
 end
 
 if nargin<1 || isempty(host)
@@ -51,8 +51,6 @@ if isa(CONN, 'dj.Connection') && ~reset
         end
     end
 else
-    % invoke setupDJ
-    
     % get host address
     if isempty(host)
         host = input('Enter datajoint host address> ','s');
@@ -116,3 +114,6 @@ end
 if nargout==0
     query(connObj, 'SELECT connection_id()')
 end
+
+end
+
