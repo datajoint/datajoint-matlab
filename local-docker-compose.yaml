@@ -1,0 +1,136 @@
+# docker-compose -f local-docker-compose.yaml --env-file LNX.env up --build
+version: '2.4'
+x-net: &net
+  networks:
+    - main
+services:
+  db:
+    <<: *net
+    image: datajoint/mysql:${MYSQL_TAG}
+    environment:
+      - MYSQL_ROOT_PASSWORD=simple
+    # ports:
+    #   - "3306:3306"
+    ## To persist MySQL data
+    # volumes:
+    #   - ./mysql/data:/var/lib/mysql
+  minio:
+    <<: *net
+    environment:
+      - MINIO_ACCESS_KEY=datajoint
+      - MINIO_SECRET_KEY=datajoint
+    image: minio/minio:$MINIO_VER
+    # ports:
+    #   - "9000:9000"
+    # To persist MinIO data and config
+    # volumes:
+    #   - ./minio/data:/data
+    #   - ./minio/config:/root/.minio
+    command: server /data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://minio:9000/minio/health/live"]
+      timeout: 5s
+      retries: 60
+      interval: 1s
+  fakeservices.datajoint.io:
+    <<: *net
+    image: raphaelguzman/nginx:v0.0.11
+    environment:
+    - ADD_db_TYPE=DATABASE
+    - ADD_db_ENDPOINT=db:3306
+    - ADD_minio_TYPE=MINIO
+    - ADD_minio_ENDPOINT=minio:9000
+    - ADD_minio_PORT=80 # allow unencrypted connections
+    - ADD_minio_PREFIX=/datajoint
+    - ADD_browser_TYPE=MINIOADMIN
+    - ADD_browser_ENDPOINT=minio:9000
+    - ADD_browser_PORT=80 # allow unencrypted connections
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3306:3306"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+  app:
+    <<: *net
+    environment:
+    - DJ_HOST=fakeservices.datajoint.io
+    - DJ_USER=root
+    - DJ_PASS=simple
+    - DJ_TEST_HOST=fakeservices.datajoint.io
+    - DJ_TEST_USER=datajoint
+    - DJ_TEST_PASSWORD=datajoint
+    - S3_ENDPOINT=fakeservices.datajoint.io
+    - S3_ACCESS_KEY=datajoint
+    - S3_SECRET_KEY=datajoint
+    - S3_BUCKET=datajoint.test
+    - MATLAB_USER
+    - MATLAB_LICENSE
+    - JUPYTER_PASSWORD=datajoint
+    - DISPLAY
+    image: raphaelguzman/matlab:${MATLAB_VERSION}-GUI
+    depends_on:
+      fakeservices.datajoint.io:
+        condition: service_healthy
+    ports:
+      - "8888:8888"
+    user: ${MATLAB_UID}:${MATLAB_GID}
+    working_dir: /home/muser/notebooks
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ORIG_DIR=$$(pwd)
+        mkdir ~/Documents
+        cd /src
+        # package into toolbox, and install
+        matlab -nodisplay -r "
+          websave([tempdir 'GHToolbox.mltbx'],\
+                  ['https://github.com/datajoint/GHToolbox' \
+                   '/releases/download/' subsref(webread(['https://api.github.com/repos' \
+                                                          '/datajoint/GHToolbox' \
+                                                          '/releases/latest']),\
+                                                 substruct('.', 'tag_name')) \
+                   '/GHToolbox.mltbx']);\
+          matlab.addons.toolbox.installToolbox([tempdir 'GHToolbox.mltbx']);\
+          fid = fopen('README.md', 'r');\
+          docs = fread(fid, '*char')';\
+          fclose(fid);\
+          ghtb.package('DataJoint',\
+                       'Raphael Guzman',\
+                       'raphael.h.guzman@gmail.com',\
+                       ['Scientific workflow management framework built on top of a ' \
+                        'relational database.'],\
+                       docs,\
+                       {'.vscode', '.git*', '*.env', '*.yaml', 'tests', 'mym', 'docs-parts',\
+                        '*.txt', '*.prf', '*.md', 'notebook'},\
+                       @() strjoin(arrayfun(@(x) num2str(x),\
+                                            cell2mat(struct2cell(dj.version)),\
+                                            'uni', false),\
+                                   '.'),\
+                       {'+dj', 'erd.m'});\
+          matlab.addons.toolbox.installToolbox('DataJoint.mltbx');\
+          addpath('tests');\
+          savepath;\
+          cd(tempdir);\
+          dir(fileparts(which('erd')));\
+          disp(dj.version);\
+        "
+        cd "$${ORIG_DIR}"
+        # Copy preferences
+        cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
+        # Interactive Jupyter Notebook environment
+        jupyter notebook
+    mac_address: $MATLAB_HOSTID
+    volumes:
+      ## Dev mounts
+      - .:/src
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      ## Additional mounts may go here
+      # - ./notebook:/home/muser/notebooks
+      # - ./matlab.prf:/tmp/matlab.prf
+networks:
+  main:
