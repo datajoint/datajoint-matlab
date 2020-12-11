@@ -111,12 +111,12 @@ classdef AutoPopulate < dj.internal.UserRelation
             %
             % See also dj.internal.AutoPopulate/parpopulate
             
-            if ~dj.set('populateAncestors')
+            if ~dj.config('queryPopulate_ancestors')
                 rels = {self};
             else
                 % get all ancestors to be populated before self
                 assert(nargout==0, ...
-                    'parpopulate cannot return output when populateAncestors is true')
+                    'parpopulate cannot return output when queryPopulate_ancestors is true')
                 rels = cellfun(@feval, self.ancestors, 'uni', false);
                 rels = rels(cellfun(@(x) isa(x,'dj.internal.AutoPopulate'), rels));
             end
@@ -149,8 +149,10 @@ classdef AutoPopulate < dj.internal.UserRelation
             %   key=null          : blob                  # structure containing the key
             %   error_message=""  : varchar(1023)         # error message returned if failed
             %   error_stack=null  : blob                  # error stack if failed
+            %   user=""           : varchar(255)          # database user
             %   host=""           : varchar(255)          # system hostname
             %   pid=0             : int unsigned          # system process id
+            %   connection_id=0   : bigint unsigned       # database connection id
             %   timestamp=CURRENT_TIMESTAMP : timestamp    # automatic timestamp
             %
             % A job is considered to be available when <package>.Jobs contains
@@ -171,7 +173,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             %
             % See also dj.internal.AutoPopulate/populate
             
-            if ~dj.set('populateAncestors')
+            if ~dj.config('queryPopulate_ancestors')
                 rels = {self};
             else
                 % get all ancestors to be populated before self
@@ -375,7 +377,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                                 success = false;
                             end
                         end
-                        if ~success && dj.set('verbose')
+                        if ~success && strcmpi(dj.config('loglevel'), 'DEBUG')
                             fprintf('** %s: skipping already reserved\n', self.className)
                             disp(key)
                         end
@@ -390,8 +392,10 @@ classdef AutoPopulate < dj.internal.UserRelation
                     catch
                         [~,host] = system('hostname');
                     end
+                    jobKey.user = self.schema.conn.user;
                     jobKey.host = strtrim(host);
                     jobKey.pid = feature('getpid');
+                    jobKey.connection_id = self.schema.conn.serverId;
                 end
                 if ismember('error_key', self.jobs.header.names)
                     % for backward compatibility with versions prior to 2.6.3
@@ -420,8 +424,10 @@ classdef AutoPopulate < dj.internal.UserRelation
             fprintf(f, 'key=null           : blob                     # structure containing the key\n');
             fprintf(f, 'error_message=""   : varchar(1023)            # error message returned if failed\n');
             fprintf(f, 'error_stack=null   : blob                     # error stack if failed\n');
+            fprintf(f, 'user=""            : varchar(255)             # database user\n');            
             fprintf(f, 'host=""            : varchar(255)             # system hostname\n');
             fprintf(f, 'pid=0              : int unsigned             # system process id\n');
+            fprintf(f, 'connection_id=0    : bigint unsigned          # database connection id\n');
             fprintf(f, 'timestamp=CURRENT_TIMESTAMP : timestamp       # automatic timestamp\n');
             fprintf(f, '%%}\n\n');
             fprintf(f, 'classdef Jobs < dj.Jobs\n');
@@ -433,8 +439,8 @@ classdef AutoPopulate < dj.internal.UserRelation
         function populateSanityChecks(self)
             % Performs sanity checks that are common to populate,
             % parpopulate and batch_populate.
-            % To disable the sanity check: dj.set('populateCheck',false)
-            if dj.set('populateCheck')
+            % To disable the sanity check: dj.config('queryPopulate_check',false)
+            if dj.config('queryPopulate_check')
                 source = self.getKeySource;
                 abovePopRel = setdiff(self.primaryKey(1:min(end,length(source.primaryKey))), source.primaryKey);
                 if ~all(ismember(source.primaryKey, self.primaryKey))

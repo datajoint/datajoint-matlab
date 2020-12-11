@@ -39,5 +39,39 @@ classdef TestConnection < Prep
                 testCase.CONN_INFO.password,'',true), ...
                 'MySQL:Error');
         end
+        function TestConnection_testTransactionRollback(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            package = 'University';
+
+            c1 = dj.conn(...
+                testCase.CONN_INFO.host,... 
+                testCase.CONN_INFO.user,...
+                testCase.CONN_INFO.password,'',true);
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_university']);
+            schema = University.getSchema;
+            tmp = {
+                20   'Henry'   'Jupyter' '2020-11-25 12:34:56'
+                21   'Lacy'   'Mars' '2017-11-25 12:34:56'
+            };
+
+            insert(University.Student, tmp(1, :));
+
+            schema.conn.startTransaction
+            try
+                insert(University.Student, tmp(2, :));
+                assert(false, 'Customer:Error', 'Message')
+            catch ME
+                schema.conn.cancelTransaction
+                if ~strcmp(ME.identifier,'Customer:Error')
+                    rethrow(ME);
+                end
+            end
+
+            q = University.Student & 'student_id in (20,21)';
+            testCase.verifyEqual(q.count, 1);
+            testCase.verifyEqual(q.fetch1('student_id'), 20);
+        end
     end
 end

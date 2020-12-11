@@ -3,7 +3,7 @@ mym/
 *.env
 notebook
 *getSchema.m
-docker-compose.yml
+docker-compose.y*ml
 .vscode
 matlab.prf
 win.*

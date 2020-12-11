@@ -18,11 +18,18 @@ classdef Prep < matlab.unittest.TestCase
     end
     properties
         test_root;
+        external_file_store_root;
     end
     methods
         function obj = Prep()
             % Initialize test_root
-            obj.test_root = [pwd '/tests'];
+            % obj.test_root = [pwd '/tests'];
+            obj.test_root = fileparts(which('Main'));
+            if ispc
+                obj.external_file_store_root = [getenv('TEMP') '\root'];
+            else
+                obj.external_file_store_root = '/tmp/root';
+            end
         end
      end
     methods (TestClassSetup)
@@ -30,7 +37,7 @@ classdef Prep < matlab.unittest.TestCase
             disp('---------------INIT---------------');
             clear functions;
             addpath([testCase.test_root '/test_schemas']);
-            dj.set('suppressPrompt', true);
+            dj.config('safemode', false);
             disp(dj.version);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
@@ -90,13 +97,17 @@ classdef Prep < matlab.unittest.TestCase
                 };
                 curr_conn.query(sprintf('%s',cmd{:}));
             end
+            % create test bucket
+            dj.store_plugins.S3.RESTCallAWSSigned('http://', ...
+                testCase.S3_CONN_INFO.endpoint, ['/' testCase.S3_CONN_INFO.bucket], ...
+                uint8(''), testCase.S3_CONN_INFO.access_key, ...
+                testCase.S3_CONN_INFO.secret_key, 'put');
         end
     end
     methods (TestClassTeardown)
         function dispose(testCase)
             disp('---------------DISP---------------');
-            warning('off','MATLAB:RMDIR:RemovedFromPath');
-            dj.set('suppressPrompt', true);
+            dj.config('safemode', false);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password, '',true);
 
@@ -108,6 +119,20 @@ classdef Prep < matlab.unittest.TestCase
                     res.(['Database (' testCase.PREFIX '_%)']){i} ';']);
             end
             curr_conn.query('SET FOREIGN_KEY_CHECKS=1;');
+
+            % remove external storage content
+            if ispc
+                [status,cmdout] = system(['rmdir /Q /s "' ...
+                    testCase.external_file_store_root '"']);
+            else
+                [status,cmdout] = system(['rm -R ' ...
+                    testCase.external_file_store_root]);
+            end
+            % remove test bucket
+            dj.store_plugins.S3.RESTCallAWSSigned('http://', ...
+                testCase.S3_CONN_INFO.endpoint, ['/' testCase.S3_CONN_INFO.bucket], ...
+                uint8(''), testCase.S3_CONN_INFO.access_key, ...
+                testCase.S3_CONN_INFO.secret_key, 'delete');
 
             % remove users
             cmd = {...
@@ -127,6 +152,7 @@ classdef Prep < matlab.unittest.TestCase
                     '/getSchema.m']);
                 % delete(['test_schemas/+University/getSchema.m'])
             end
+            warning('off','MATLAB:RMDIR:RemovedFromPath');
             rmpath([testCase.test_root '/test_schemas']);
             warning('on','MATLAB:RMDIR:RemovedFromPath');
         end

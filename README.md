@@ -4,6 +4,7 @@ DataJoint for MATLAB is a high-level programming interface for relational databa
 
 DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias' Lab](http://toliaslab.org) for the distributed processing and management of large volumes of data streaming from regular experiments. Starting in 2011, DataJoint has been available as an open-source project adopted by other labs and improved through contributions from several developers.
 
+
 ## Installation
 
 ### (Recommended) Greater than R2016b
@@ -46,9 +47,10 @@ MATLAB_UID=1000
 MATLAB_GID=1000
 MYSQL_TAG=5.7
 ```
-* `cp local-docker-compose.yml docker-compose.yml`
+* `cp local-docker-compose.yaml docker-compose.yaml`
 * `docker-compose up` (Note configured `JUPYTER_PASSWORD`)
 * Select a means of running MATLAB e.g. Jupyter Notebook, GUI, or Terminal (see bottom)
+* Add `tests` directory to path e.g. in MATLAB, `addpath('tests')`
 * Run desired tests. Some examples are as follows:
 
 | Use Case                     | MATLAB Code                                                                    |

@@ -1,4 +1,4 @@
-function createSchema(package,parentdir,db)
+function createSchema(package, parentdir, db)
     % DJ.CREATESCHEMA - interactively create a new DataJoint schema
     %
     % INPUT:

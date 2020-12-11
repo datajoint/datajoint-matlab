@@ -7,10 +7,12 @@ classdef Connection < handle
         use_tls
         inTransaction = false
         connId       % connection handle
+        serverId     % database connection id
         packages     % maps database names to package names
+        schemas      % registered schema objects
         
         % dependency lookups by table name
-        foreignKeys   % maps table names to their referenced table names     (primary foreign key)
+        foreignKeys   % maps table names to their referenced table names  (primary foreign key)
     end
     
     properties(Access = private)
@@ -27,7 +29,7 @@ classdef Connection < handle
             % specify the connection to the database.
             % initQuery is the SQL query to be executed at the start
             % of each new session.
-            dj.setup('prompt', ~dj.set('suppressPrompt'));
+            dj.setup('prompt', dj.config('safemode'));
             self.host = host;
             self.user = username;
             self.password = password;
@@ -39,9 +41,14 @@ classdef Connection < handle
             end
             self.foreignKeys  = struct([]);
             self.packages = containers.Map;
+            self.schemas = struct();
         end
         
         
+        function register(self, schema)
+            self.schemas.(schema.dbname) = schema;
+        end
+
         function addPackage(self, dbname, package)
             self.packages(dbname) = package;
         end
@@ -55,7 +62,8 @@ classdef Connection < handle
                 '\((?<ref_attrs>[`\w, ]+)\)');
             
             for tabName = schema.headers.keys
-                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, tabName{1}));
+                fk = self.query(sprintf('SHOW CREATE TABLE `%s`.`%s`', schema.dbname, ...
+                    tabName{1}));
                 fk = strtrim(regexp(fk.('Create Table'){1},'\n','split')');
                 fk = regexp(fk, pat, 'names');
                 fk = [fk{:}];
@@ -121,7 +129,8 @@ classdef Connection < handle
             s = regexp(fullTableName, '^`(?<dbname>.+)`.`(?<tablename>[#~\w\d]+)`$','names');
             className = fullTableName;
             if ~isempty(s) && self.packages.isKey(s.dbname)
-                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(s.tablename));
+                className = sprintf('%s.%s',self.packages(s.dbname),dj.internal.toCamelCase(...
+                    s.tablename));
             elseif strict
                 error('Unknown package for "%s". Activate its schema first.', fullTableName)
             end
@@ -141,7 +150,7 @@ classdef Connection < handle
             ret = ~isempty(self.connId) && 0==mym(self.connId, 'status');
             
             if ~ret && self.inTransaction
-                if dj.set('reconnectTimedoutTransaction')
+                if dj.config('databaseReconnect_transaction')
                     warning 'Reconnected after server disconnected during a transaction'
                 else
                     error 'Server disconnected during a transaction'
@@ -156,12 +165,18 @@ classdef Connection < handle
             % The same connection is re-used by all DataJoint objects.
             if ~self.isConnected
                 self.connId=mym(-1, 'open', self.host, self.user, self.password, self.use_tls);
+
                 if ~isempty(self.initQuery)
-                    self.query(self.initQuery);
+                    mym(self.connId, self.initQuery);
                 end
+
+                tmp = mym(self.connId, 'SELECT CONNECTION_ID() as id');
+                self.serverId = uint64(tmp.id);
+
             end
+            
             v = varargin;
-            if dj.set('bigint_to_double')
+            if dj.config('queryBigint_to_double')
                 v{end+1} = 'bigint_to_double';
             end
             if nargout>0
