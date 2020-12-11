@@ -8,7 +8,7 @@ classdef SessionAnalysis < dj.Computed
     methods(Access=protected)
         function makeTuples(self,key)
 
-            c = dj.conn();
+            c = self.schema.conn;
             r = sprintf('connection_id = %d', c.serverId);
 
             j = fetch(Lab.Jobs() & r, '*');
