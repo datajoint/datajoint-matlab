@@ -1,5 +1,5 @@
-3.4.0 -- December 9, 2020
--------------------------
+3.4.0 -- December 11, 2020
+--------------------------
 * Minor: Add dj.config to be compatible with dj-python and removed dj.set (#186) #188
 * Minor: Add UUID DataJoint datatype (#180) PR #194
 * Minor: Add file external storage (#143) PR #197
@@ -7,6 +7,8 @@
 * Minor: Improve dependency version compatibility handling (#228) PR #285
 * Minor: Add unique and nullable options for foreign keys (#110) PR #303
 * Minor: Add non-interactive option for dj.new (#69) #317
+* Minor: Add dj.kill_quick (#251) PR #314
+* Minor: Log connection ID, user in jobs table (#87, #275) PR #314
 * Bugfix: Handle empty password (#250) PR #279, #292
 * Bugfix: Disable GUI password if running headless (#278) PR #280, #292
 * Bugfix: Add order_by option to dj.kill output (#229) PR #248, #292
