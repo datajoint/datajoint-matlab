@@ -1,6 +1,6 @@
 classdef TestPopulate < Prep
     methods(Test)
-        function testPopulate(testCase)
+        function TestPopulate_testPopulate(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'Lab';
