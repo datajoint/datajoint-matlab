@@ -7,7 +7,6 @@
 * Minor: Improve dependency version compatibility handling (#228) PR #285
 * Minor: Add unique and nullable options for foreign keys (#110) PR #303
 * Minor: Add non-interactive option for dj.new (#69) #317
-* Minor: Add server-side connection ID
 * Minor: Add dj.kill_quick (#251) PR #314
 * Minor: Log connection ID, user in jobs table (#87, #275) PR #314
 * Bugfix: Handle empty password (#250) PR #279, #292
