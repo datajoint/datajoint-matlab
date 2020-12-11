@@ -23,9 +23,8 @@ classdef Prep < matlab.unittest.TestCase
     methods
         function obj = Prep()
             % Initialize test_root
-            test_pkg_details = what('dj');
-            [test_root, ~, ~] = fileparts(test_pkg_details.path);
-            obj.test_root = [test_root '/tests'];
+            % obj.test_root = [pwd '/tests'];
+            obj.test_root = fileparts(which('Main'));
             if ispc
                 obj.external_file_store_root = [getenv('TEMP') '\root'];
             else
@@ -37,14 +36,14 @@ classdef Prep < matlab.unittest.TestCase
         function init(testCase)
             disp('---------------INIT---------------');
             clear functions;
-            addpath(testCase.test_root);
             addpath([testCase.test_root '/test_schemas']);
-
+            dj.config('safemode', false);
+            disp(dj.version);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password,'',true);
             % create test users
             ver = curr_conn.query('select @@version as version').version;
-            if lib.compareVersions(ver,'5.8')
+            if compareVersions(ver,'5.8')
                 cmd = {...
                 'CREATE USER IF NOT EXISTS ''datajoint''@''%%'' '
                 'IDENTIFIED BY ''datajoint'';'
@@ -108,8 +107,7 @@ classdef Prep < matlab.unittest.TestCase
     methods (TestClassTeardown)
         function dispose(testCase)
             disp('---------------DISP---------------');
-            warning('off','MATLAB:RMDIR:RemovedFromPath');
-
+            dj.config('safemode', false);
             curr_conn = dj.conn(testCase.CONN_INFO_ROOT.host, ...
                 testCase.CONN_INFO_ROOT.user, testCase.CONN_INFO_ROOT.password, '',true);
 
@@ -121,7 +119,7 @@ classdef Prep < matlab.unittest.TestCase
                     res.(['Database (' testCase.PREFIX '_%)']){i} ';']);
             end
             curr_conn.query('SET FOREIGN_KEY_CHECKS=1;');
-            
+
             % remove external storage content
             if ispc
                 [status,cmdout] = system(['rmdir /Q /s "' ...
@@ -154,8 +152,8 @@ classdef Prep < matlab.unittest.TestCase
                     '/getSchema.m']);
                 % delete(['test_schemas/+University/getSchema.m'])
             end
+            warning('off','MATLAB:RMDIR:RemovedFromPath');
             rmpath([testCase.test_root '/test_schemas']);
-            % rmpath(testCase.test_root);
             warning('on','MATLAB:RMDIR:RemovedFromPath');
         end
     end
