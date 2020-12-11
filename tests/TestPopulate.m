@@ -14,7 +14,7 @@ classdef TestPopulate < Prep
                 [testCase.PREFIX '_lab']);
 
             insert(Lab.Subject, {
-               100, '2020-04-02';
+               100, '2010-04-02';
             });
 
             insert(Lab.Rig, struct( ...
