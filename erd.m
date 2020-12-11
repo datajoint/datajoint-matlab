@@ -12,7 +12,7 @@ ret = dj.ERD();
 for entity = varargin
     if exist(entity{1}, 'class')
         obj = dj.ERD(feval(entity{1}));
-        r = dj.set('tableErdRadius');
+        r = dj.config('displayDiagram_hierarchy_radius');
         while min(r)>0
             if r(1)>0
                 obj.up
