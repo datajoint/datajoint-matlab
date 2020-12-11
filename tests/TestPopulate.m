@@ -8,7 +8,8 @@ classdef TestPopulate < Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_lab']);
             
-            schema = Lab.getSchema; % use schema's connection to verify id
+            lab_schema = Lab.getSchema; % we need schema's connection id
+            sid = lab_schema.conn.serverId;
 
             insert(Lab.Subject, {
                100, '2010-04-02';
@@ -34,7 +35,7 @@ classdef TestPopulate < Prep
 
             parpopulate(Lab.SessionAnalysis);
             a_result = fetch(Lab.SessionAnalysis & 'session_id = 0', '*');
-            testCase.verifyEqual(a_result.session_analysis.connection_id, schema.serverId);
+            testCase.verifyEqual(a_result.session_analysis.connection_id, sid);
 
             % regular populate of 1 record
             % .. (SessionAnalysis logs jobs record as session_analysis data)
