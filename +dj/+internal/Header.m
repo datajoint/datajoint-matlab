@@ -92,10 +92,11 @@ classdef Header < matlab.mixin.Copyable
                 attrs.database{i} = schema.dbname;
                 attrs.sqlType{i} = attrs.type{i};
                 attrs.sqlComment{i} = attrs.comment{i};
-                special = regexp(attrs.comment{i}, ':([^:]+):(.*)', 'tokens');
+                special = regexp(attrs.comment{i}, ...
+                                 '^:(?<type>[^: ,()]+):(?<comment>.*)', 'names');
                 if ~isempty(special)
-                    attrs.type{i} = special{1}{1};
-                    attrs.comment{i} = special{1}{2};
+                    attrs.type{i} = special.type;
+                    attrs.comment{i} = special.comment;
                     category = dj.internal.Declare.matchType(attrs.type{i});
                     assert(any(strcmpi(category, dj.internal.Declare.SPECIAL_TYPES)));
                 else
