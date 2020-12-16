@@ -118,10 +118,12 @@ classdef ERD < handle
             
             self.makeGraph
             
-            rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), dj.Schema.tierPrefixes, 'uni', false);
+            rege = cellfun(@(s) sprintf('^`[a-z]\\w*`\\.`%s[a-z]\\w*`$',s), ...
+                           dj.Schema.tierPrefixes, 'uni', false);
             rege{end+1} = '^`[a-z]\w*`\.`\W?\w+__\w+`$';   % for part tables
             rege{end+1} = '^\d+$';  % for numbered nodes
-            tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'last'), self.graph.Nodes.Name);
+            tiers = cellfun(@(l) find(~cellfun(@isempty, regexp(l, rege)), 1, 'last'), ...
+                            self.graph.Nodes.Name);
             colormap(0.3+0.7*[
                 0.3 0.3 0.3
                 0.0 0.5 0.0
@@ -180,8 +182,10 @@ classdef ERD < handle
                 ref = [];
                 from = [];
             else
-                from = arrayfun(@(item) find(strcmp(item.from, list)), self.conn.foreignKeys, 'uni', false);
-                ref = arrayfun(@(item) find(strcmp(item.ref, list)), self.conn.foreignKeys, 'uni', false);
+                from = arrayfun(@(item) find(strcmp(item.from, list)), ...
+                                self.conn.foreignKeys, 'uni', false);
+                ref = arrayfun(@(item) find(strcmp(item.ref, list)), ...
+                               self.conn.foreignKeys, 'uni', false);
                 ix = ~cellfun(@isempty, from) & ~cellfun(@isempty, ref);
                 if ~isempty(ref)
                     primary = [self.conn.foreignKeys(ix).primary];
@@ -212,6 +216,18 @@ classdef ERD < handle
             end
         end
     end
-    
-    
+    methods(Static)
+        function tier = getTier(tableName)
+            tier = [];
+            for pattern = cellfun(@(x) dj.(x(4:end)).tierRegexp, dj.Schema.tierClasses, ...
+                                  'uni', false)
+                fieldInfo = regexp(tableName, pattern{1}, 'names');
+                if ~isempty(fieldInfo)
+                    tier = fieldnames(fieldInfo);
+                    tier = tier{1};
+                    break
+                end
+            end
+        end
+    end
 end

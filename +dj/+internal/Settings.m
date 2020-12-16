@@ -147,10 +147,14 @@ function out = stateAccess(operation, new)
     % return STATE prior to change
     out = STATE;
     if any(strcmpi(operation, {'set', 'load'}))
-        % merge with existing STATE
-        STATE = rmfield(STATE, intersect(fieldnames(STATE), fieldnames(new)));
-        names = [fieldnames(STATE); fieldnames(new)];
-        STATE = orderfields(cell2struct([struct2cell(STATE); struct2cell(new)], names, 1));
+        if isempty(STATE)
+            STATE = new;
+        else
+            % merge with existing STATE
+            STATE = rmfield(STATE, intersect(fieldnames(STATE), fieldnames(new)));
+            names = [fieldnames(STATE); fieldnames(new)];
+            STATE = orderfields(cell2struct([struct2cell(STATE); struct2cell(new)], names, 1));
+        end
         if strcmpi(operation, 'load')
             envVarUpdate();
         end

@@ -197,6 +197,9 @@ classdef TestConfig < Prep
             base = regexprep(base,'[a-z0-9][A-Z]','${$0(1)}_${lower($0(2))}');
             TestConfig.TestConfig_configSingleFileTest(testCase, 'load-custom', ...
                 [pkg_path '/test_schemas/config_lite.json'], jsondecode(base));
+            % test load on launch MATLAB
+            clear functions;
+            dj.config.load(sprintf('%s/test_schemas/config_lite.json', pkg_path));
             % cleanup
             dj.config.restore;
         end
