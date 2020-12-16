@@ -93,7 +93,7 @@ classdef Header < matlab.mixin.Copyable
                 attrs.sqlType{i} = attrs.type{i};
                 attrs.sqlComment{i} = attrs.comment{i};
                 special = regexp(attrs.comment{i}, ...
-                                 '^:(?<type>[^: ,()]+):(?<comment>.*)', 'names');
+                                 '^:(?<type>[^:]+):(?<comment>.*)', 'names');
                 if ~isempty(special)
                     attrs.type{i} = special.type;
                     attrs.comment{i} = special.comment;
