@@ -199,7 +199,7 @@ classdef TestConfig < Prep
                 [pkg_path '/test_schemas/config_lite.json'], jsondecode(base));
             % test load on launch MATLAB
             clear functions;
-            dj.config.load([pkg_path '/test_schemas/config_lite.json']);
+            dj.config.load(sprintf('%s/test_schemas/config_lite.json', pkg_path));
             % cleanup
             dj.config.restore;
         end

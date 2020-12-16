@@ -113,10 +113,10 @@ classdef TestSchema < Prep
                 testCase.CONN_INFO.host, ...
                 testCase.CONN_INFO.user, ...
                 testCase.CONN_INFO.password,'',true);
-            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
-                [testCase.PREFIX '_' lower(package)]);
+            dj.createSchema(package, sprintf('%s/test_schemas', testCase.test_root), ...
+                sprintf('%s_%s', testCase.PREFIX, lower(package)));
             Lab.SessionAnalysis()
-            schema = dj.Schema(c1, package, [testCase.PREFIX '_' lower(package)]);
+            schema = dj.Schema(c1, package, sprintf('%s_%s', testCase.PREFIX, lower(package)));
             schema.v.SessionAnalysis()
         end
     end
