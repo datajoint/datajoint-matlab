@@ -54,11 +54,24 @@ classdef Declare
                     if isa(table_instance, 'dj.Part')
                         tableInfo.tier = 'part';
                     elseif ~isa(table_instance, 'dj.internal.ExternalTable')
-                        specialClass = find(cellfun(@(c) isa(table_instance, c), ...
-                            dj.Schema.tierClasses));
-                        assert(length(specialClass)==1, ...
-                            'Unknown type of UserRelation in %s', class(table_instance))
-                        tableInfo.tier = dj.Schema.allowedTiers{specialClass};
+                        try
+                            specialClass = find(cellfun(@(c) isa(table_instance, c), ...
+                                dj.Schema.tierClasses));
+                            assert(length(specialClass)==1, ...
+                                'DataJoint:TableType:Unknown', ...
+                                'Unknown type of UserRelation in %s', class(table_instance))
+                            tableInfo.tier = dj.Schema.allowedTiers{specialClass};
+                        catch ME
+                            if ~strcmp(ME.identifier,'DataJoint:TableType:Unknown')
+                                rethrow(ME);
+                            else
+                                tier = dj.ERD.getTier(table_instance.plainTableName);
+                                assert(~isempty(tier), ...
+                                    'DataJoint:TableType:Unknown', ...
+                                    'Unknown type of UserRelation in %s',class(table_instance))
+                                tableInfo.tier = tier;
+                            end
+                        end
                     end
                     % remove empty lines
                     def(cellfun(@(x) isempty(x), def)) = [];
@@ -368,8 +381,8 @@ classdef Declare
                     end
                 end
             end
-            assert(~any(ismember(field.comment, '"\')), ... % TODO: escape isntead
-                'illegal characters in attribute comment "%s"', field.comment)
+            % Escape characters: "/
+            field.comment = regexprep(field.comment, '(["\/])', '\\\\$1');
 
             category = dj.internal.Declare.matchType(field.type);
             store = [];

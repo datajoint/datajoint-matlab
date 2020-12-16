@@ -103,5 +103,21 @@ classdef TestSchema < Prep
             dj.new('new.Student', 'M', pwd , 'djtest_new');
             rmdir('+new', 's');
         end
+        function TestSchema_testVirtual(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            % setup
+            dj.config.restore;
+            package = 'Lab';
+            c1 = dj.conn(...
+                testCase.CONN_INFO.host, ...
+                testCase.CONN_INFO.user, ...
+                testCase.CONN_INFO.password,'',true);
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_' lower(package)]);
+            Lab.SessionAnalysis()
+            schema = dj.Schema(c1, package, [testCase.PREFIX '_' lower(package)]);
+            schema.v.SessionAnalysis()
+        end
     end
 end

@@ -26,19 +26,7 @@ classdef TableAccessor < dynamicprops
                 splitName = strsplit(className{1}, '.');
                 name = splitName{2};
                 addprop(self, name);
-                tableName = schema.tableNames(className{1});
-                tierClass = 'dj.Manual';
-                for k=1:numel(dj.Schema.tierPrefixes)
-                    tierCharLen = length(dj.Schema.tierPrefixes{k});
-                    if tierCharLen > 0 && length(tableName) >= tierCharLen && ...
-                            ~isempty(regexp(dj.Schema.tierPrefixes{k}, ...
-                                            tableName(1:tierCharLen), 'ONCE'))
-                        tierClass = dj.Schema.tierClasses{k};
-                        break;
-                    end
-                end
-                tierClass = strsplit(tierClass, '.');
-                self.(name) = dj.(tierClass{2})(className{1});
+                self.(name) = dj.internal.UserRelation(className{1});
             end
         end
     end
