@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+# contact_links:
+#   - name: DataJoint Community Engagement Policy
+#     url: https://docs.datajoint.io/python/intro/05-Community.html
+#     about: Please make sure to review the DataJoint Community Engagement Policy.
