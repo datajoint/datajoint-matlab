@@ -2,6 +2,7 @@
 --------------------------
 * Bugfix: Error on accessing unmanaged Imported/Computed tables (#336) PR #338
 * Bugfix: Certain characters in attribute comment not escaped properly (#210, #335) PR #338
+* Bugfix: `dj.config.load(...)` after initial MATLAB boot throws invalid input error. PR #338
 
 3.4.0 -- December 11, 2020
 --------------------------
