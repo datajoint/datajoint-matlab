@@ -149,7 +149,11 @@ classdef Prep < matlab.unittest.TestCase
             subFolders = files(dirFlags);
             for k = 1 : length(subFolders)
                 delete([testCase.test_root '/test_schemas/' subFolders(k).name ...
-                    '/getSchema.m']);
+                        '/getSchema.m']);
+                if strcmp(subFolders(k).name, '+Lab')
+                    delete([testCase.test_root '/test_schemas/' subFolders(k).name ...
+                            '/Jobs.m']);
+                end
                 % delete(['test_schemas/+University/getSchema.m'])
             end
             warning('off','MATLAB:RMDIR:RemovedFromPath');

@@ -46,6 +46,7 @@ classdef Schema < handle
         allowedTiers = {'lookup' 'manual' 'imported' 'computed' 'job'}
         tierPrefixes = {'#', '', '_', '__', '~'}
         tierClasses = {'dj.Lookup' 'dj.Manual' 'dj.Imported' 'dj.Computed' 'dj.Jobs'}
+        baseRegexp = '[a-z][a-z0-9]*(_[a-z][a-z0-9]*)*'
     end
     
     
