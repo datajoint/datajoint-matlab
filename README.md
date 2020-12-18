@@ -35,6 +35,9 @@ DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias
 3. Right-Click and Select *Install*
 4. Select *Install*
 
+## Config
+For help in utilizing `dj.config` (added in `3.4.0`), you may access the help via `help('dj.config')` or review it online [here](https://github.com/datajoint/datajoint-matlab/blob/c2bd6b3e195dfeef773d4e12bad5573c461193b0/%2Bdj/config.m#L2-L27). Formal documentation to follow.
+
 ## Running Tests Locally
 
 * Create an `.env` with desired development environment values e.g.
