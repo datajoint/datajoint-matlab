@@ -13,15 +13,6 @@ classdef SessionAnalysis < dj.Computed
 
             j = fetch(Lab.Jobs() & r, '*');
             
-            jobkey = struct('key_hash', dj.key_hash(key));
-            fprintf('before')
-            Lab.Jobs() & jobkey
-            
-            del(Lab.Jobs() & jobkey
-            
-            fprintf('after')
-            Lab.Jobs() & jobkey
-
             if isempty(j)
                 key.session_analysis = key.session_id;
             else
