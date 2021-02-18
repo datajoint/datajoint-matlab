@@ -3,8 +3,8 @@ This can be done by using `dj.internal.hash` to convert the key as follows:
 
 .. code-block:: matlab
 
-    > kh = dj.internal.hash(key);
-    > Lab.Jobs() & struct('key_hash', kh(1:32))
+    > job_key = struct('key_hash', dj.key_hash(key));
+    > Lab.Jobs() & job_key
 
 
     ans = 
@@ -21,9 +21,9 @@ This can be done by using `dj.internal.hash` to convert the key as follows:
 
     1 tuples (0.127 s)
 
-    > del(Lab.Jobs() & struct('key_hash', kh(1:32)));
+    > del(Lab.Jobs() & job_key;
 
-    > Lab.Jobs() & struct('key_hash', kh(1:32))
+    > Lab.Jobs() & job_key
 
     ans = 
 
