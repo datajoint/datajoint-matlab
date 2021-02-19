@@ -3,7 +3,8 @@ This can be done by using `dj.internal.hash` to convert the key as follows:
 
 .. code-block:: matlab
 
-    > job_key = struct('key_hash', dj.key_hash(key));
+    > job_key = struct('table_name', 'Lab.SessionAnalysis', ...
+                       'key_hash', dj.key_hash(key));
     > Lab.Jobs() & job_key
 
 
