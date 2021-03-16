@@ -1,7 +1,7 @@
 3.4.2 -- March 16, 2021
 --------------------------
-* Bugfix: Fetchn with zero results throws an error (#353) PR #???
-* Bugfix: Syntax error in documentation for next auto_increment value (#352) PR #???
+* Bugfix: Fetchn with zero results throws an error (#353) PR #355
+* Bugfix: Syntax error in documentation for next auto_increment value (#352) PR #355
 
 3.4.1 -- December 18, 2020
 --------------------------
