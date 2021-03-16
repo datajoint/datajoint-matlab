@@ -1,3 +1,8 @@
+3.4.2 -- March 16, 2021
+--------------------------
+* Bugfix: Fetchn with zero results throws an error (#353) PR #???
+* Bugfix: Syntax error in documentation for next auto_increment value (#352) PR #???
+
 3.4.1 -- December 18, 2020
 --------------------------
 * Bugfix: Error on accessing unmanaged Imported/Computed tables (#336) PR #338
