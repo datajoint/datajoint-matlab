@@ -257,12 +257,12 @@ classdef TestFetch < Prep
                 [testCase.PREFIX '_university']);
 
             q = University.A & 'id=999';
-            testCase.verifyEqual(q.fetchn('id'), double.empty(0,1));
-            testCase.verifyEqual(q.fetchn('string'), cell.empty(0,1));
-            testCase.verifyEqual(q.fetchn('datetime'), cell.empty(0,1));
-            testCase.verifyEqual(q.fetchn('date'), cell.empty(0,1));
-            testCase.verifyEqual(q.fetchn('number'), double.empty(0,1));
-            testCase.verifyEqual(q.fetchn('blob'), cell.empty(0,1));
+            testCase.verifyEqual(q.fetchn('id'), []);
+            testCase.verifyEqual(q.fetchn('string'), {});
+            testCase.verifyEqual(q.fetchn('datetime'), {});
+            testCase.verifyEqual(q.fetchn('date'), {});
+            testCase.verifyEqual(q.fetchn('number'), []);
+            testCase.verifyEqual(q.fetchn('blob'), {});
         end
         function TestFetch_testDescribe(testCase)
             st = dbstack;
