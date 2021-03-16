@@ -242,6 +242,28 @@ classdef TestFetch < Prep
             testCase.verifyEqual(number(1),  NaN);
             testCase.verifyEqual(blob{1},  '');
         end
+        function TestFetch_testFetchn(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            % related to % https://github.com/datajoint/datajoint-matlab/issues/353
+            package = 'University';
+
+            c1 = dj.conn(...
+                testCase.CONN_INFO.host,...
+                testCase.CONN_INFO.user,...
+                testCase.CONN_INFO.password,'',true);
+
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_university']);
+
+            q = University.A & 'id=999';
+            testCase.verifyEqual(q.fetchn('id'), double.empty(0,1));
+            testCase.verifyEqual(q.fetchn('string'), cell.empty(0,1));
+            testCase.verifyEqual(q.fetchn('datetime'), cell.empty(0,1));
+            testCase.verifyEqual(q.fetchn('date'), cell.empty(0,1));
+            testCase.verifyEqual(q.fetchn('number'), double.empty(0,1));
+            testCase.verifyEqual(q.fetchn('blob'), cell.empty(0,1));
+        end
         function TestFetch_testDescribe(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);

@@ -289,7 +289,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             for iArg=1:length(specs)
                 % if renamed, use the renamed attribute
                 name = regexp(specs{iArg}, '(\w+)\s*$', 'tokens');
-                if isnumeric(s(1).(name{1}{1})) && length(s(1).(name{1}{1})) == 1
+                sel = cellfun(@(x) strcmp(x, name{1}), {self.header.attributes.name});
+                if self.tableHeader.attributes(sel).isNumeric
                     varargout{iArg} = [s.(name{1}{1})]';
                 else
                     varargout{iArg} = {s.(name{1}{1})}';
