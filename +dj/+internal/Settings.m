@@ -148,7 +148,10 @@ function out = stateAccess(operation, new)
     out = STATE;
     if any(strcmpi(operation, {'set', 'load'}))
         if isempty(STATE)
-            STATE = new;
+            STATE = rmfield(dj.internal.Settings.DEFAULTS, intersect(fieldnames( ...
+                dj.internal.Settings.DEFAULTS), fieldnames(new)));
+            names = [fieldnames(STATE); fieldnames(new)];
+            STATE = orderfields(cell2struct([struct2cell(STATE); struct2cell(new)], names, 1));
         else
             % merge with existing STATE
             STATE = rmfield(STATE, intersect(fieldnames(STATE), fieldnames(new)));
