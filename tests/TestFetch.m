@@ -264,6 +264,24 @@ classdef TestFetch < Prep
             testCase.verifyEqual(q.fetchn('number'), []);
             testCase.verifyEqual(q.fetchn('blob'), {});
         end
+        function TestFetch_testFetchnJoin(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            % https://github.com/datajoint/datajoint-matlab/issues/361
+            % https://github.com/datajoint/datajoint-matlab/issues/364
+            package = 'Lab';
+
+            c1 = dj.conn(...
+                testCase.CONN_INFO.host,...
+                testCase.CONN_INFO.user,...
+                testCase.CONN_INFO.password,'',true);
+
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_lab']);
+
+            q = Lab.Session * Lab.Rig;
+            testCase.verifyEqual(q.fetchn('rig_note'), {});
+        end
         function TestFetch_testDescribe(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
