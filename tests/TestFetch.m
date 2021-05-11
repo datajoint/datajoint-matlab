@@ -279,7 +279,7 @@ classdef TestFetch < Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_lab']);
 
-            q = Lab.Session * Lab.Rig;
+            q = Lab.Session * Lab.Rig & 'rig_model="nonexistent"';
             testCase.verifyEqual(q.fetchn('rig_note'), {});
         end
         function TestFetch_testDescribe(testCase)
