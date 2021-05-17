@@ -122,7 +122,7 @@ classdef struct
             s = dj.struct.proj(s, varargin{:});            
         end
         
-        function s = proj(s,varargin)
+        function s = proj(s, varargin)
             % DJ.STRUCT.PROJ - the relational projection operator
             % of structure array onto the specified fields.
             % The result may contain duplicate tuples.
