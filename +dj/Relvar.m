@@ -87,8 +87,9 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                             self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
-                            fk_index = arrayfun(@(x) strcmp(x.from, rels(ix).fullTableName),...
-                                                self.schema.conn.foreignKeys, 'uni', true);
+                            fk_index = arrayfun(...
+                                @(x) strcmp(x.from, rels(ix).fullTableName), ...
+                                self.schema.conn.foreignKeys, 'uni', true);
                             fks = self.schema.conn.foreignKeys(fk_index);
                             if ~fks.aliased
                                 rels(ix).restrict(proj(rels(i)));
