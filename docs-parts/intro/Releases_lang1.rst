@@ -1,4 +1,4 @@
-3.4.3 -- May 21, 2021
+3.4.3 -- May 28, 2021
 --------------------------
 * Bugfix: `dj.config` omits default values when loading new config immediately after MATLAB boot (#359) PR #369
 * Bugfix: Regression error when using fetchn with a join (#361) PR #369
