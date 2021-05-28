@@ -21,7 +21,11 @@ classdef TestDeclaration < Prep
             % Check that the comment is correct
             table = Lab.Subject();
             firstAttributeComment = table.header.attributes.comment;
-            assert(strcmp(firstAttributeComment, '{subject_id} Comment to test curly bracket'), 'Comment did not get inserted correctly');
+            assert(strcmp(
+                firstAttributeComment, ...
+                '{subject_id} Comment to test curly bracket'), ...
+                'Comment did not get inserted correctly'...
+                );
         end
     end
 end
