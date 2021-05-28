@@ -12,7 +12,7 @@ classdef SessionAnalysis < dj.Computed
             r = sprintf('connection_id = %d', c.serverId);
 
             j = fetch(Lab.Jobs() & r, '*');
-
+            
             if isempty(j)
                 key.session_analysis = key.session_id;
             else
