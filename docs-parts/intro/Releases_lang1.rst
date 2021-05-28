@@ -1,5 +1,9 @@
 3.4.3 -- May 28, 2021
----------------------
+--------------------------
+* Bugfix: `dj.config` omits default values when loading new config immediately after MATLAB boot (#359) PR #369
+* Bugfix: Regression error when using fetchn with a join (#361) PR #369
+* Bugfix: Cascading delete not functioning properly when using renamed foreign keys (#362) PR #369
+* Update NGINX reverse-proxy image use PR #369
 * Bugfix: Add support to curly brackets in comments (#365) PR #373 
 
 3.4.2 -- March 16, 2021

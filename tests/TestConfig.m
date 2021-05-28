@@ -200,8 +200,20 @@ classdef TestConfig < Prep
             % test load on launch MATLAB
             clear functions;
             dj.config.load(sprintf('%s/test_schemas/config_lite.json', pkg_path));
-            % cleanup
-            dj.config.restore;
+            try
+                port = dj.config('databasePort');
+                testCase.verifyEqual(port, 3306);
+            catch ME
+                switch ME.identifier
+                    case 'DataJoint:Config:InvalidKey'
+                        % cleanup
+                        dj.config.restore;
+                        rethrow(ME);
+                    otherwise
+                        % cleanup
+                        dj.config.restore;
+                end
+            end
         end
         function TestConfig_testEnv(testCase)
             st = dbstack;
