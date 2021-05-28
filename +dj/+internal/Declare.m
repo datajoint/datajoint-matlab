@@ -382,7 +382,7 @@ classdef Declare
                 end
             end
             % Escape characters: "/
-            field.comment = regexprep(field.comment, '(["\/])', '\\\\$1');
+            field.comment = regexprep(field.comment, '(["\/{}])', '\\\\$1');
 
             category = dj.internal.Declare.matchType(field.type);
             store = [];
