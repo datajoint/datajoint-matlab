@@ -37,7 +37,7 @@ classdef TestSchema < Prep
                 [testCase.PREFIX '_' lower(package)]);
             schema = External.getSchema;
             q = schema.v.Document & ['document_id=' num2str(id)];
-            % display
+            % display (be careful with MxPrint's b/c this test relies on stdout)
             queryPreview = evalc('q');
             queryPreview = splitlines(queryPreview);
             recordPreview = queryPreview(end-4);
