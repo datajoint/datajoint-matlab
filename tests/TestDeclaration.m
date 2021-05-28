@@ -1,9 +1,9 @@
-classdef TestDecleration < Prep
+classdef TestDeclaration < Prep
     methods (Test)
         %{ Function to test if a table can be inserted with curley brackets in the comments
         %}
-        function TestDecleration_testCurlyBracketComment(testCase)
-            packageName = 'Decleration';
+        function TestDeclaration_testCurlyBracketComment(testCase)
+            packageName = 'Lab';
             lowerPackageName = lower(packageName);
             % Create the connection
             c1 = dj.conn(...
@@ -16,12 +16,12 @@ classdef TestDecleration < Prep
                 [testCase.PREFIX '_' lowerPackageName]);
 
             % Initialize the table
-            Decleration.CurlyBracketCommentTable
+            Lab.Subject
 
             % Check that the comment is correct
-            table = Decleration.CurlyBracketCommentTable();
+            table = Lab.Subject();
             firstAttributeComment = table.header.attributes.comment;
-            assert(strcmp(firstAttributeComment, '{username}_{subject_nickname}'), 'Comment did not get inserted correctly');
+            assert(strcmp(firstAttributeComment, '{subject_id} Comment to test curly bracket'), 'Comment did not get inserted correctly');
         end
     end
 end
