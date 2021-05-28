@@ -1,3 +1,7 @@
+3.4.3 -- May 28, 2021
+---------------------
+* Bugfix: Add support to curly brackets in comments (#365) PR #373 
+
 3.4.2 -- March 16, 2021
 --------------------------
 * Bugfix: Fetchn with zero results throws an error (#353) PR #355
