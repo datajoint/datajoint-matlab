@@ -87,20 +87,27 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                             self.schema.conn.tableToClass(child),list)), rels(i).children)
                         % and restrict them by it or its restrictions
                         if restrictByMe(i)
+                            % Extract foreign key indices for table that match target parent
                             fk_index = arrayfun(...
                                 @(x) strcmp(x.from, rels(ix).fullTableName), ...
                                 self.schema.conn.foreignKeys, 'uni', true);
                             fks = self.schema.conn.foreignKeys(fk_index);
                             if ~fks.aliased
+                                % If matched foreign keys are not aliased, no renaming
+                                % necessary. Restrict table based on normal projection.
                                 rels(ix).restrict(proj(rels(i)));
                             else
+                                % Determine which foreign keys have been renamed
                                 alias_index = cellfun(...
                                     @(ref_attr, attr) ~strcmp(ref_attr, attr), ...
                                     fks.ref_attrs, fks.attrs, 'uni', true);
+                                % Create rename arguments for projection
                                 aliased_attrs = cellfun(...
                                     @(ref_attr, attr) sprintf('%s->%s', ref_attr, attr), ...
                                     fks.ref_attrs(alias_index), fks.attrs(alias_index), ...
                                     'uni', false);
+                                % Restrict table based on projection with rename arguments on
+                                % foreign keys.
                                 rels(ix).restrict(proj(rels(i), aliased_attrs{:}));
                             end
                         else
