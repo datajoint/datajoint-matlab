@@ -33,7 +33,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
         end
         
         
-        function del(self)
+        function del(self,maintainTransaction)
             % DEL - remove all tuples of the relation from its table
             % and, recursively, all matching tuples in dependent tables.
             %
@@ -48,22 +48,30 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             %                                   that do not have matching tuples in table 
             %                                   Cells
             % See also delQuick, drop
-            
-            function cleanup(self)
-                if self.schema.conn.inTransaction
+
+            function cleanup(self, maintainTransaction)
+                if self.schema.conn.inTransaction && ~maintainTransaction
                     fprintf '\n ** delete rolled back due to an interrupt\n'
                     self.schema.conn.cancelTransaction
                 end
             end
-            
+
+            if nargin<2
+                maintainTransaction = false;
+            end
+
             % this is guaranteed to be executed when the function is
             % terminated even if by KeyboardInterrupt (CTRL-C)
-            cleanupObject = onCleanup(@() cleanup(self));
+            cleanupObject = onCleanup(@() cleanup(self, maintainTransaction));
             
-            self.schema.conn.cancelTransaction  % exit ongoing transaction, if any
-            
+            if ~maintainTransaction
+                self.schema.conn.cancelTransaction  % exit ongoing transaction, if any
+            end
+
             if ~self.exists
                 disp 'nothing to delete'
+            elseif any(strcmp(superclasses(self),'dj.Part'))
+                disp 'cannot delete directly from part table'
             else
                 % compile the list of relvars to be deleted from
                 list = self.descendants;
@@ -132,15 +140,101 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                 if dj.config('safemode') && ~strcmpi('yes', ...
                         dj.internal.ask('Proceed to delete?'))
                     disp 'delete canceled'
+                    if maintainTransaction
+                        error('Cancelled nested delete of master/part relation.');
+                    end
                 else
-                    self.schema.conn.startTransaction
+                    if ~maintainTransaction
+                        self.schema.conn.startTransaction
+                    end
                     try
+                        parts = {};
+                        partRels = {};
                         for rel = fliplr(rels)
                             fprintf('Deleting from %s\n', rel.className)
-                            rel.delQuick;
+
+                            if any(strcmp(superclasses(rel.className), 'dj.Part'))
+                                if strcmp(feval(rel.className).master.className,self.className)
+                                    % we want to delete this part with the master
+                                    parts = cat(1,parts,{feval(rel.className)});
+                                    partRels = cat(1,partRels,{rel});
+                                elseif ~strcmp(feval(rel.className).master.className,{rels(:).className})
+                                    %the master does not derive from the
+                                    %caller, but a part must be deleted
+                                    
+                                    %must delete the master to maintain
+                                    %integrity. Deleting the master will
+                                    %delete this part
+                                    del(feval(rel.className).master & rel, true);
+                                    
+                                else
+                                    %the master derives from the caller, so
+                                    %all is fine
+                                    rel.delQuick;
+                                end
+                            elseif strcmp(rel.className,self.className) && ~isempty(parts)
+                                %the current table is a master table
+                                %we will delete alongside its parts
+                                
+                                
+                                % self.schema.conn.query(sprintf('DELETE %s,%s FROM %s',...
+                                %     feval(rel.className).sql, parts{1}.sql,join.sql));
+                                % above doesn't seem to work, due to `ON
+                                % DELETE RESTRICT` foreign key
+                                
+                                % so we will disable the foreign key
+                                % temporarily, then do the multi-delete
+                                
+                                reentries = {};
+                                join = feval(rel.className);
+                                del_str = join.sql;
+                                for n=1:numel(parts)
+                                    join = parts{n} * join * partRels{n};
+                                    del_str = sprintf('%s,%s',parts{n}.sql,del_str);
+                                    fks = splitlines(parts{n}.describe());
+                                    tfk = fks(contains(fks, rel.className));
+                                    for fk =tfk
+                                        % parts{1}.addForeignKey(cell2mat(fk));
+                                        [attr_sql, fk_sql, ~, ~] = dj.internal.Declare.makeFK(fk{1}, ...
+                                            parts{n}.primaryKey, true, dj.internal.shorthash(parts{n}.fullTableName));
+                                        reentries = cat(1, reentries, {sprintf('ALTER TABLE %s ADD %s%s', parts{n}.fullTableName,attr_sql, fk_sql)});
+                                    end
+                                end
+                                
+                                for n=1:numel(parts)
+                                    name = self.schema.conn.query(sprintf( ...
+                                        ['SELECT distinct constraint_name AS name ' ...
+                                        'FROM information_schema.key_column_usage ' ...
+                                        'WHERE table_schema="%s" and table_name="%s"' ...
+                                        'AND referenced_table_schema="%s" ' ...
+                                        'AND referenced_table_name="%s"'], ...
+                                        parts{n}.schema.dbname, parts{n}.plainTableName, ...
+                                        feval(rel.className).schema.dbname, feval(rel.className).plainTableName...
+                                        ));
+                                    for name_ind = numel(name.name)
+                                        % The table could have multiple keys
+                                        % referring to the master, so we'll
+                                        % drop them all
+                                        self.schema.conn.query(sprintf('ALTER TABLE %s DROP FOREIGN KEY `%s`',...
+                                            parts{n}.fullTableName, name.name{name_ind}));
+                                    end
+                                end
+                                self.schema.conn.query(sprintf('DELETE %s FROM %s',...
+                                    del_str,join.sql));
+                                
+                                %add back the foreign keys (note that we're
+                                %still in the same transaction...)
+                                for ind = 1:numel(reentries)
+                                    self.schema.conn.query(reentries{ind});
+                                end
+                            else
+                                rel.delQuick;
+                            end
                         end
-                        self.schema.conn.commitTransaction
-                        disp committed
+                        if ~maintainTransaction
+                            self.schema.conn.commitTransaction
+                            disp committed
+                        end
                     catch err
                         fprintf '\n ** delete rolled back due to an error\n'
                         self.schema.conn.cancelTransaction
