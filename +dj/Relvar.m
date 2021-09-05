@@ -100,7 +100,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 @(x) strcmp(x.from, rels(ix).fullTableName), ...
                                 self.schema.conn.foreignKeys, 'uni', true);
                             fks = self.schema.conn.foreignKeys(fk_index);
-                            if ~fks.aliased
+                            if ~any([fks.aliased])
                                 % If matched foreign keys are not aliased, no renaming
                                 % necessary. Restrict table based on normal projection.
                                 rels(ix).restrict(proj(rels(i)));
