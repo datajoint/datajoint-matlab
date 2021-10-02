@@ -50,12 +50,41 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
             % See also delQuick, drop
 
             function cleanup(self, maintainTransaction)
+                %need to test maintainTransaction to prevent cancelling
+                %transaction on successful nested function call
+                
+                %interrupts in nested function will cancel transaction in
+                %root call
                 if self.schema.conn.inTransaction && ~maintainTransaction
                     fprintf '\n ** delete rolled back due to an interrupt\n'
                     self.schema.conn.cancelTransaction
                 end
             end
 
+            function fix_fks(self,reentries)
+                %re-enter any dropped foreign keys 
+                for ind = 1:numel(reentries)
+                    self.schema.conn.query(reentries{ind});
+                end
+            end
+            
+            function out = fk_recurser(fks, table, schema, column, master_column, const_name)
+                %get all foreign keys that depend on the master
+                out = struct(...
+                    'const_name',const_name,...
+                    'schema',schema,...
+                    'table',table,...
+                    'column',column,...
+                    'master_column',master_column...
+                    ); 
+                ind = strcmp({fks(:).master_schema},schema)...
+                    & strcmp({fks(:).master_table}, table)...
+                    & strcmp({fks(:).master_column}, column); 
+                for key=fks(ind)'
+                    out = cat(1,out,fk_recurser(fks,key.part_table, key.part_schema, key.part_column, master_column,key.name));
+                end
+            end
+            
             if nargin<2
                 maintainTransaction = false;
             end
@@ -156,7 +185,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                             if any(strcmp(superclasses(rel.className), 'dj.Part'))
                                 if strcmp(feval(rel.className).master.className,self.className)
                                     % we want to delete this part with the master
-                                    parts = cat(1,parts,{feval(rel.className)});
+                                    parts = cat(1,parts,{feval(rel.className).proj()});
                                     partRels = cat(1,partRels,{rel});
                                 elseif ~strcmp(feval(rel.className).master.className,{rels(:).className})
                                     %the master does not derive from the
@@ -176,57 +205,104 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 %the current table is a master table
                                 %we will delete alongside its parts
                                 
-                                
-                                % self.schema.conn.query(sprintf('DELETE %s,%s FROM %s',...
-                                %     feval(rel.className).sql, parts{1}.sql,join.sql));
-                                % above doesn't seem to work, due to `ON
-                                % DELETE RESTRICT` foreign key
-                                
-                                % so we will disable the foreign key
-                                % temporarily, then do the multi-delete
-                                
+                                % Prepare foreign keys to be reentered
                                 reentries = {};
-                                join = feval(rel.className);
-                                del_str = join.sql;
                                 for n=1:numel(parts)
-                                    join = parts{n} * join * partRels{n};
-                                    del_str = sprintf('%s,%s',parts{n}.sql,del_str);
-                                    fks = splitlines(parts{n}.describe());
+                                    fks = splitlines(partRels{n}.describe());
                                     tfk = fks(contains(fks, rel.className));
                                     for fk =tfk
-                                        % parts{1}.addForeignKey(cell2mat(fk));
                                         [attr_sql, fk_sql, ~, ~] = dj.internal.Declare.makeFK(fk{1}, ...
-                                            parts{n}.primaryKey, true, dj.internal.shorthash(parts{n}.fullTableName));
-                                        reentries = cat(1, reentries, {sprintf('ALTER TABLE %s ADD %s%s', parts{n}.fullTableName,attr_sql, fk_sql)});
+                                            parts{n}.primaryKey, true, dj.internal.shorthash(partRels{n}.fullTableName));
+                                        reentries = cat(1, reentries, {sprintf('ALTER TABLE %s ADD %s%s', partRels{n}.fullTableName,attr_sql, fk_sql)});
                                     end
                                 end
                                 
-                                for n=1:numel(parts)
-                                    name = self.schema.conn.query(sprintf( ...
-                                        ['SELECT distinct constraint_name AS name ' ...
-                                        'FROM information_schema.key_column_usage ' ...
-                                        'WHERE table_schema="%s" and table_name="%s"' ...
-                                        'AND referenced_table_schema="%s" ' ...
-                                        'AND referenced_table_name="%s"'], ...
-                                        parts{n}.schema.dbname, parts{n}.plainTableName, ...
-                                        feval(rel.className).schema.dbname, feval(rel.className).plainTableName...
+                                fk_fixer = onCleanup(@() fix_fks(self,reentries)); %these seem to not be transacted?
+                                
+                                % Find all the foreign keys that reference the master
+                                fks = self.schema.conn.query([...
+                                    'SELECT constraint_name AS name,'...
+                                    'column_name AS part_column,'...
+                                    'referenced_column_name AS master_column,'...
+                                    'table_name AS part_table,'...
+                                    'referenced_table_name AS master_table,'...
+                                    'table_schema AS part_schema,'...
+                                    'referenced_table_schema AS master_schema '...
+                                    'FROM information_schema.key_column_usage '...
+                                ]);
+                                fks = struct(...
+                                    'name',fks.name,...
+                                    'part_column',fks.part_column,...
+                                    'part_table',fks.part_table,...
+                                    'part_schema',fks.part_schema,...
+                                    'master_column',fks.master_column,...
+                                    'master_table',fks.master_table,...
+                                    'master_schema',fks.master_schema...
+                                    );
+                                all_fks = struct('const_name',{},'schema',{},...
+                                    'table',{},'column',{},'master_column',{});
+                                for pk=feval(rel.className).header.primaryKey
+                                    all_fks = cat(1,all_fks,fk_recurser(...
+                                        fks,...
+                                        feval(rel.className).plainTableName,...
+                                        feval(rel.className).schema.dbname,...
+                                        pk,pk,[]...
                                         ));
-                                    for name_ind = numel(name.name)
-                                        % The table could have multiple keys
-                                        % referring to the master, so we'll
-                                        % drop them all
+                                end
+    
+                                % Build the query string and drop pesky foreign keys
+                                sql = feval(rel.className).sql;
+                                del_str = sql;
+                                for n=1:numel(parts)
+                                    on_clause = '';
+                                    fks = all_fks(...
+                                        strcmp({all_fks(:).schema},partRels{n}.schema.dbname)...
+                                        & strcmp({all_fks(:).table},partRels{n}.plainTableName)...
+                                        );
+                                    consts = unique({fks(:).const_name});
+                                    for c = 1:numel(consts)
+                                        % Drop the keys that refer to the
+                                        % master
                                         self.schema.conn.query(sprintf('ALTER TABLE %s DROP FOREIGN KEY `%s`',...
-                                            parts{n}.fullTableName, name.name{name_ind}));
+                                            partRels{n}.fullTableName, consts{c}));
                                     end
+                                    hash = arrayfun(@(x) cat(2,x.column, x.master_column),fks,'uni',0);
+                                    [~,ufks] = unique(hash);
+                                    for fk = fks(ufks)'
+                                        % construct the on clause for joining                                        
+                                        on_clause = sprintf('%s AND %s.`%s` = %s.`%s`',...
+                                            on_clause,...
+                                            rel.fullTableName,...
+                                            fk.master_column, partRels{n}.fullTableName, fk.column);
+                                    end
+                                    
+                                    %construct the inner join with this part table
+                                    sql = sprintf('%s INNER JOIN %s ON %s',...
+                                        sql, parts{n}.sql, on_clause(6:end));
+                                    del_str = sprintf('%s,%s',parts{n}.sql,del_str);
+                                    
                                 end
+
+                                %extract the desired where clause (this part is quite hacky)
+                                where = rel.whereClause;
+                                subs = strfind(where, 'SELECT');
+                                if isempty(subs) %we're deleting directly from the master
+                                    where = regexprep(where,'(`\w+`)',sprintf('%s.$1',rel.fullTableName));
+                                    sql = sprintf('%s%s',sql,where);
+                                else %we have cascaded (down or up) to the master
+                                    colsStart = strfind(where,'(');
+                                    colsEnd = strfind(where,')');
+                                    cols = where(colsStart(2)+1:colsEnd(1)-1); %the restricted columns on the master
+                                    colsFull = strsplit(cols,',');
+                                    colsFull = sprintf([rel.fullTableName,'.%s'],colsFull{:});
+
+                                    sql = sprintf(...
+                                        '%s WHERE %s IN (SELECT %s FROM (%s) AS `deletion_alias`)',...
+                                        sql,colsFull,cols,where(subs(1):end-2));
+                                end
+                                %we are now ready to perform the multi-delete
                                 self.schema.conn.query(sprintf('DELETE %s FROM %s',...
-                                    del_str,join.sql));
-                                
-                                %add back the foreign keys (note that we're
-                                %still in the same transaction...)
-                                for ind = 1:numel(reentries)
-                                    self.schema.conn.query(reentries{ind});
-                                end
+                                    del_str,sql));
                             else
                                 rel.delQuick;
                             end
@@ -237,7 +313,7 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                         end
                     catch err
                         fprintf '\n ** delete rolled back due to an error\n'
-                        self.schema.conn.cancelTransaction
+                        self.schema.conn.cancelTransaction 
                         rethrow(err)
                     end
                 end

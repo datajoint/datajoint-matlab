@@ -19,6 +19,7 @@ classdef TestMasterPart < Prep
             testCase.verifyEqual(count(Acquisition.Segment), 3);
             testCase.verifyEqual(count(Acquisition.SegmentRound), 4);
             testCase.verifyEqual(count(Acquisition.SegmentSubsegment), 6);
+            testCase.verifyEqual(count(Acquisition.SegmentMiscellaneous), 3);
             testCase.verifyEqual(count(Acquisition.SAR), 1);
 
             %% deletion of part table dependency should cascade to master
@@ -29,6 +30,7 @@ classdef TestMasterPart < Prep
             testCase.verifyEqual(count(Acquisition.Segment), 1); %master which doesn't inherit from starting relation
             testCase.verifyEqual(count(Acquisition.SegmentRound), 1);
             testCase.verifyEqual(count(Acquisition.SegmentSubsegment), 2); %non-inheriting part of master
+            testCase.verifyEqual(count(Acquisition.SegmentMiscellaneous), 1); %has a matching secondary key with subsegment
             testCase.verifyEqual(count(Acquisition.SAR), 0); %dependency of both starting relation and master
 
 
@@ -38,7 +40,8 @@ classdef TestMasterPart < Prep
             Acquisition.Segment().populate();
             testCase.verifyEqual(count(Acquisition.Segment), 3);
             testCase.verifyEqual(count(Acquisition.SegmentRound), 4); %requires a proper 'target' property on master
-
+            testCase.verifyEqual(count(Acquisition.SegmentMiscellaneous), 3);
+            
 
         end
     end

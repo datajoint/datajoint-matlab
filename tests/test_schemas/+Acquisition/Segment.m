@@ -25,12 +25,15 @@ classdef Segment < dj.Computed
             key2 = key;
             for n=1:2
                 key.subsegment = n;
+                key.duplicate_column = 1;
                 key2.round = n;
                 try %can only actually insert if there's a matching acquisition_round
                     Acquisition.SegmentRound().insert(key2);
                 end
                 Acquisition.SegmentSubsegment().insert(key);
             end
+            Acquisition.SegmentMiscellaneous().insert(rmfield(key,'subsegment'));
+            
         end
     end
 end
