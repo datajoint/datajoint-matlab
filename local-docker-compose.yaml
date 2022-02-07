@@ -35,6 +35,9 @@ services:
   fakeservices.datajoint.io:
     <<: *net
     image: datajoint/nginx:v0.0.19
+    volumes:
+      - ./entrypoint.sh:/entrypoint.sh
+    platform: linux/amd64
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
