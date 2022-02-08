@@ -52,7 +52,9 @@ classdef File
         function upload_buffer(buffer, external_filepath)
             % put blob
             [~,start_idx,~] = regexp(external_filepath, '/', 'match', 'start', 'end');
-            mkdir(external_filepath(1:(start_idx(end)-1)));
+            if ~isfolder(external_filepath(1:(start_idx(end)-1)))
+                mkdir(external_filepath(1:(start_idx(end)-1)));
+            end
             fileID = fopen(external_filepath, 'w');
             fwrite(fileID, buffer);
             fclose(fileID);
