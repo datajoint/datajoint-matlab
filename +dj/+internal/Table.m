@@ -568,6 +568,10 @@ classdef Table < handle
                 else
                     try
                         for table = tables(end:-1:1)
+                            if isa(feval(table.className),'dj.Shared')
+                                self.schema.conn.query(sprintf('DROP TABLE `%s`.`$%s`', ...
+                                table.schema.dbname, table.plainTableName))
+                            end
                             self.schema.conn.query(sprintf('DROP TABLE %s', ...
                                 table.fullTableName))
                             fprintf('Dropped table %s\n', table.fullTableName)
@@ -628,7 +632,32 @@ classdef Table < handle
                 table.create;
             end
             self.schema.conn.query(sql);
-            self.schema.reload
+            self.schema.reload;
+            if isa(self,'dj.Shared')
+                hiddenDef = ['%{',newline,'-> ',self.className,newline,'%}'];
+                temp = dj.Hidden;
+                temp.schema = self.schema;
+                sql = dj.internal.Declare.declare(temp,hiddenDef);
+                sql = strrep(sql,'`$hidden`',['`$',self.plainTableName,'`']);
+                self.schema.conn.query(sql);
+
+            end
+            for parent = self.parents
+                parentClass = feval(self.schema.conn.tableToClass(cell2mat(parent)));
+                if isa(parentClass,'dj.Shared')
+                    
+                    fk_i = strcmp(self.fullTableName,{self.schema.conn.foreignKeys(:).from}) & strcmp(parentClass.fullTableName,{self.schema.conn.foreignKeys(:).ref});
+                    fk = self.schema.conn.foreignKeys(fk_i);
+                    
+                    sql = sprintf('CREATE TRIGGER `%s`.`%s_shared_insert` BEFORE INSERT ON `%s`.`%s`',self.schema.dbname,self.plainTableName,self.schema.dbname,self.plainTableName);
+                    sql = sprintf('%s%sFOR EACH ROW',sql,newline);
+                    sql = sprintf('%s%sBEGIN',sql,newline);
+                    sql = sprintf('%s%sINSERT INTO `%s`.`$%s` (%s)',sql,newline,parentClass.schema.dbname,parentClass.plainTableName,strjoin(fk.ref_attrs,','));
+                    sql = sprintf('%s%sVALUES (%s);',sql,' ',strjoin(strcat('NEW.',fk.attrs),','));
+                    sql = sprintf('%s%sEND',sql,newline);
+                    self.schema.conn.query(sql);
+                end
+            end
         end
     end
     
