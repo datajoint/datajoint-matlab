@@ -28,10 +28,13 @@ classdef AutoPopulate < dj.internal.UserRelation
     properties(Dependent)
         jobs  % the jobs table
     end
+
+    properties(Access=protected, Dependent)
+        target_
+    end
     
     properties(Access=protected)
         keySource_
-        target_
         useReservations
         executionEngine
         jobs_     % used for self.jobs
@@ -53,20 +56,14 @@ classdef AutoPopulate < dj.internal.UserRelation
     end
     
     methods
-        function target = getTarget(self)
+        function target = get.target_(self)
             % construct target for auto-population of imported and
             % computed tables.
             % By default the target is self.
-            
-            if ~isempty(self.target_)
-                target = self.target_;
+            if isprop(self, 'target')
+                target = self.target;
             else
-                if isprop(self, 'target')
-                    target = self.target;
-                else
-                    target = self;
-                end
-                self.target_ = target;
+                target = self;
             end
         end
         
@@ -106,7 +103,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             %
             % The method self.getKeySource yields the relation that provides
             % the keys for which self must be populated. The key source is
-            % compared to self.getTarget.proj() (usually self.proj()) to
+            % compared to self.target.proj() (usually self.proj()) to
             % determine unpopulated keys.
             %
             % self.populate will call self.makeTuples(key) for every
@@ -115,7 +112,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             %
             % Additional input arguments contain restriction conditions
             % applied to the key source.  Therefore, all keys to be populated
-            % are obtained as fetch((self.getKeySource - self.getTarget) & varargin).
+            % are obtained as fetch((self.getKeySource - self.target) & varargin).
             %
             % Without any output arguments, populate rethrows errors
             % that occur in makeTuples. However, if output arguments are
@@ -274,7 +271,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                     'Cannot populate a restricted relation. Correct syntax: progress(rel, restriction)'))
             end
             
-            remaining = count((self.getKeySource & varargin) - self.getTarget);
+            remaining = count((self.getKeySource & varargin) - self.target_);
             if nargout
                 % return remaning items if asked
                 varargout{1} = remaining;
@@ -310,7 +307,7 @@ classdef AutoPopulate < dj.internal.UserRelation
             popRestricts = varargin;  % restrictions on key source
             restricts = self.restrictions;  % restricts on self
             if isempty(restricts)
-                unpopulated = fetch((self.getKeySource & popRestricts) - self.getTarget.proj());
+                unpopulated = fetch((self.getKeySource & popRestricts) - self.target_.proj());
             else
                 assert(numel(restricts)==1, 'only one restriction is allowed in populated relations')
                 restricts = restricts{1};
@@ -320,7 +317,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                 assert(isstruct(restricts), ...
                     'populated relvars can be restricted only by other relations, structures, or structure arrays')
                 % the rule for populating restricted relations:
-                unpopulated = dj.struct.join(restricts, fetch((self.getKeySource & popRestricts & restricts) - (self.getTarget & restricts)));
+                unpopulated = dj.struct.join(restricts, fetch((self.getKeySource & popRestricts & restricts) - (self.target_ & restricts)));
             end
             
             % restrict the key source to unpopulated tuples
@@ -334,7 +331,7 @@ classdef AutoPopulate < dj.internal.UserRelation
                     self.timedOut = [];
                     for key = unpopulated'
                         if self.setJobStatus(key, 'reserved')
-                            if exists(self.getTarget & key)
+                            if exists(self.target_ & key)
                                 % already populated
                                 self.setJobStatus(key, 'completed');
                             else
