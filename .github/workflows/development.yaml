@@ -16,11 +16,11 @@ jobs:
       matrix:
         matlab_version: ["R2019a"]
         mysql_version: ["8.0.18", "5.7", "5.6"]
-        include:
-          - matlab_version: "R2018b"
-            mysql_version: "5.7"
-          - matlab_version: "R2016b"
-            mysql_version: "5.7"
+        # include:
+        #   - matlab_version: "R2018b"
+        #     mysql_version: "5.7"
+        #   - matlab_version: "R2016b"
+        #     mysql_version: "5.7"
     steps:
       - uses: actions/checkout@v2
       - name: Run primary tests
