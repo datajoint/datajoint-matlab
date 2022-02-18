@@ -101,14 +101,14 @@ classdef Relvar < dj.internal.GeneralRelvar & dj.internal.Table
                                 % necessary. Restrict table based on normal projection.
                                 rels(ix).restrict(proj(rels(i)));
                             else
-                                % Determine which foreign keys have been renamed
-                                fks_ref_attrs_flattened = arrayfun(@(x) x.ref_attrs{:}, fks, 'UniformOutput', false);
-                                fks_attrs_flattened = arrayfun(@(x) x.attrs{:}, fks, 'UniformOutput', false);
-                                alias_index = cellfun(@(ref_attr, attr) ~strcmp(ref_attr, attr), fks_ref_attrs_flattened, fks_attrs_flattened, 'uni', true);
+                                 % Determine which foreign keys have been renamed
+                                alias_index = cellfun(...
+                                    @(ref_attr, attr) ~strcmp(ref_attr, attr), ...
+                                    fks(1).ref_attrs, fks(1).attrs, 'uni', true);
                                 % Create rename arguments for projection
                                 aliased_attrs = cellfun(...
                                     @(ref_attr, attr) sprintf('%s->%s', ref_attr, attr), ...
-                                    fks_ref_attrs_flattened(alias_index), fks_attrs_flattened(alias_index), ...
+                                    fks(1).ref_attrs(alias_index), fks(1).attrs(alias_index), ...
                                     'uni', false);
                                 % Restrict table based on projection with rename arguments on
                                 % foreign keys.
