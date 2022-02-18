@@ -35,7 +35,6 @@ services:
   fakeservices.datajoint.io:
     <<: *net
     image: datajoint/nginx:v0.1.0
-    platform: linux/amd64
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
@@ -71,6 +70,7 @@ services:
     - MATLAB_USER
     - MATLAB_LICENSE
     - JUPYTER_PASSWORD=datajoint
+    - DISPLAY
     image: raphaelguzman/matlab:${MATLAB_VERSION}-GUI
     depends_on:
       fakeservices.datajoint.io:
