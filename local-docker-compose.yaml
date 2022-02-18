@@ -131,8 +131,8 @@ services:
       - .:/src
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       ## Additional mounts may go here
-      - ./notebook:/home/muser/notebooks
-      - ./:/home/muser/djmatlab
+      # - ./notebook:/home/muser/notebooks
+
       # - ./matlab.prf:/tmp/matlab.prf
 networks:
   main:
