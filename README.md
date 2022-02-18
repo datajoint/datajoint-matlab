@@ -44,7 +44,7 @@ For help in utilizing `dj.config` (added in `3.4.0`), you may access the help vi
 ``` sh
 MATLAB_USER=rguzman
 MATLAB_LICENSE=IyBCRUd... # For image usage instructions see https://github.com/guzman-raphael/matlab, https://hub.docker.com/r/raphaelguzman/matlab
-MATLAB_VERSION=R2016b
+MATLAB_VERSION=R2019a
 MATLAB_HOSTID=XX:XX:XX:XX:XX:XX
 MATLAB_UID=1000
 MATLAB_GID=1000

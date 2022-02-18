@@ -34,9 +34,7 @@ services:
       interval: 1s
   fakeservices.datajoint.io:
     <<: *net
-    image: datajoint/nginx:v0.0.19
-    volumes:
-      - ./entrypoint.sh:/entrypoint.sh
+    image: datajoint/nginx:v0.1.0
     platform: linux/amd64
     environment:
     - ADD_db_TYPE=DATABASE
@@ -73,7 +71,6 @@ services:
     - MATLAB_USER
     - MATLAB_LICENSE
     - JUPYTER_PASSWORD=datajoint
-    - DISPLAY=host.docker.internal:0 
     image: raphaelguzman/matlab:${MATLAB_VERSION}-GUI
     depends_on:
       fakeservices.datajoint.io:
