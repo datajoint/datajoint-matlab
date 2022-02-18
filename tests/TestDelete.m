@@ -46,23 +46,20 @@ classdef TestDelete < Prep
             dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
                 [testCase.PREFIX '_testlab']);
 
-            users = [{'user0', 
-                    'user1', 
-                    'user2'}]
+            users = [{'user0'; 'user1'; 'user2'}];
 
-            insert(TestLab.User, users)
+            insert(TestLab.User, users);
 
             duty = [{'2020-01-01','user0','user1'},
-                    {'2020-12-31','user1','user2'}]
+                    {'2020-12-31','user1','user2'}];
 
-            insert(TestLab.Duty, duty)
+            insert(TestLab.Duty, duty);
 
-            TestLab.User()
+            key.user_id = 'user0';
+            del(TestLab.User & key);
 
-            TestLab.Duty()
-
-            key.user_id = 'user0'
-            del(TestLab.User & key)
+            testCase.verifyEqual(length(fetch(TestLab.User & 'user_id != "user0"')), 2);
+            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_first != "user0"')), 1);
         end
     end
 end
