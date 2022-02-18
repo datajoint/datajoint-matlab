@@ -34,7 +34,10 @@ services:
       interval: 1s
   fakeservices.datajoint.io:
     <<: *net
-    image: datajoint/nginx:v0.0.16
+    image: datajoint/nginx:v0.0.19
+    volumes:
+      - ./entrypoint.sh:/entrypoint.sh
+    platform: linux/amd64
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
@@ -70,7 +73,7 @@ services:
     - MATLAB_USER
     - MATLAB_LICENSE
     - JUPYTER_PASSWORD=datajoint
-    - DISPLAY
+    - DISPLAY=host.docker.internal:0 
     image: raphaelguzman/matlab:${MATLAB_VERSION}-GUI
     depends_on:
       fakeservices.datajoint.io:
@@ -83,6 +86,7 @@ services:
       - /bin/bash
       - -c
       - |
+        set -e
         ORIG_DIR=$$(pwd)
         mkdir ~/Documents
         cd /src
@@ -121,7 +125,7 @@ services:
         "
         cd "$${ORIG_DIR}"
         # Copy preferences
-        cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
+        # cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
         # Interactive Jupyter Notebook environment
         jupyter notebook
     mac_address: $MATLAB_HOSTID
@@ -130,7 +134,8 @@ services:
       - .:/src
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       ## Additional mounts may go here
-      # - ./notebook:/home/muser/notebooks
+      - ./notebook:/home/muser/notebooks
+      - ./:/home/muser/djmatlab
       # - ./matlab.prf:/tmp/matlab.prf
 networks:
   main:
