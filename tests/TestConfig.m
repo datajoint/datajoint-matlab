@@ -249,7 +249,7 @@ classdef TestConfig < Prep
         end
         function TestConfig_testUse32BitDims(testCase)
             st = dbstack;
-            disp(['---------------' st(1).name '---------------']);            
+            disp(['---------------' st(1).name '---------------']);
             dj.config.use32BitDims(true);
             testCase.verifyEqual(getenv('USE_32BIT_DIMS'), 'true');
             dj.config.use32BitDims(false);
