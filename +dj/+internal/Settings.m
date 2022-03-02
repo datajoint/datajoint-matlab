@@ -85,6 +85,13 @@ classdef Settings < matlab.mixin.Copyable
             end
             dj.internal.Settings.save(location);
         end
+        function use32BitDims(flag)
+            if flag
+                setenv('USE_32BIT_DIMS', 'true');
+            else
+                setenv('USE_32BIT_DIMS', 'false');
+            end
+        end
     end
 end
 function data = fixProps(data, raw)
