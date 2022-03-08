@@ -160,6 +160,14 @@ classdef Header < matlab.mixin.Copyable
                         '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
                     if ~isempty(toks)
                         ix = find(strcmp(toks{1}{1},self.names));
+                        if ~length(ix)
+                            ix = find(strcmp(toks{1}{1},{self.attributes.alias}));
+                            assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
+                            self.attributes(self.count + 1) = self.attributes(ix);
+                            self.attributes(self.count).name = self.attributes(self.count).alias;
+                            self.attributes(self.count).alias = '';
+                            ix = self.count;
+                        end
                         assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
                         assert(~ismember(toks{1}{2},union({self.attributes.alias}, ...
                             self.names)), 'Duplicate attribute alias `%s`',toks{1}{2})
