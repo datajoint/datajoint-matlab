@@ -87,9 +87,9 @@ classdef Settings < matlab.mixin.Copyable
         end
         function use32BitDims(flag)
             if flag
-                setenv('USE_32BIT_DIMS', 'true');
+                setenv('MYM_USE_32BIT_DIMS', 'true');
             else
-                setenv('USE_32BIT_DIMS', 'false');
+                setenv('MYM_USE_32BIT_DIMS', 'false');
             end
         end
     end
