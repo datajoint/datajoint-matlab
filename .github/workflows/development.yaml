@@ -19,8 +19,8 @@ jobs:
         include:
           - matlab_version: "R2018b"
             mysql_version: "5.7"
-          - matlab_version: "R2016b"
-            mysql_version: "5.7"
+          # - matlab_version: "R2016b"
+          #   mysql_version: "5.7"
     steps:
       - uses: actions/checkout@v2
       - name: Run primary tests
