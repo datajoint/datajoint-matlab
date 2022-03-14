@@ -42,14 +42,13 @@ For help in utilizing `dj.config` (added in `3.4.0`), you may access the help vi
 
 * Create an `.env` with desired development environment values e.g.
 ``` sh
-MATLAB_USER=rguzman
-MATLAB_LICENSE=IyBCRUd... # For image usage instructions see https://github.com/guzman-raphael/matlab, https://hub.docker.com/r/raphaelguzman/matlab
-MATLAB_VERSION=R2019a
+MATLAB_USER=raphael
+MATLAB_LICENSE="#\ BEGIN----...---------END" # For image usage instructions see https://github.com/guzman-raphael/matlab, https://hub.docker.com/r/raphaelguzman/matlab
+MATLAB_VERSION=R2018b
 MATLAB_HOSTID=XX:XX:XX:XX:XX:XX
 MATLAB_UID=1000
 MATLAB_GID=1000
 MYSQL_TAG=5.7
-MINIO_VER=RELEASE.2022-01-03T18-22-58Z
 ```
 * `cp local-docker-compose.yaml docker-compose.yaml`
 * `docker-compose up` (Note configured `JUPYTER_PASSWORD`)
