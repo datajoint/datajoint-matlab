@@ -26,7 +26,7 @@ classdef TestProjection < Prep
             res = q.fetch1('enrolled_date');
             testCase.verifyEqual(res,  '2018-01-24');
         end
-        function TestProjection_testRenameSameKey(testCase)
+        function TestProjection_testRenameSameKey(testCase) %runtests('Main/TestProjection_testRenameSameKey')
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             package = 'University';
