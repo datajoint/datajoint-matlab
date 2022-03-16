@@ -51,15 +51,16 @@ classdef TestDelete < Prep
             insert(TestLab.User, users);
 
             duty = [{'2020-01-01','user0','user1'},
-                    {'2020-12-31','user1','user2'}];
+                    {'2020-01-02','user1','user2'},
+                    {'2020-12-31','user0','user2'}];
 
             insert(TestLab.Duty, duty);
 
-            key.user_id = 'user2';
+            key.user_id = 'user1';
             del(TestLab.User & key);
 
-            testCase.verifyEqual(length(fetch(TestLab.User & 'user_id != "user2"')), 2);
-            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_second != "user2"')), 1);
+            testCase.verifyEqual(length(fetch(TestLab.User & 'user_id != "user1"')), 2);
+            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_second != "user1"')), 1);
         end
     end
 end
