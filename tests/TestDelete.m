@@ -36,7 +36,7 @@ classdef TestDelete < Prep
             testCase.verifyEqual(...
                 length(fetch(Company.Machine & struct('employee_id', 'shan'))), 0);
         end
-        function TestDelete_testTwoFKOnePK(testCase) %runtests('Main/TestDelete_testTwoFKOnePK')
+        function TestDelete_testTwoFKOnePK(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             % https:%github.com/datajoint/datajoint-matlab/issues/379
