@@ -59,8 +59,10 @@ classdef TestDelete < Prep
             key.user_id = 'user1';
             del(TestLab.User & key);
 
-            testCase.verifyEqual(length(fetch(TestLab.User & 'user_id != "user1"')), 2);
-            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_second != "user1"')), 1);
+            testCase.verifyEqual(length(fetch(TestLab.User)), 2);
+            testCase.verifyEqual(length(fetch(TestLab.Duty)), 1);
+            testCase.verifyEqual(length(fetch(TestLab.User & 'user_id = "user1"')), 0);
+            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_first = "user1" OR duty_second = "user1"')), 0);
         end
     end
 end

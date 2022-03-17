@@ -34,7 +34,7 @@ services:
       interval: 1s
   fakeservices.datajoint.io:
     <<: *net
-    image: datajoint/nginx:v0.1.0
+    image: datajoint/nginx:v0.1.1
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
@@ -132,7 +132,6 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       ## Additional mounts may go here
       # - ./notebook:/home/muser/notebooks
-
       # - ./matlab.prf:/tmp/matlab.prf
 networks:
   main:
