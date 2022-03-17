@@ -78,7 +78,7 @@ services:
     ports:
       - "8888:8888"
     user: ${MATLAB_UID}:${MATLAB_GID}
-    working_dir: /home/muser/notebooks
+    working_dir: /home/muser
     command:
       - /bin/bash
       - -c
