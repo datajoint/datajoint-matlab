@@ -16,11 +16,11 @@ jobs:
       matrix:
         matlab_version: ["R2019a"]
         mysql_version: ["8.0.18", "5.7", "5.6"]
-        include:
-          - matlab_version: "R2018b"
-            mysql_version: "5.7"
-          - matlab_version: "R2016b"
-            mysql_version: "5.7"
+        # include:
+        #   - matlab_version: "R2018b"
+        #     mysql_version: "5.7"
+        #   - matlab_version: "R2016b"
+        #     mysql_version: "5.7"
     steps:
       - uses: actions/checkout@v2
       - name: Run primary tests
@@ -31,7 +31,7 @@ jobs:
           MATLAB_HOSTID: ${{ secrets.matlab_hostid }}
           MATLAB_VERSION: ${{ matrix.matlab_version }}
           MYSQL_TAG: ${{ matrix.mysql_version }}
-          MINIO_VER: RELEASE.2019-09-26T19-42-35Z
+          MINIO_VER: RELEASE.2022-01-03T18-22-58Z
           MATLAB_LICENSE: ${{ secrets[format('matlab_license_{0}', matrix.matlab_version)] }}
           DOCKER_CLIENT_TIMEOUT: "120"
           COMPOSE_HTTP_TIMEOUT: "120"

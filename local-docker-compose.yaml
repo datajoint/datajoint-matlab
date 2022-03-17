@@ -34,7 +34,7 @@ services:
       interval: 1s
   fakeservices.datajoint.io:
     <<: *net
-    image: datajoint/nginx:v0.0.16
+    image: datajoint/nginx:v0.1.1
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306
@@ -78,11 +78,12 @@ services:
     ports:
       - "8888:8888"
     user: ${MATLAB_UID}:${MATLAB_GID}
-    working_dir: /home/muser/notebooks
+    working_dir: /home/muser
     command:
       - /bin/bash
       - -c
       - |
+        set -e
         ORIG_DIR=$$(pwd)
         mkdir ~/Documents
         cd /src
@@ -121,7 +122,7 @@ services:
         "
         cd "$${ORIG_DIR}"
         # Copy preferences
-        cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
+        # cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
         # Interactive Jupyter Notebook environment
         jupyter notebook
     mac_address: $MATLAB_HOSTID
