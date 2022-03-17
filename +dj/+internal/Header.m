@@ -152,17 +152,25 @@ classdef Header < matlab.mixin.Copyable
             
             include = [self.attributes.iskey];  % always include the primary key
             for iAttr=1:length(params)
-                if strcmp('*',params{iAttr})
+                if strcmp('*', params{iAttr})
                     include = include | true;   % include all attributes
                 else
                     % process a renamed attribute
                     toks = regexp(params{iAttr}, ...
                         '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
                     if ~isempty(toks)
-                        ix = find(strcmp(toks{1}{1},self.names));
-                        assert(length(ix)==1,'Attribute `%s` not found',toks{1}{1});
-                        assert(~ismember(toks{1}{2},union({self.attributes.alias}, ...
-                            self.names)), 'Duplicate attribute alias `%s`',toks{1}{2})
+                        ix = find(strcmp(toks{1}{1}, self.names));
+                        if ~length(ix)
+                            ix = find(strcmp(toks{1}{1}, {self.attributes.alias}));
+                            assert(length(ix)==1, 'Attribute `%s` not found', toks{1}{1});
+                            self.attributes(self.count + 1) = self.attributes(ix);
+                            self.attributes(self.count).name = self.attributes(self.count).alias;
+                            self.attributes(self.count).alias = '';
+                            ix = self.count;
+                        end
+                        assert(length(ix)==1, 'Attribute `%s` not found', toks{1}{1});
+                        assert(~ismember(toks{1}{2}, union({self.attributes.alias}, ...
+                            self.names)), 'Duplicate attribute alias `%s`', toks{1}{2})
                         self.attributes(ix).name = toks{1}{2};
                         self.attributes(ix).alias = toks{1}{1};
                     else

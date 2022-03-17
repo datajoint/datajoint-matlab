@@ -36,5 +36,33 @@ classdef TestDelete < Prep
             testCase.verifyEqual(...
                 length(fetch(Company.Machine & struct('employee_id', 'shan'))), 0);
         end
+        function TestDelete_testTwoFKOnePK(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            % https:%github.com/datajoint/datajoint-matlab/issues/379
+            dj.config('safemode', false);
+            package = 'TestLab';
+
+            dj.createSchema(package,[testCase.test_root '/test_schemas'], ...
+                [testCase.PREFIX '_testlab']);
+
+            users = [{'user0'; 'user1'; 'user2'}];
+
+            insert(TestLab.User, users);
+
+            duty = [{'2020-01-01','user0','user1'},
+                    {'2020-01-02','user1','user2'},
+                    {'2020-12-31','user0','user2'}];
+
+            insert(TestLab.Duty, duty);
+
+            key.user_id = 'user1';
+            del(TestLab.User & key);
+
+            testCase.verifyEqual(length(fetch(TestLab.User)), 2);
+            testCase.verifyEqual(length(fetch(TestLab.Duty)), 1);
+            testCase.verifyEqual(length(fetch(TestLab.User & 'user_id = "user1"')), 0);
+            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_first = "user1" OR duty_second = "user1"')), 0);
+        end
     end
 end
