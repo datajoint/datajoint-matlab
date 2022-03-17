@@ -179,9 +179,9 @@ classdef TestExternalFile < Prep
             data.sides = 'llllrrl';
             data.hits = [NaN,1,1,0,1,0,NaN];
 
-            dj.config.use32BitDims(true);
+            dj.config('use32BitDims', true);
             unpacked = mym('deserialize', packed);
-            dj.config.use32BitDims(false);
+            dj.config('use32BitDims', false);
  
             testCase.verifyEqual(unpacked, data);
         end
