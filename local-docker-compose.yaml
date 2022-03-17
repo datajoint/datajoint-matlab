@@ -136,4 +136,3 @@ services:
       # - ./matlab.prf:/tmp/matlab.prf
 networks:
   main:
-  
