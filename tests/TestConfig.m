@@ -247,5 +247,15 @@ classdef TestConfig < Prep
             setenv('DJ_INIT', '');
             dj.config.restore;
         end
+        function TestConfig_testUse32BitDims(testCase)
+            st = dbstack;
+            disp(['---------------' st(1).name '---------------']);
+            dj.config('use_32bit_dims', true);
+            testCase.verifyEqual(getenv('MYM_USE_32BIT_DIMS'), 'true');
+            dj.config('use_32bit_dims', false);
+            testCase.verifyEqual(getenv('MYM_USE_32BIT_DIMS'), 'false');
+            
+            dj.config.restore;
+        end
     end
 end

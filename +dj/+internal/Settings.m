@@ -19,7 +19,8 @@ classdef Settings < matlab.mixin.Copyable
             'queryPopulate_check', true, ...
             'queryPopulate_ancestors', false, ...
             'queryBigint_to_double', false, ...
-            'queryIgnore_extra_insert_fields', false ...  when false, throws an error in `insert(self, tuple)` when tuple has extra fields.
+            'queryIgnore_extra_insert_fields', false, ...  when false, throws an error in `insert(self, tuple)` when tuple has extra fields.
+            'use_32bit_dims', false ...
         )
     end
     properties
@@ -58,6 +59,10 @@ classdef Settings < matlab.mixin.Copyable
             if nargin == 2
                 new_state = subsasgn(current_state, subscript, value);
                 stateAccess('set', new_state);
+                if strcmp(subscript(1).subs, 'use_32bit_dims')
+                    ternary = @(varargin)varargin{end-varargin{1}};
+                    setenv('MYM_USE_32BIT_DIMS', ternary(value, 'true', 'false'));
+                end
             end
         end
         function out = restore()

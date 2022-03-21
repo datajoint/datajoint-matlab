@@ -1,3 +1,9 @@
+3.5.0 -- March 21, 2022
+--------------------------
+* Bugfix: Cascading delete for renamed foreign keys (#379) PR #386
+* Minor: Add renaming the same attribute multiple times within a single projection PR #386
+* Minor: Add config for reading values with 32-bit dimensions (datajoint/mym#86) PR #395
+
 3.4.3 -- May 28, 2021
 --------------------------
 * Bugfix: `dj.config` omits default values when loading new config immediately after MATLAB boot (#359) PR #369
