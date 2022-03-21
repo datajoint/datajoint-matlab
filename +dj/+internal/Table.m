@@ -649,13 +649,15 @@ classdef Table < handle
                     fk_i = strcmp(self.fullTableName,{self.schema.conn.foreignKeys(:).from}) & strcmp(parentClass.fullTableName,{self.schema.conn.foreignKeys(:).ref});
                     fk = self.schema.conn.foreignKeys(fk_i);
                     
-                    sql = sprintf('CREATE TRIGGER `%s`.`%s_shared_insert` BEFORE INSERT ON `%s`.`%s`',self.schema.dbname,self.plainTableName,self.schema.dbname,self.plainTableName);
-                    sql = sprintf('%s%sFOR EACH ROW',sql,newline);
-                    sql = sprintf('%s%sBEGIN',sql,newline);
-                    sql = sprintf('%s%sINSERT INTO `%s`.`$%s` (%s)',sql,newline,parentClass.schema.dbname,parentClass.plainTableName,strjoin(fk.ref_attrs,','));
-                    sql = sprintf('%s%sVALUES (%s);',sql,' ',strjoin(strcat('NEW.',fk.attrs),','));
-                    sql = sprintf('%s%sEND',sql,newline);
-                    self.schema.conn.query(sql);
+                    if fk_i.primary
+                        sql = sprintf('CREATE TRIGGER `%s`.`%s_shared_insert` BEFORE INSERT ON `%s`.`%s`',self.schema.dbname,self.plainTableName,self.schema.dbname,self.plainTableName);
+                        sql = sprintf('%s%sFOR EACH ROW',sql,newline);
+                        sql = sprintf('%s%sBEGIN',sql,newline);
+                        sql = sprintf('%s%sINSERT INTO `%s`.`$%s` (%s)',sql,newline,parentClass.schema.dbname,parentClass.plainTableName,strjoin(fk.ref_attrs,','));
+                        sql = sprintf('%s%sVALUES (%s);',sql,' ',strjoin(strcat('NEW.',fk.attrs),','));
+                        sql = sprintf('%s%sEND',sql,newline);
+                        self.schema.conn.query(sql);
+                    end
                 end
             end
         end
