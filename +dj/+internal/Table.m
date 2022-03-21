@@ -649,7 +649,7 @@ classdef Table < handle
                     fk_i = strcmp(self.fullTableName,{self.schema.conn.foreignKeys(:).from}) & strcmp(parentClass.fullTableName,{self.schema.conn.foreignKeys(:).ref});
                     fk = self.schema.conn.foreignKeys(fk_i);
                     
-                    if fk_i.primary
+                    if fk.primary
                         sql = sprintf('CREATE TRIGGER `%s`.`%s_shared_insert` BEFORE INSERT ON `%s`.`%s`',self.schema.dbname,self.plainTableName,self.schema.dbname,self.plainTableName);
                         sql = sprintf('%s%sFOR EACH ROW',sql,newline);
                         sql = sprintf('%s%sBEGIN',sql,newline);
