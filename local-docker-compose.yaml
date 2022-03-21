@@ -83,6 +83,7 @@ services:
       - /bin/bash
       - -c
       - |
+        set -e
         ORIG_DIR=$$(pwd)
         mkdir ~/Documents
         cd /src
