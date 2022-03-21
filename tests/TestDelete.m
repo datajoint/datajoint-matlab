@@ -36,7 +36,7 @@ classdef TestDelete < Prep
             testCase.verifyEqual(...
                 length(fetch(Company.Machine & struct('employee_id', 'shan'))), 0);
         end
-        function TestDelete_testTwoFKOnePK(testCase)
+        function TestDelete_testThreeFKOnePK(testCase)
             st = dbstack;
             disp(['---------------' st(1).name '---------------']);
             % https:%github.com/datajoint/datajoint-matlab/issues/379
@@ -63,7 +63,7 @@ classdef TestDelete < Prep
             testCase.verifyEqual(length(fetch(TestLab.User)), 3);
             testCase.verifyEqual(length(fetch(TestLab.Duty)), 1);
             testCase.verifyEqual(length(fetch(TestLab.User & 'user_id = "user1"')), 0);
-            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_first = "user1" OR duty_second = "user1"')), 0);
+            testCase.verifyEqual(length(fetch(TestLab.Duty & 'duty_first = "user1" OR duty_second = "user1" OR duty_third = "user1"')), 0);
         end
     end
 end
