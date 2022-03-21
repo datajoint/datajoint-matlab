@@ -1,4 +1,4 @@
-3.5.0 -- TBD
+3.5.0 -- March 21, 2022
 --------------------------
 * Bugfix: Cascading delete for renamed foreign keys (#379) PR #386
 * Minor: Add renaming the same attribute multiple times within a single projection PR #386

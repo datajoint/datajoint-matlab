@@ -59,7 +59,7 @@ classdef Settings < matlab.mixin.Copyable
             if nargin == 2
                 new_state = subsasgn(current_state, subscript, value);
                 stateAccess('set', new_state);
-                if strcmp(subscript(1).subs, 'use_32bit_dims')%~isempty(subscript(1).subs) && strcmp(subscript(1).subs, 'use_32bit_dims')
+                if strcmp(subscript(1).subs, 'use_32bit_dims')
                     ternary = @(varargin)varargin{end-varargin{1}};
                     setenv('MYM_USE_32BIT_DIMS', ternary(value, 'true', 'false'));
                 end
