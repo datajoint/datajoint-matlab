@@ -121,7 +121,7 @@ services:
         "
         cd "$${ORIG_DIR}"
         # Copy preferences
-        cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
+        # cp /tmp/matlab.prf /home/muser/.matlab/${MATLAB_VERSION}/matlab.prf
         # Interactive Jupyter Notebook environment
         jupyter notebook
     mac_address: $MATLAB_HOSTID
