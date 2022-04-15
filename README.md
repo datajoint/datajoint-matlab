@@ -38,6 +38,14 @@ DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias
 ## Config
 For help in utilizing `dj.config` (added in `3.4.0`), you may access the help via `help('dj.config')` or review it online [here](https://github.com/datajoint/datajoint-matlab/blob/c2bd6b3e195dfeef773d4e12bad5573c461193b0/%2Bdj/config.m#L2-L27). Formal documentation to follow.
 
+## Documentation and Tutorials
+
+* https://datajoint.org  -- start page
+* https://docs.datajoint.org -- up-to-date documentation
+* https://tutorials.datajoint.io -- step-by-step tutorials
+* https://elements.datajoint.org -- catalog of example pipelines
+* https://codebook.datajoint.io -- interactive online tutorials
+
 ## Citation
 + If your work uses DataJoint for MATLAB, please cite the following Research Resource Identifier (RRID) and manuscript.
 
