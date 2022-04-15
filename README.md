@@ -46,6 +46,8 @@ For help in utilizing `dj.config` (added in `3.4.0`), you may access the help vi
 + Yatsenko D, Reimer J, Ecker AS, Walker EY, Sinz F, Berens P, Hoenselaar A, Cotton RJ, Siapas AS, Tolias AS. DataJoint: managing big scientific data using MATLAB or Python. bioRxiv. 2015 Jan 1:031658. doi: https://doi.org/10.1101/031658
 
 ## Running Tests Locally
+<details>
+<summary>Click to expand details</summary>
 
 * Create an `.env` with desired development environment values e.g.
 ``` sh
@@ -89,3 +91,5 @@ MINIO_VER=RELEASE.2022-01-03T18-22-58Z
 
 * Shell into `datajoint-matlab_app_1` i.e. `docker exec -it datajoint-matlab_app_1 bash`
 * Launch Matlab with no GUI by runnning command `matlab -nodisplay`
+
+</details>
