@@ -54,7 +54,7 @@ For help in utilizing `dj.config` (added in `3.4.0`), you may access the help vi
 ## Citation
 + If your work uses DataJoint for MATLAB, please cite the following Research Resource Identifier (RRID) and manuscript.
 
-+ DataJoint ([RRID:SCR_014543](https://scicrunch.org/resolver/SCR_014543)) - DataJoint for MATLAB (version < enter version number >)
++ DataJoint ([RRID:SCR_014543](https://scicrunch.org/resolver/SCR_014543)) - DataJoint for MATLAB (version `<Enter version number>`)
 
 + Yatsenko D, Reimer J, Ecker AS, Walker EY, Sinz F, Berens P, Hoenselaar A, Cotton RJ, Siapas AS, Tolias AS. DataJoint: managing big scientific data using MATLAB or Python. bioRxiv. 2015 Jan 1:031658. doi: https://doi.org/10.1101/031658
 
