@@ -1,11 +1,14 @@
 [![View DataJoint on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/63218-datajoint)
 
+# Welcome to DataJoint for MATLAB!
 DataJoint for MATLAB is a high-level programming interface for relational databases designed to support data processing chains in science labs. DataJoint is built on the foundation of the relational data model and prescribes a consistent method for organizing, populating, and querying data.
 
-DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias' Lab](http://toliaslab.org) for the distributed processing and management of large volumes of data streaming from regular experiments. Starting in 2011, DataJoint has been available as an open-source project adopted by other labs and improved through contributions from several developers.
-
+DataJoint was initially developed in 2009 by Dimitri Yatsenko in Andreas Tolias' Lab at Baylor College of Medicine for the distributed processing and management of large volumes of data streaming from regular experiments. Starting in 2011, DataJoint has been available as an open-source project adopted by other labs and improved through contributions from several developers.
+Presently, the primary developer of DataJoint open-source software is the company DataJoint (https://datajoint.com). Related resources are listed at https://datajoint.org.
 
 ## Installation
+<details>
+<summary>Click to expand details</summary>
 
 ### (Recommended) Greater than R2016b
 
@@ -35,10 +38,29 @@ DataJoint was initially developed in 2009 by Dimitri Yatsenko in [Andreas Tolias
 3. Right-Click and Select *Install*
 4. Select *Install*
 
+</details>
+
 ## Config
 For help in utilizing `dj.config` (added in `3.4.0`), you may access the help via `help('dj.config')` or review it online [here](https://github.com/datajoint/datajoint-matlab/blob/c2bd6b3e195dfeef773d4e12bad5573c461193b0/%2Bdj/config.m#L2-L27). Formal documentation to follow.
 
+## Documentation and Tutorials
+
+* https://datajoint.org  -- start page
+* https://docs.datajoint.org -- up-to-date documentation
+* https://tutorials.datajoint.io -- step-by-step tutorials
+* https://elements.datajoint.org -- catalog of example pipelines
+* https://codebook.datajoint.io -- interactive online tutorials
+
+## Citation
++ If your work uses DataJoint for MATLAB, please cite the following Research Resource Identifier (RRID) and manuscript.
+
++ DataJoint ([RRID:SCR_014543](https://scicrunch.org/resolver/SCR_014543)) - DataJoint for MATLAB (version `<Enter version number>`)
+
++ Yatsenko D, Reimer J, Ecker AS, Walker EY, Sinz F, Berens P, Hoenselaar A, Cotton RJ, Siapas AS, Tolias AS. DataJoint: managing big scientific data using MATLAB or Python. bioRxiv. 2015 Jan 1:031658. doi: https://doi.org/10.1101/031658
+
 ## Running Tests Locally
+<details>
+<summary>Click to expand details</summary>
 
 * Create an `.env` with desired development environment values e.g.
 ``` sh
@@ -82,3 +104,5 @@ MINIO_VER=RELEASE.2022-01-03T18-22-58Z
 
 * Shell into `datajoint-matlab_app_1` i.e. `docker exec -it datajoint-matlab_app_1 bash`
 * Launch Matlab with no GUI by runnning command `matlab -nodisplay`
+
+</details>
