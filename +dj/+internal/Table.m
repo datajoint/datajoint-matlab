@@ -643,7 +643,11 @@ classdef Table < handle
 
             end
             for parent = self.parents
-                parentClass = feval(self.schema.conn.tableToClass(cell2mat(parent)));
+                parentClassName = self.schema.conn.tableToClass(cell2mat(parent));
+                if ~exist(parentClassName, 'class')
+                    continue
+                end
+                parentClass = feval(parentClassName);
                 if isa(parentClass,'dj.Shared')
                     
                     fk_i = strcmp(self.fullTableName,{self.schema.conn.foreignKeys(:).from}) & strcmp(parentClass.fullTableName,{self.schema.conn.foreignKeys(:).ref});
