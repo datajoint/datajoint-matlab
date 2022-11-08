@@ -1,55 +1,16 @@
 [![View DataJoint on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/63218-datajoint)
 
 # Welcome to DataJoint for MATLAB!
+
 DataJoint for MATLAB is a high-level programming interface for relational databases designed to support data processing chains in science labs. DataJoint is built on the foundation of the relational data model and prescribes a consistent method for organizing, populating, and querying data.
 
 DataJoint was initially developed in 2009 by Dimitri Yatsenko in Andreas Tolias' Lab at Baylor College of Medicine for the distributed processing and management of large volumes of data streaming from regular experiments. Starting in 2011, DataJoint has been available as an open-source project adopted by other labs and improved through contributions from several developers.
 Presently, the primary developer of DataJoint open-source software is the company DataJoint (https://datajoint.com). Related resources are listed at https://datajoint.org.
 
-## Installation
-<details>
-<summary>Click to expand details</summary>
-
-### (Recommended) Greater than R2016b
-
-1. Utilize MATLAB built-in GUI i.e. *Top Ribbon -> Add-Ons -> Get Add-Ons*
-2. Search and Select `DataJoint`
-3. Select *Add from GitHub*
-
-### Using GHToolbox (FileExchange Community Toolbox)
-
-1. Install *GHToolbox* using using an appropriate method in https://github.com/datajoint/GHToolbox
-2. run: `ghtb.install('datajoint/datajoint-matlab')`
-
-### Less than R2016b
-
-1. Utilize MATLAB built-in GUI i.e. *Top Ribbon -> Add-Ons -> Get Add-Ons*
-2. Search and Select `DataJoint`
-3. Select *Download from GitHub*
-4. Save `DataJoint.mltbx` locally
-5. Navigate in MATLAB tree browser to saved toolbox file
-6. Right-Click and Select *Install*
-7. Select *Install*
-
-### From Source
-
-1. Download `DataJoint.mltbx` locally
-2. Navigate in MATLAB tree browser to saved toolbox file
-3. Right-Click and Select *Install*
-4. Select *Install*
-
-</details>
+For more information, please visit our [documentation](https://datajoint.com/docs/core/datajoint-matlab/).
 
 ## Config
 For help in utilizing `dj.config` (added in `3.4.0`), you may access the help via `help('dj.config')` or review it online [here](https://github.com/datajoint/datajoint-matlab/blob/c2bd6b3e195dfeef773d4e12bad5573c461193b0/%2Bdj/config.m#L2-L27). Formal documentation to follow.
-
-## Documentation and Tutorials
-
-* https://datajoint.org  -- start page
-* https://docs.datajoint.org -- up-to-date documentation
-* https://tutorials.datajoint.io -- step-by-step tutorials
-* https://elements.datajoint.org -- catalog of example pipelines
-* https://codebook.datajoint.io -- interactive online tutorials
 
 ## Citation
 + If your work uses DataJoint for MATLAB, please cite the following Research Resource Identifier (RRID) and manuscript.

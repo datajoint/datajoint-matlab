@@ -1,1 +1,0 @@
-A custom key source can be configured by setting the ``keySource`` property within a table's ``classdef`` block, using MATLAB's `dependent properties <https://www.mathworks.com/help/matlab/matlab_oop/access-methods-for-dependent-properties.html>`_ syntax.

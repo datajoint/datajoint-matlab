@@ -1,0 +1,6 @@
+mkdocs-material
+mkdocs-redirects
+mike
+mdx-truly-sane-lists
+mkdocs-literate-nav
+mkdocs-exclude-search
