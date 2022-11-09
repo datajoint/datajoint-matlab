@@ -21,7 +21,9 @@ experiment_schema = experiment.getSchema();
 experiment_schema.v.Session() & 'session_id=1234';
 ```
 
-Note: You can view the available tables in a schema by using tab completion on
-the `schema.v` property.
+???+ Note
+
+    You can view the available tables in a schema by using tab completion on
+    the `schema.v` property.
 
 To visualize an unfamiliar schema, see commands for generating [diagrams](../../getting-started/#diagram).

@@ -1,4 +1,3 @@
-XX
 # Operators
 
 The examples below will use the table definitions in [table tiers](../../reproduce/table-tiers).
@@ -28,8 +27,8 @@ of table `A` by a string containing an attribute not found in table `A` produces
 error.
 
 ```matlab
-Session & 'user = "Alice"' # (1)
-Session & 'session_date >= "2022-01-01"' # (2)
+Session & 'user = "Alice"' % (1)
+Session & 'session_date >= "2022-01-01"' % (2)
 ```
 
 1. All the sessions performed by Alice
@@ -55,7 +54,8 @@ Session() & cond_struct % (3)
 
 1. A cell array
 2. A structure array
-3. This command will show all the sessions that either Alice or Jerry conducted on the given day.
+3. This command will show all the sessions that either Alice or Jerry conducted on the
+   given day.
 
 ### By a query
 
@@ -113,8 +113,8 @@ Session.proj('session_end_time-session_start_time -> duration') & 'duration > 10
 For more complicated calculations, we can use aggregation.
 
 ```matlab
-Subject.aggr(Session,'count(*)->n') # (1)
-Subject.aggr(Session,'avg(session_start_time)->average_start') # (2)
+Subject.aggr(Session,'count(*)->n') % (1)
+Subject.aggr(Session,'avg(session_start_time)->average_start') % (2)
 ```
 
 1. Number of sessions per subject.
@@ -133,10 +133,9 @@ Subject.aggr(Session,'avg(session_start_time)->average_start') # (2)
 Universal sets offer the complete list of combinations of attributes.
 
 ```matlab
-# All home cities of students
-dj.U('laser_wavelength', 'laser_power') & Scan # (1)
-dj.U('laser_wavelength', 'laser_power').aggr(Scan, 'count(*)->n') # (2)
-dj.U().aggr(Session, 'max(session)->n') # (3)
+dj.U('laser_wavelength', 'laser_power') & Scan % (1)
+dj.U('laser_wavelength', 'laser_power').aggr(Scan, 'count(*)->n') % (2)
+dj.U().aggr(Session, 'max(session)->n') % (3)
 ```
 
 1. All combinations of wavelength and power.

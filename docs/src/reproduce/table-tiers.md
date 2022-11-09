@@ -42,22 +42,6 @@ classdef Session < dj.Manual
 end
 ```
 
-File `+experiment/Scan.m` XX WHERE?
-
-``` matlab
-%{
-  # Two-photon imaging scan
-  -> experiment.Session
-  scan : smallint  # scan number within the session
-  ---
-  -> experiment.Lens
-  laser_wavelength : decimal(5,1)  # um
-  laser_power      : decimal(4,1)  # mW
-%}
-classdef Scan < dj.Manual
-end
-```
-
 Note that the notation to permit null entries differs for attributes versus foreign
 key references.
 
@@ -109,7 +93,7 @@ classdef FilteredImage < dj.Computed
     methods(Access=protected)
         function makeTuples(self, key)
             img = fetch1(test.Image & key, 'image');
-            key.filtered_image = myfilter(img);
+            key.filtered_image = my_filter(img);
             self.insert(key)
         end
     end
@@ -119,41 +103,15 @@ end
 ??? Note "`makeTuples` vs. `make`"
 
     Currently matlab uses `makeTuples` rather than `make`. This will be
-    fixed in an upcoming release:
-    <https://github.com/datajoint/datajoint-matlab/issues/141>
-
+    fixed in an upcoming release. You can monitor the discussion
+    [here](https://github.com/datajoint/datajoint-matlab/issues/141)
 
 ## Part Tables
 
-The following code defines a Imported table with an associated part table. In MATLAB, the master and part tables are declared in a separate `classdef` file. The
-name of the part table must begin with the name of the master table. The part table
-must declare the property `master` containing an object of the master.
-
-```python
-@schema
-class Scan(dj.Imported):
-    definition = """
-    # Two-photon imaging scan
-    -> Session
-    scan : smallint  # scan number within the session
-    ---
-    -> Lens
-    laser_wavelength : decimal(5,1)  # um
-    laser_power      : decimal(4,1)  # mW
-    """
-
-    class ScanField(dj.Part):
-        definition = """
-        -> master
-        ROI: longblob  # Region of interest
-        """
-
-    def make(self, key):
-        ... # (1)
-        self.insert1(key)
-        self.ScanField.insert1(ROI_information)
-```
-
+The following code defines a Imported table with an associated part table. In MATLAB,
+the master and part tables are declared in a separate `classdef` file. The name of the
+part table must begin with the name of the master table. The part table must declare the
+property `master` containing an object of the master.
 
 `+image/Scan.m`
 

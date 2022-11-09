@@ -15,9 +15,16 @@
         "src/archive"
     ],
     "words": [
-        "conda",
+        "ghtb",
+        "disp",
+        "mltbx",
+        "setenv",
+        "isempty",
+        "fetchn",
+        "struct",
         "linenums",
         "repr",
+        "conda",
         "numpy",
         "sess",
         "cond",

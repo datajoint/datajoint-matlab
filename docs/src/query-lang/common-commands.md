@@ -1,4 +1,3 @@
-XX - refer to existing table defintions
 # Common Commands
 
 <!-- ## Insert is present in the general docs here-->
@@ -39,9 +38,9 @@ For example, the two methods below are equivalent although the second
 method creates an extra variable.
 
 ``` matlab
-result = fetch(university.Student, '*');
+result = fetch(my_schema.Rectangle, '*');
 
-query = university.Student;
+query = my_schema.Rectangle;
 result = query.fetch()
 ```
 
@@ -53,7 +52,7 @@ the `struct`.
 
 ``` matlab
 keys = query.fetch;
-keys = fetch(university.Student & university.StudentMajor);
+keys = fetch(my_schema.Rectangle & my_schema.Area);
 ```
 
 Note that MATLAB allows calling functions without the parentheses `()`.
@@ -65,7 +64,7 @@ retrieves the entire result as a struct array.
 
 ``` matlab
 data = query.fetch('*');
-data = fetch(university.Student & university.StudentMajor, '*');
+data = fetch(my_schema.Rectangle & my_schema.Area, '*');
 ```
 
 ??? Note "For very large tables..."
@@ -92,8 +91,8 @@ returned in the form of cell arrays, even when `query` happens to contain a sing
 entity.
 
 ``` matlab
-[name, img] = query.fetch1('name', 'image'); % (1)
-[names, imgs] = query.fetchn('name', 'image'); % (2)
+[shape_id, height] = query.fetch1('shape_id', 'shape_height'); % (1)
+[shape_ids, heights] = query.fetchn('shape_id', 'shape_height'); % (2)
 ```
 
 1. When the table has exactly one entity.
@@ -106,7 +105,7 @@ retrieved by `fetchn`. This can be done by adding a special input argument indic
 the request and another output argument to receive the key values:
 
 ``` matlab
-[names, imgs, keys] = query.fetchn('name', 'image', 'KEY');
+[shape_ids, heights, keys] = query.fetchn('shape_id', 'shape_height', 'KEY');
 ```
 
 The resulting value of `keys` will be a column array of type `struct`.
@@ -114,12 +113,13 @@ This mechanism is only implemented for `fetchn`.
 
 ### Rename and calculate
 
-In DataJoint for MATLAB, all `fetch` methods have all the same capability as the `proj
-<proj>` operator. For example, renaming an attribute can be accomplished using the
-syntax below.
+In DataJoint for MATLAB, all `fetch` methods have all the same capability as the 
+[`proj` operator](../operators#proj). For example, renaming an attribute can be 
+accomplished using the syntax below.
 
 ``` matlab
-[names, BMIs] = query.fetchn('name', 'weight/height/height -> bmi');
+[shape_ids, perimeter] = query.fetchn('shape_id', ...
+    '2*(shape_height+shape_width) -> perimeter');
 ```
 
 See [`proj`](../operators#proj) for an in-depth description of projection.
@@ -129,23 +129,23 @@ See [`proj`](../operators#proj) for an in-depth description of projection.
 To sort the result, add the additional `ORDER BY` argument in `fetch` and `fetchn`
 methods as the last argument. 
 
-The following command retrieves the field `course_name` from courses in the biology
-department, sorted by course number.
+The following command retrieves the field `shape_id` from rectangles with height greater
+than 2, sorted by width.
 
 ``` matlab
-notes = fetchn(university.Course & 'dept="BIOL"', 'course_name', ...
-     'ORDER BY course');
+notes = fetchn(my_schema.Rectangle & 'shape_height>2"', 'shape_id' ...
+     'ORDER BY shape_width');
 ```
 
 The ORDER BY argument is passed directly to SQL and follows the same syntax as the 
 [ORDER BY clause](https://dev.mysql.com/doc/refman/5.7/en/order-by-optimization.html)
 
 Similarly, the LIMIT and OFFSET clauses can be used to limit the result to a subset of
-entities. For example, to return the most advanced courses, one could do the
+entities. For example, to return the five rectangles with largest area, one could do the
 following:
 
 ``` matlab
-s = fetch(university.Course, '*', 'ORDER BY course DESC LIMIT 5')
+s = fetch(my_schema.Area, '*', 'ORDER BY shape_area DESC LIMIT 5')
 ```
 
 The limit clause is passed directly to SQL and follows the same

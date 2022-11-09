@@ -10,11 +10,6 @@ First, please install DataJoint via one of the following:
     2. Search and Select `DataJoint`
     3. Select *Add from GitHub*
 
-=== "GHToolbox"
-
-    1. Install *GHToolbox* using using an appropriate method in https://github.com/datajoint/GHToolbox
-    2. run: `ghtb.install('datajoint/datajoint-matlab')`
-
 === "Matlab < R2016"
 
     1. Utilize MATLAB built-in GUI i.e. *Top Ribbon -> Add-Ons -> Get Add-Ons*
@@ -24,6 +19,11 @@ First, please install DataJoint via one of the following:
     5. Navigate in MATLAB tree browser to saved toolbox file
     6. Right-Click and Select *Install*
     7. Select *Install*
+
+=== "GHToolbox"
+
+    1. Install *GHToolbox* using using an appropriate method in https://github.com/datajoint/GHToolbox
+    2. run: `ghtb.install('datajoint/datajoint-matlab')`
 
 === "From source"
 
@@ -48,7 +48,7 @@ server `tutorial-db.datajoint.io` with username `alice` and password
 
 ```matlab
 setenv DJ_USER alice
-setenv DJ_HOST alicelab.datajoint.io
+setenv DJ_HOST tutorial-db.datajoint.io
 setenv DJ_PASS 'fake-password'
 ```
 
@@ -56,7 +56,7 @@ setenv DJ_PASS 'fake-password'
 
     Although you may connect to any MySQL server of your choice, the DataJoint company
     offers an online tutorial environment at `tutorial-db.datajoint.io`. Simply sign up
-    for a free[DataJoint account](https://accounts.datajoint.io). You will be granted
+    for a free [DataJoint account](https://accounts.datajoint.io). You will be granted
     privileges to create schemas that are prefixed as `{user}_`.
 
 You will need to execute these commands at the beginning of each DataJoint work session.
@@ -71,10 +71,14 @@ password when connecting to the database.
 To change the database password, use the following command
 
 ```matlab
->> dj.setPassword('my#cool!new*psswrd')
+>> dj.setPassword('my#cool!new*password')
 ```
 
 And update your credentials in your startup script for the next session.
+
+For more information on various settings, access help via `help('dj.config')` or review
+it online
+[here](https://github.com/datajoint/datajoint-matlab/blob/c2bd6b3e195dfeef773d4e12bad5573c461193b0/%2Bdj/config.m#L2-L27).
 
 ## Creating Schemas
 
@@ -90,7 +94,7 @@ We can create the database schema using the following command:
 query(dj.conn, 'CREATE SCHEMA `{user}_my_schema`')
 ```
 
-!!! Note "Server privileges"
+??? Note "Server privileges"
 
     You must have create privileges for the schema name pattern. It is a common practice
     to grant all privileges to users for schemas that begin with the username, in
@@ -250,6 +254,9 @@ Or for individual or sets of tables:
 erd my_schema.Rectangle
 draw(dj.ERD(my_schema.Rectangle) + dj.ERD(my_schema.Area))
 ```
+
+![Shapes Pipeline](../images/shapes_pipeline.svg)
+
 ### Customize
 
 Adding or substracting a number to a diagram object adds nodes downstream or upstream,

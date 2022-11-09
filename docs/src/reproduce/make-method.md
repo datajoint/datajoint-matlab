@@ -1,7 +1,7 @@
 # Make Method
 
 Consider the following table definition from the article on 
-[table tiers](./table-tiers):
+[table tiers](../table-tiers):
 
 ```matlab
 %{ Filtered image
@@ -14,7 +14,7 @@ classdef FilteredImage < dj.Computed
     methods(Access=protected)
         function makeTuples(self, key)
             img = fetch1(test.Image & key, 'image');
-            key.filtered_image = myfilter(img);
+            key.filtered_image = my_filter(img);
             self.insert(key)
         end
     end
@@ -22,7 +22,6 @@ end
 ```
 
 The `FilteredImage` table can be populated as
-
 
 ``` matlab
 populate(test.FilteredImage)

@@ -11,12 +11,11 @@ nav:
     - Common Commands:  query-lang/common-commands.md
     - Operators: query-lang/operators.md
     - Iteration: query-lang/iteration.md
-    - Query Caching: query-lang/query-caching.md
   - Reproducibility:
     - Table Tiers: reproduce/table-tiers.md
     - Make Method: reproduce/make-method.md
-  - Tutorials: tutorials.md
-  - Changelog: about/changelog.md
+  # - Tutorials: tutorials.md # Commented out pending viable draft
+  - Changelog: changelog.md
 
 # ---------------------------- STANDARD -----------------------------
 
@@ -50,9 +49,6 @@ plugins:
   - redirects:
       redirect_maps:
         "index.md": "getting-started/index.md"
-  - gen-files:
-      scripts:
-      - ./src/api/make_pages.py
   - literate-nav:
       nav_file: navigation.md
   - exclude-search:
