@@ -6,7 +6,27 @@ settings files, that were used in developing these docs:
 - [MarkdownLinter](https://github.com/DavidAnson/markdownlint):
   - `.markdownlint.yaml` establishes settings for various
   [linter rules](https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md)
-  - `.vscode/settings.json` formatting on save to fix linting
+  - `.vscode/settings.json` formatting settings
+
+  ```json
+  {
+    "[markdown]" : {
+        "editor.rulers": [88],
+        "editor.formatOnPaste": true,
+        "editor.formatOnSave": true,
+        // https://github.com/stkb/Rewrap/
+        // Toggle via command prompt per file
+        // Default paragraph rewrap key: alt+q or option+q
+        "rewrap.autoWrap.enabled": true,
+        "rewrap.wrappingColumn": 88
+    },
+    // https://github.com/DavidAnson/markdownlint
+    "editor.codeActionsOnSave": {
+        "source.fixAll.markdownlint":true
+    },
+    "markdownlint.focusMode": 5, // ignore issues around the cursor
+  }
+  ```
 
 - [CSpell](https://github.com/streetsidesoftware/vscode-spell-checker): `cspell.json`
 has various ignored words.
