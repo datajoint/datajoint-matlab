@@ -4,6 +4,7 @@ mym/
 notebook
 *getSchema.m
 docker-compose*.y*ml
+!docs/docker-compose.yaml
 .vscode
 matlab.prf
 win.*
