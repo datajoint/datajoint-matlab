@@ -632,6 +632,8 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % get reference to the connection object from the first table
             if strcmp(self.operator, 'table')
                 conn = self.operands{1}.schema.conn;
+            elseif strcmp(self.operator, 'U') && isempty(self.operands)
+                conn = dj.conn;
             else
                 conn = self.operands{1}.getConn;
             end
@@ -699,7 +701,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     sql = sprintf('%s NATURAL JOIN %s', sql1, sql2);
                     header = join(header1,header2);
                     clear header1 header2 sql1 sql2
-                    
+                
+                case 'U'
+                    [header, sql] = compile(self.operands{1},1);
+                    header.promote(self.operands{3}, self.operands{2}.primaryKey{:});
                 otherwise
                     error 'unknown relational operator'
             end

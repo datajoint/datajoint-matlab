@@ -6,6 +6,7 @@ classdef Header < matlab.mixin.Copyable
     properties(SetAccess=private)
         info          % table info
         attributes    % array of attributes
+        distinct=false% whether to select all the elements or only distinct ones
     end
     
     properties(Access=private,Constant)
@@ -242,7 +243,8 @@ classdef Header < matlab.mixin.Copyable
         function sql = sql(self)
             % make an SQL list of attributes for header
             sql = '';
-            assert(~isempty(self.attributes))
+            assert(~isempty(self.attributes),...
+                'Relation has no attributes');
             for i = 1:length(self.attributes)
                 if isempty(self.attributes(i).alias)
                     % if strcmp(self.attributes(i).type,'float')
@@ -266,13 +268,52 @@ classdef Header < matlab.mixin.Copyable
                     end
                 end
             end
-            sql = sql(2:end); % strip leading comma 
+            sql = sql(2:end); % strip leading comma
+            
+            if self.distinct
+                sql = sprintf('DISTINCT %s', sql);
+            end
         end
         
         
         function stripAliases(self)
             for i=1:length(self.attributes)
                 self.attributes(i).alias = '';
+            end
+        end
+    end
+
+    methods (Access = {?dj.internal.GeneralRelvar})
+        function promote(self, keep, varargin)
+            if ~keep
+                [self.attributes(:).iskey] = deal(false);
+                self.distinct = true;
+                self.project(varargin); % do the projection
+            else
+                self.project([varargin, '*']);
+            end
+
+            % promote the keys
+            for iAttr = 1:numel(varargin)
+                %renamed attribute
+                toks = regexp(varargin{iAttr}, ...
+                    '^([a-z]\w*)\s*->\s*(\w+)', 'tokens');
+                if ~isempty(toks)
+                    name = toks{1}{2};
+                else
+                    %computed attribute
+                    toks = regexp(varargin{iAttr}, '(.*\S)\s*->\s*(\w+)', 'tokens');
+                    if ~isempty(toks)
+                        name = toks{1}{2};
+                    else
+                        %regular attribute
+                        name = varargin{iAttr};                            
+                    end
+                end                
+                ix = find(strcmp(name, self.names));
+                assert(~isempty(ix), 'Attribute `%s` does not exist', ...
+                                name)
+                self.attributes(ix).iskey = true;
             end
         end
     end
