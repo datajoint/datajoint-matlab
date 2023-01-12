@@ -171,8 +171,12 @@ classdef GeneralRelvar < matlab.mixin.Copyable
         
         function n = count(self)
             % COUNT - the number of tuples in the relation.
-            [~, sql_] = self.compile(3);
-            n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql_));
+            [header_, sql_] = self.compile(3);
+            if header_.distinct
+                n = self.conn.query(sprintf('SELECT count(*) as n FROM (SELECT %s FROM %s) as `counted`', header_.sql, sql_));
+            else
+                n = self.conn.query(sprintf('SELECT count(*) as n FROM %s', sql_));
+            end
             n = double(n.n);
         end
         
@@ -670,10 +674,10 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     assert(...
                         length(union(self.operands{1}.primaryKey, self.operands{2}.primaryKey)) == ...
                         length(intersect(self.operands{1}.primaryKey, self.operands{2}.primaryKey)), ...
-                        'Union operands must have the same primary key.');
+                        'DataJoint:invalidUnion','Union operands must have the same primary key.');
                     
                     assert(isempty(intersect(self.operands{1}.nonKeyFields, self.operands{2}.nonKeyFields)), ...
-                        'Union operands may not have any common non-key attributes.');
+                        'DataJoint:invalidUnion','Union operands may not have any common non-key attributes.');
                     
                     % join the operands, which will form part of the query
                     [header,sql1] = compile(self.operands{1} * self.operands{2}, 0);

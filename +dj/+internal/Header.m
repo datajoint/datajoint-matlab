@@ -205,7 +205,8 @@ classdef Header < matlab.mixin.Copyable
                         else
                             % process a regular attribute
                             ix = find(strcmp(params{iAttr},self.names));
-                            assert(~isempty(ix), 'Attribute `%s` does not exist', ...
+                            assert(~isempty(ix),'DataJoint:missingAttributes',...
+                                'Attribute `%s` does not exist', ...
                                 params{iAttr})
                         end
                     end
@@ -244,7 +245,7 @@ classdef Header < matlab.mixin.Copyable
             % make an SQL list of attributes for header
             sql = '';
             assert(~isempty(self.attributes),...
-                'Relation has no attributes');
+                'DataJoint:missingAttributes','Relation has no attributes');
             for i = 1:length(self.attributes)
                 if isempty(self.attributes(i).alias)
                     % if strcmp(self.attributes(i).type,'float')
@@ -316,7 +317,7 @@ classdef Header < matlab.mixin.Copyable
                     end
                 end                
                 ix = find(strcmp(name, self.names));
-                assert(~isempty(ix), 'Attribute `%s` does not exist', ...
+                assert(~isempty(ix), 'DataJoint:missingAttributes', 'Attribute `%s` does not exist', ...
                                 name)
                 self.attributes(ix).iskey = true;
             end
