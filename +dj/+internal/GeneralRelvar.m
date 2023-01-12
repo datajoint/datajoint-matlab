@@ -667,9 +667,58 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % apply relational operators recursively
             switch self.operator
                 case 'union'
-                    throwAsCaller(MException('DataJoint:invalidOperator', ...
-                        'The union operator must be used in a restriction'))
+                    assert(...
+                        length(union(self.operands{1}.primaryKey, self.operands{2}.primaryKey)) == ...
+                        length(intersect(self.operands{1}.primaryKey, self.operands{2}.primaryKey)), ...
+                        'Union operands must have the same primary key.');
                     
+                    assert(isempty(intersect(self.operands{1}.nonKeyFields, self.operands{2}.nonKeyFields)), ...
+                        'Union operands may not have any common non-key attributes.');
+                    
+                    % join the operands, which will form part of the query
+                    [header,sql1] = compile(self.operands{1} * self.operands{2}, 0);
+                    
+                    if isempty(self.operands{1}.nonKeyFields) && isempty(self.operands{2}.nonKeyFields)
+                        % Only PKs: simple UNION
+                        % We just need to make sure the attributes are in
+                        % the same order (assumed by MySQL)
+                        [header2,sql2] = compile(self.operands{1}, 0);
+                        [~,fieldOrder] = ismember(header.names, header2.names);
+                        header2.reorderFields(fieldOrder);
+                        
+                        [header3,sql3] = compile(self.operands{2}, 0);
+                        [~,fieldOrder] = ismember(header.names, header3.names);
+                        header3.reorderFields(fieldOrder);
+                        sql = sprintf('((SELECT %s FROM %s) UNION (SELECT %s FROM %s)) as `$s%x`',...
+                            header2.sql,sql2,header3.sql,sql3,aliasCount);
+                    else
+                        % With dependent fields, we first want to join any
+                        % matching PKs, then union with the antijoin, 
+                        % (a-b)|(b-a). We will append NULL to the missing
+                        % columns in the antijoin to make the query valid.
+                        
+                        fields = header.dependentFields;
+                        nk = ismember(fields, self.operands{2}.nonKeyFields);
+                        fields(nk) = cellfun(@(s) sprintf('NULL -> %s',s), fields(nk), 'UniformOutput', false);
+                        
+                        [header2,sql2] = compile(proj(self.operands{1} - self.operands{2}, fields{:}), 0);
+                        [~,fieldOrder] = ismember(header.names, header2.names);
+                        header2.reorderFields(fieldOrder);
+                        
+                        fields = header.dependentFields;
+                        nk = ismember(fields, self.operands{1}.nonKeyFields);
+                        fields(nk) = cellfun(@(s) sprintf('NULL -> %s',s), fields(nk), 'UniformOutput', false);
+                        
+                        [header3,sql3] = compile(proj(self.operands{2} - self.operands{1}, fields{:}), 0);
+                        [~,fieldOrder] = ismember(header.names, header3.names);
+                        header3.reorderFields(fieldOrder);
+                        
+                        sql = sprintf(...
+                            '((SELECT %s FROM %s) UNION (SELECT %s FROM %s) UNION (SELECT %s FROM %s)) as `$s%x`',...
+                            header.sql,sql1,header2.sql,sql2,header3.sql,sql3, aliasCount);
+                                   
+                    end    
+
                 case 'not'
                     throwAsCaller(MException('DataJoint:invalidOperator', ...
                         'The NOT operator must be used in a restriction'))

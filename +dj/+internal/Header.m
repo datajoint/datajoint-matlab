@@ -284,6 +284,11 @@ classdef Header < matlab.mixin.Copyable
     end
 
     methods (Access = {?dj.internal.GeneralRelvar})
+        function reorderFields(self, order)
+            assert(length(order) == length(self.names));
+            self.attributes = self.attributes(order);
+        end
+
         function promote(self, keep, varargin)
             if ~keep
                 [self.attributes(:).iskey] = deal(false);
