@@ -756,7 +756,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
                     clear header1 header2 sql1 sql2
                 
                 case 'U'
-                    [header, sql] = compile(self.operands{1},1);
+                    [header, sql] = compile(self.operands{1},2);
                     header.promote(self.operands{3}, self.operands{2}.primaryKey{:});
                 otherwise
                     error 'unknown relational operator'
