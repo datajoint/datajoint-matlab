@@ -390,7 +390,7 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             ret.restrict(arg)
         end
         
-        function ret = or(self, arg)
+        function ret = plus(self, arg)
             % the relational union operator.
             %
             % arg can be another relvar, a string condition, or a structure array of tuples.
@@ -400,9 +400,9 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             % queried on its own.
             %
             % For example:
-            %   B | C   cannot be used on its own, but:
-            %   A & (B | C) returns all tuples in A that have matching tuples in B or C.
-            %   A - (B | C) returns all tuples in A that have no matching tuples in B or C.
+            %   B + C   cannot be used on its own, but:
+            %   A & (B + C) returns all tuples in A that have matching tuples in B or C.
+            %   A - (B + C) returns all tuples in A that have no matching tuples in B or C.
             %
             % Warning:
             %  ~A  does not produce a valid relation by itself. Negation is
@@ -556,11 +556,6 @@ classdef GeneralRelvar < matlab.mixin.Copyable
             warning(['The relational operator / (antijoin) will be removed in a future ' ...
                 'release.  Please use - instead.']);
             ret = self - arg;
-        end
-        function ret = plus(self, arg)
-            warning(['The relational operator + (union) will be removed in a future ' ...
-                'release.  Please use | instead']);
-            ret = self | arg;
         end
         
         function ret = show(self)
