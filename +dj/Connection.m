@@ -41,12 +41,12 @@ classdef Connection < handle
             end
             self.foreignKeys  = struct([]);
             self.packages = containers.Map;
-            self.schemas = struct();
+            self.schemas = containers.Map;
         end
         
         
         function register(self, schema)
-            self.schemas.(schema.dbname) = schema;
+            self.schemas(schema.dbname) = schema;
         end
 
         function addPackage(self, dbname, package)
