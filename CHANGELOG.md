@@ -13,5 +13,5 @@ Observes [Semantic Versioning](https://semver.org/spec/v2.0.0.html) standard and
 + Minor: Add renaming the same attribute multiple times within a single projection PR #386
 + Minor: Add config for reading values with 32-bit dimensions (datajoint/mym#86) PR #395
 
-[3.5.1]: https://github.com/datajoint/datajoint-matlab/compare/3.5.0...3.5.1
-[3.5.0]: https://github.com/datajoint/datajoint-matlab/releases/tag/3.50
+[3.5.1]: https://github.com/datajoint/datajoint-matlab/compare/v3.5.0...v3.5.1
+[3.5.0]: https://github.com/datajoint/datajoint-matlab/releases/tag/v3.5.0
