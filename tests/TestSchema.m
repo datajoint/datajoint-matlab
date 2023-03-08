@@ -100,8 +100,8 @@ classdef TestSchema < Prep
             % setup
             dj.config.restore;
             dj.config('safemode', false);
-            dj.new('new.Student', 'M', pwd , 'djtest_new');
-            rmdir('+new', 's');
+            dj.new('new_space.Student', 'M', pwd , 'djtest_new-space');
+            rmdir('+new_space', 's');
         end
         function TestSchema_testVirtual(testCase)
             st = dbstack;

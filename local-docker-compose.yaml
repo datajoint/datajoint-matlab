@@ -1,4 +1,4 @@
-# docker-compose -f local-docker-compose.yaml --env-file LNX.env up --build
+# docker compose -f local-docker-compose.yaml --env-file LNX.env up --build
 version: '2.4'
 x-net: &net
   networks:
@@ -34,7 +34,7 @@ services:
       interval: 1s
   fakeservices.datajoint.io:
     <<: *net
-    image: datajoint/nginx:v0.1.1
+    image: datajoint/nginx:v0.2.4
     environment:
     - ADD_db_TYPE=DATABASE
     - ADD_db_ENDPOINT=db:3306

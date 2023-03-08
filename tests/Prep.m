@@ -115,8 +115,8 @@ classdef Prep < matlab.unittest.TestCase
             curr_conn.query('SET FOREIGN_KEY_CHECKS=0;');
             res = curr_conn.query(['SHOW DATABASES LIKE "' testCase.PREFIX '_%";']);
             for i = 1:length(res.(['Database (' testCase.PREFIX '_%)']))
-                curr_conn.query(['DROP DATABASE ' ...
-                    res.(['Database (' testCase.PREFIX '_%)']){i} ';']);
+                curr_conn.query(['DROP DATABASE `' ...
+                    res.(['Database (' testCase.PREFIX '_%)']){i} '`;']);
             end
             curr_conn.query('SET FOREIGN_KEY_CHECKS=1;');
 
