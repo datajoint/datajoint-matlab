@@ -15,8 +15,8 @@ function createSchema(package, parentdir, db)
     if ~dbname
         disp 'No database name entered. Quitting.'
     elseif isempty(regexp(dbname,'^[a-z][a-z0-9_\-]*$','once'))
-        error(['Invalid database name. Begin with a letter, only lowercase alphanumerical and ' ...
-            'underscores.'])
+        error(['Invalid database name. Valid name must begin with a letter and include ' ...
+            'only lowercase alphanumerical, dashes, and underscores.'])
     else
         % create database
         s = query(dj.conn, ...
