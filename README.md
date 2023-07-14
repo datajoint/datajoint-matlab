@@ -5,16 +5,8 @@
 DataJoint for MATLAB is a high-level programming interface for relational databases designed to support data processing chains in science labs. DataJoint is built on the foundation of the relational data model and prescribes a consistent method for organizing, populating, and querying data.
 
 For more information, see our
-[general](https://datajoint.com/docs/welcome/) and
-[MATLAB](https://datajoint.com/docs/core/datajoint-matlab/) documentation pages.
-
-## Citation
-
-+ If your work uses DataJoint for MATLAB, please cite the following Research Resource Identifier (RRID) and manuscript.
-
-+ DataJoint ([RRID:SCR_014543](https://scicrunch.org/resolver/SCR_014543)) - DataJoint for MATLAB (version `<Enter version number>`)
-
-+ Yatsenko D, Reimer J, Ecker AS, Walker EY, Sinz F, Berens P, Hoenselaar A, Cotton RJ, Siapas AS, Tolias AS. DataJoint: managing big scientific data using MATLAB or Python. bioRxiv. 2015 Jan 1:031658. doi: https://doi.org/10.1101/031658
+[general DataJoint docs](https://datajoint.com/docs/) and
+[DataJoint MATLAB docs](https://datajoint.com/docs/additional-resources/).
 
 ## For Developers: Running Tests Locally
 
