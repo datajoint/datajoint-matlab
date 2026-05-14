@@ -2,6 +2,15 @@
 
 # Welcome to DataJoint for MATLAB!
 
+> ## 📌 Maintenance status: community stewardship
+>
+> DataJoint Inc. has shifted its core development focus to the **Python-centered ecosystem** — [`datajoint-python`](https://github.com/datajoint/datajoint-python), the DataJoint Platform, and related tools. `datajoint-matlab` is now in **community-stewardship mode**: we are no longer proactively developing or supporting it, but we welcome pull requests from the community and will review well-formed, tested contributions on a best-effort basis.
+>
+> If you are starting a new DataJoint project, we recommend the Python-based stack. See **[docs.datajoint.com](https://docs.datajoint.com)** for the current documentation, tools, and platform overview.
+>
+> Existing users: this package remains functional and free to use under its existing license. Issues and PRs may not receive timely responses, but well-formed community contributions are appreciated.
+
+
 DataJoint for MATLAB is a high-level programming interface for relational databases designed to support data processing chains in science labs. DataJoint is built on the foundation of the relational data model and prescribes a consistent method for organizing, populating, and querying data.
 
 For more information, see our
