@@ -4,10 +4,23 @@ on:
     branches:
       - '**' # every branch
       - '!stage*' # exclude branches beginning with stage
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/workflows/**'
+      - 'LICENSE*'
+      - '.gitignore'
   pull_request:
     branches:
       - '**' # every branch
       - '!stage*' # exclude branches beginning with stage
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/workflows/**'
+      - 'LICENSE*'
+      - '.gitignore'
+
 jobs:
   test:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
