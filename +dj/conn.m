@@ -91,7 +91,7 @@ else
     elseif islogical(use_tls) && use_tls
         use_tls = 'true';
     elseif ~isstruct(use_tls)
-        use_tls = 'none';
+        use_tls = 'false';
     else
         use_tls = jsonencode(use_tls);
     end
